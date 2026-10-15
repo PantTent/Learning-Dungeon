@@ -1,4 +1,5 @@
 import type { BankItem, Difficulty } from './types';
+import { READING_BANK_EXTRA } from './readingBankExtra';
 
 /**
  * Grade 4 reading / language bank, aligned with the Massachusetts 2017
@@ -32,7 +33,7 @@ function q(
 
 const SPELL = 'Which word is spelled correctly?';
 
-export const READING_BANK: BankItem[] = [
+const BASE: BankItem[] = [
   // ---------------------------------------------------------------- synonyms
   q('synonyms', 1, 'Which word means the same as HUGE?', 'enormous', ['tiny', 'quiet', 'quick'], 'Huge and enormous both mean very, very big.'),
   q('synonyms', 1, 'Which word is a synonym for HAPPY?', 'glad', ['sad', 'angry', 'sleepy'], 'Happy and glad both describe a good, cheerful feeling.'),
@@ -302,3 +303,6 @@ export const READING_BANK: BankItem[] = [
   q('comprehension', 3, 'Paul Revere was a silversmith in Boston. On a spring night in 1775, he rode his horse to warn colonists that British soldiers were coming.\n\nWhy did Paul Revere ride at night?', 'to warn the colonists', ['to deliver silver', 'to visit his family', 'to race his friends'], 'The passage says he rode to warn colonists that British soldiers were coming.'),
   q('comprehension', 3, 'Juan noticed that the new boy sat alone at lunch every day. On Monday, Juan carried his tray over and asked, "Want to play soccer at recess?"\n\nWhat can you infer about Juan?', 'He is friendly and caring.', ['He wants a new lunch.', 'He does not like soccer.', 'He is new at school.'], 'Juan noticed the boy was alone and invited him to play. That shows he is caring.'),
 ];
+
+/** Base bank plus the extra items, so repeats are rarer. */
+export const READING_BANK: BankItem[] = [...BASE, ...READING_BANK_EXTRA];

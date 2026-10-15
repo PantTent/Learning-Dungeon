@@ -2,12 +2,30 @@ import { READING_BANK, READING_TOPICS } from './readingBank';
 
 describe('READING_BANK', () => {
   it('has a healthy number of items', () => {
-    expect(READING_BANK.length).toBeGreaterThanOrEqual(200);
+    expect(READING_BANK.length).toBeGreaterThanOrEqual(500);
   });
 
   it('covers every topic', () => {
     for (const key of Object.keys(READING_TOPICS)) {
       expect(READING_BANK.some((it) => it.topic === key), key).toBe(true);
+    }
+  });
+
+  it('has no repeated prompts (case-insensitive)', () => {
+    // Shared prompts are fine only for these generic "pick from the choices"
+    // questions, where the choices carry the content.
+    const generic = new Set(
+      [
+        'Which word is spelled correctly?',
+        'Which phrase has the adjectives in the correct order?',
+      ].map((p) => p.toLowerCase()),
+    );
+    const seen = new Set<string>();
+    for (const it of READING_BANK) {
+      const k = it.prompt.trim().toLowerCase();
+      if (generic.has(k)) continue;
+      expect(seen.has(k), k).toBe(false);
+      seen.add(k);
     }
   });
 

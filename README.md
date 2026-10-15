@@ -15,7 +15,7 @@ Questions follow the **Massachusetts 2017 Grade 4 curriculum frameworks**:
   fractions, comparing fractions, adding and subtracting fractions, fraction x
   whole number, decimals, measurement conversions, area and perimeter, angles,
   and word problems.
-- **Reading/vocabulary** (247 hand-written questions): synonyms, antonyms,
+- **Reading/vocabulary** (579 hand-written questions): synonyms, antonyms,
   vocabulary, context clues, prefixes and suffixes, Greek and Latin roots,
   figurative language, homophones, grammar, spelling, and short reading
   comprehension passages.
@@ -91,7 +91,7 @@ npm run build && npx cap sync android && npx cap open android
 npm test
 ```
 The tests check every math generator against independently computed answers,
-validate all 247 reading questions, and cover the equip rules (two-handed and
+validate all 579 reading questions, and cover the equip rules (two-handed and
 off-hand, rings), the level cap, and the boss's 4-of-5 rule.
 
 ## Roadmap
