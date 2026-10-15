@@ -149,50 +149,79 @@ export class InventoryScene extends Phaser.Scene {
     this.popup = c;
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.55).setOrigin(0).setInteractive().on('pointerup', () => c.destroy()));
     const compare = equippedSlot ? null : slotsFor(it.base).map((s) => p.equipped[s]).find(Boolean) ?? null;
-    const pw = compare ? 760 : 420;
+    const pw = compare ? 760 : 460;
     const px = W / 2 - pw / 2;
-    c.add(panel(this, px, 60, pw, 400, 0x1d1730, RARITY[it.rarity].color));
-    c.add(this.add.rectangle(px, 60, pw, 400, 0, 0).setOrigin(0).setInteractive());
+    const colW = compare ? pw / 2 - 36 : pw - 48;
 
-    const col = (x: number, item: Item, title: string) => {
-      c.add(txt(this, x, 74, title, 15, C.dim));
-      c.add(this.add.image(x + 26, 124, ICON[item.base]).setScale(3));
-      c.add(txt(this, x + 60, 100, item.name, 21, RARITY[item.rarity].css, { wordWrap: { width: 300 } }));
-      this.itemLines(item).forEach((l, i) => c.add(txt(this, x, 168 + i * 26, l, 18, i === 0 ? C.dim : C.text)));
+    // Lay out the content first, then size the window around it.
+    const body = this.add.container(0, 0);
+    const col = (x: number, item: Item, title: string): number => {
+      body.add(txt(this, x, 0, title, 15, C.dim));
+      const name = txt(this, x + 60, 24, item.name, 21, RARITY[item.rarity].css, { wordWrap: { width: colW - 60 } });
+      body.add(name);
+      body.add(this.add.image(x + 24, 24 + Math.max(name.height, 44) / 2, ICON[item.base]).setScale(3));
+      let y = 24 + Math.max(name.height, 44) + 14;
+      this.itemLines(item).forEach((l, i) => {
+        body.add(txt(this, x, y, l, 18, i === 0 ? C.dim : C.text));
+        y += 26;
+      });
+      return y;
     };
-    col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag');
+    let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag');
+    if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing'));
+    bottom += 8;
     if (compare) {
-      col(px + pw / 2 + 12, compare, 'Currently wearing');
       const diff = itemScore(it, cls) - itemScore(compare, cls);
-      c.add(
-        txt(this, W / 2, 390, diff > 0 ? 'This looks like an UPGRADE!' : diff < 0 ? 'Your current item is better.' : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5),
+      body.add(
+        txt(this, W / 2, bottom, diff > 0 ? 'This looks like an UPGRADE!' : diff < 0 ? 'Your current item is better.' : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),
       );
+      bottom += 30;
     }
-    if (!canUse(cls, it)) c.add(txt(this, px + 24, 350, `A ${cls.name} can't use this.`, 17, C.bad));
+    if (!canUse(cls, it)) {
+      body.add(txt(this, px + 24, bottom, `A ${cls.name} can't use this.`, 17, C.bad));
+      bottom += 28;
+    }
 
-    const by = 425;
-    if (equippedSlot) {
-      c.add(button(this, W / 2 - 90, by, 160, 50, 'Unequip', () => {
-        if (!unequip(p, equippedSlot)) toast(this, 'Bag is full!', C.bad);
-        this.draw();
-      }));
-      c.add(button(this, W / 2 + 90, by, 160, 50, 'Close', () => c.destroy(), { color: 0x3a3450 }));
-    } else {
-      const b = button(this, W / 2 - 180, by, 160, 50, 'Equip', () => {
-        if (!equip(p, it)) toast(this, 'Bag is full!', C.bad);
-        saveProfile(p);
-        this.draw();
-      }, { color: 0x2f9a4a });
-      b.setEnabled(canUse(cls, it));
+    const bh = 50;
+    const ph = 18 + bottom + 12 + bh + 18;
+    const py = Math.max(10, H / 2 - ph / 2);
+    c.add(panel(this, px, py, pw, ph, 0x1d1730, RARITY[it.rarity].color));
+    c.add(this.add.rectangle(px, py, pw, ph, 0, 0).setOrigin(0).setInteractive());
+    body.y = py + 18;
+    c.add(body);
+
+    // Buttons always fit inside the window.
+    const by = py + ph - 18 - bh / 2;
+    const actions: { label: string; color: number; fn: () => void; enabled?: boolean }[] = equippedSlot
+      ? [
+          { label: 'Unequip', color: 0x4b3a78, fn: () => {
+            if (!unequip(p, equippedSlot)) toast(this, 'Bag is full!', C.bad);
+            this.draw();
+          } },
+          { label: 'Close', color: 0x3a3450, fn: () => c.destroy() },
+        ]
+      : [
+          { label: 'Equip', color: 0x2f9a4a, enabled: canUse(cls, it), fn: () => {
+            if (!equip(p, it)) toast(this, 'Bag is full!', C.bad);
+            saveProfile(p);
+            this.draw();
+          } },
+          { label: `Sell ${it.value}g`, color: 0x6a5a2a, fn: () => {
+            p.bag = p.bag.filter((x) => x.id !== it.id);
+            p.gold += it.value;
+            saveProfile(p);
+            this.draw();
+          } },
+          { label: 'Close', color: 0x3a3450, fn: () => c.destroy() },
+        ];
+    const gap = 12;
+    const bw = Math.min(160, (pw - 48 - gap * (actions.length - 1)) / actions.length);
+    const total = actions.length * bw + (actions.length - 1) * gap;
+    actions.forEach((a, i) => {
+      const b = button(this, W / 2 - total / 2 + bw / 2 + i * (bw + gap), by, bw, bh, a.label, a.fn, { color: a.color, size: 20 });
+      if (a.enabled === false) b.setEnabled(false);
       c.add(b);
-      c.add(button(this, W / 2, by, 160, 50, `Sell ${it.value}g`, () => {
-        p.bag = p.bag.filter((x) => x.id !== it.id);
-        p.gold += it.value;
-        saveProfile(p);
-        this.draw();
-      }, { color: 0x6a5a2a }));
-      c.add(button(this, W / 2 + 180, by, 160, 50, 'Close', () => c.destroy(), { color: 0x3a3450 }));
-    }
+    });
   }
 
   private sellCommons() {
