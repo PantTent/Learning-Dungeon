@@ -56,6 +56,8 @@ export class QuestionPanel {
     const tagColor = q.subject === 'math' ? '#7fd3ff' : '#ffb36b';
     root.add(txt(scene, 64, 32, `${q.subject === 'math' ? 'MATH' : 'READING'}  -  ${topicName}`, 16, tagColor));
     if (this.opts.header) root.add(txt(scene, W - 64, 32, this.opts.header, 16, '#ffd24a').setOrigin(1, 0));
+    // Missed questions come back on purpose; say so, so it doesn't feel like a glitch.
+    if (q.isRetry) root.add(txt(scene, W / 2 + 60, 32, "Let's try this one again!", 16, '#ffb36b').setOrigin(0.5, 0));
 
     const isNumber = q.input === 'number';
     const promptW = isNumber ? 470 : W - 270;

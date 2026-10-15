@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Fx, SkillDef } from '../data/classes';
+import type { Fx, PowerDef, SkillDef } from '../data/classes';
 import { BOSS, makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
@@ -51,6 +51,8 @@ export class BattleScene extends Phaser.Scene {
   private earnedXp = 0;
   private earnedGold = 0;
   private lowLevelXp = false;
+  private powerStars: Phaser.GameObjects.Star[] = [];
+  private powerLabel?: Phaser.GameObjects.Text;
   private questionsRight = 0;
   private questionsAsked = 0;
 
@@ -93,6 +95,14 @@ export class BattleScene extends Phaser.Scene {
     this.heroMp.set(p.mp, s.maxMp, false);
     this.heroHp.setDepth(5);
     this.heroMp.setDepth(5);
+
+    // Power meter: 3 right answers in a row charges the class power attack.
+    this.powerStars = [];
+    this.powerLabel = txt(this, W - 284, H - 156, 'POWER', 15, '#ffe9a0').setDepth(6);
+    for (let i = 0; i < 3; i++) {
+      this.powerStars.push(this.add.star(W - 110 + i * 34, H - 147, 5, 6, 13, 0x3a2f50).setStrokeStyle(2, 0xffd24a).setDepth(6));
+    }
+    this.refreshPower();
 
     this.log = txt(this, W / 2, 16, '', 20, '#ffe9a0', { align: 'center', wordWrap: { width: 600 } }).setOrigin(0.5, 0).setDepth(50);
 
@@ -204,6 +214,16 @@ export class BattleScene extends Phaser.Scene {
       if (sk.mp > p.mp) b.setEnabled(false);
       c.add(b);
     });
+    // Charged power attack!
+    if ((p.streak ?? 0) >= 3) {
+      if (this.isBoss) {
+        c.add(txt(this, 320, H - 150, 'Your power is saved for after the boss!', 15, '#ffe9a0').setOrigin(0.5));
+      } else {
+        const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${cls.power.name}! \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
+        c.add(pb);
+        this.tweens.add({ targets: pb, scale: 1.06, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      }
+    }
     // Locked skill hints so kids know what's coming.
     const nextLocked = cls.skills.find((s) => s.unlock > p.level);
     if (nextLocked && !this.isBoss) {
@@ -260,6 +280,7 @@ export class BattleScene extends Phaser.Scene {
       readAloud: p.settings.readAloud,
       done: (correct) => {
         this.engine.record(q, correct);
+        this.updateStreak(sk, correct);
         this.questionsAsked++;
         if (correct) this.questionsRight++;
         saveProfile(p);
@@ -273,6 +294,215 @@ export class BattleScene extends Phaser.Scene {
         this.perform(sk, target, correct);
       },
     });
+  }
+
+  // ------------------------------------------------------------ power attack
+
+  private powerSkill(): SkillDef {
+    const cls = classOf(current());
+    return { id: 'power', name: `\u2605 ${cls.power.name}`, desc: 'Super attack!', unlock: 1, mp: 0, kind: 'damage', power: 3, fx: cls.skills[0].fx };
+  }
+
+  /** 3 right in a row charges the power; using it (right or wrong) spends it. */
+  private updateStreak(sk: SkillDef, correct: boolean) {
+    const p = current();
+    const before = p.streak ?? 0;
+    if (sk.id === 'power') p.streak = 0;
+    else if (before < 3) p.streak = correct ? before + 1 : 0;
+    this.refreshPower();
+    if (before < 3 && (p.streak ?? 0) >= 3) {
+      this.time.delayedCall(200, () => {
+        sfx('ready');
+        this.floatText(this.hero.x, this.hero.y - 120, 'POWER READY!', '#ffd24a', 30);
+        this.sparkle(this.hero, 0xffd24a, 24);
+      });
+    }
+  }
+
+  private refreshPower() {
+    const n = Math.min(3, current().streak ?? 0);
+    const color = classOf(current()).power.color;
+    this.powerStars.forEach((st, i) => {
+      this.tweens.killTweensOf(st);
+      st.setScale(1).setFillStyle(i < n ? (n >= 3 ? color : 0xffd24a) : 0x3a2f50);
+      if (n >= 3) this.tweens.add({ targets: st, scale: 1.35, angle: 72, duration: 500, yoyo: true, repeat: -1, delay: i * 120 });
+    });
+    this.powerLabel?.setText(n >= 3 ? 'POWER READY!' : 'POWER').setColor(n >= 3 ? '#ffd24a' : '#ffe9a0');
+  }
+
+  /** Cinematic super attack: darken, name banner, charge-up, then a class-specific finisher. */
+  private powerAnim(pw: PowerDef, target: Foe, onImpact: () => void) {
+    const dim = this.add.rectangle(0, 0, W, H, 0x000000, 0).setOrigin(0).setDepth(140);
+    this.tweens.add({ targets: dim, fillAlpha: 0.6, duration: 300 });
+    const banner = txt(this, -300, 120, pw.name.toUpperCase() + '!', 58, pw.css).setOrigin(0.5).setDepth(400);
+    banner.setStroke('#120a1c', 10);
+    this.tweens.add({ targets: banner, x: W / 2, duration: 380, ease: 'Back.Out' });
+    sfx('power');
+    this.hero.setDepth(150).setTint(pw.color);
+    this.tweens.add({ targets: this.hero, scale: 7.2, duration: 300, yoyo: true, repeat: 1 });
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = this.add.image(this.hero.x + Math.cos(a) * 160, this.hero.y + Math.sin(a) * 160, 'dot').setTint(pw.color).setBlendMode('ADD').setDepth(160);
+      this.tweens.add({ targets: d, x: this.hero.x, y: this.hero.y, alpha: 0.2, duration: 600, delay: i * 15, onComplete: () => d.destroy() });
+    }
+    const impact = () => {
+      sfx('boom');
+      this.cameras.main.shake(450, 0.03);
+      this.cameras.main.flash(250, 255, 255, 255);
+      this.burst(target.sprite.x, target.sprite.y, pw.color, 60, 300);
+      this.burst(target.sprite.x, target.sprite.y, 0xffffff, 30, 300);
+      for (let i = 0; i < 3; i++) {
+        const ring = this.add.circle(target.sprite.x, target.sprite.y, 10).setStrokeStyle(6 - i, pw.color).setDepth(300);
+        this.tweens.add({ targets: ring, radius: 140 + i * 50, alpha: 0, duration: 500 + i * 150, delay: i * 90, onComplete: () => ring.destroy() });
+      }
+      this.tweens.add({ targets: [dim, banner], alpha: 0, duration: 500, delay: 500, onComplete: () => { dim.destroy(); banner.destroy(); } });
+      this.hero.clearTint().setDepth(10);
+      onImpact();
+    };
+    this.time.delayedCall(950, () => this.powerFinisher(pw, target, impact));
+  }
+
+  private powerFinisher(pw: PowerDef, target: Foe, impact: () => void) {
+    const tx = target.sprite.x;
+    const ty = target.sprite.y;
+    const D = 200;
+    switch (pw.style) {
+      case 'meteor':
+      case 'infernal': {
+        const col = pw.style === 'meteor' ? 0xff7a2a : 0x5aff4a;
+        const rock = this.add.circle(tx + 420, -120, 30, pw.style === 'meteor' ? 0x5a2a10 : 0x1a4a1a).setDepth(D);
+        const glow = this.add.image(rock.x, rock.y, 'glow').setScale(9).setTint(col).setBlendMode('ADD').setDepth(D - 1);
+        const trail = this.add.particles(0, 0, 'dot', { follow: rock, speed: 60, lifespan: 500, scale: { start: 2, end: 0 }, tint: [col, 0xffe066], blendMode: 'ADD', frequency: 8 }).setDepth(D - 2);
+        this.tweens.add({
+          targets: [rock, glow],
+          x: tx,
+          y: ty,
+          duration: 650,
+          ease: 'Quad.In',
+          onComplete: () => {
+            rock.destroy();
+            glow.destroy();
+            trail.stop();
+            this.time.delayedCall(500, () => trail.destroy());
+            if (pw.style === 'infernal') {
+              const pillar = this.add.rectangle(tx, ty, 120, 900, col, 0.5).setOrigin(0.5, 1).setDepth(D).setBlendMode('ADD');
+              this.tweens.add({ targets: pillar, scaleX: 0, alpha: 0, duration: 700, onComplete: () => pillar.destroy() });
+            }
+            impact();
+          },
+        });
+        break;
+      }
+      case 'arrowstorm': {
+        const n = 26;
+        let landed = 0;
+        for (let i = 0; i < n; i++) {
+          const x = tx + Phaser.Math.Between(-80, 80);
+          const a = this.add.rectangle(x + 60, -40, 4, 34, 0xe8d8a0).setDepth(D).setRotation(-0.25);
+          this.tweens.add({
+            targets: a,
+            x,
+            y: ty + Phaser.Math.Between(-30, 30),
+            duration: 260,
+            delay: i * 28,
+            ease: 'Quad.In',
+            onComplete: () => {
+              this.burst(a.x, a.y, 0x9aff6a, 4, D);
+              a.destroy();
+              if (++landed === n) impact();
+            },
+          });
+        }
+        break;
+      }
+      case 'whirlwind': {
+        const hx = this.hero.x;
+        const hy = this.hero.y;
+        this.tweens.add({
+          targets: this.hero,
+          x: tx + 40,
+          y: ty - 190,
+          angle: 360,
+          duration: 380,
+          ease: 'Quad.Out',
+          onComplete: () =>
+            this.tweens.add({
+              targets: this.hero,
+              y: ty - 10,
+              angle: 1080,
+              duration: 240,
+              ease: 'Quad.In',
+              onComplete: () => {
+                for (let i = 0; i < 4; i++) this.time.delayedCall(i * 60, () => this.slash(tx, ty, i % 2 ? 0xffffff : pw.color));
+                impact();
+                this.tweens.add({ targets: this.hero, x: hx, y: hy, angle: 0, duration: 400, delay: 350 });
+              },
+            }),
+        });
+        break;
+      }
+      case 'hammer': {
+        const pillar = this.add.rectangle(tx, ty + 40, 110, 900, 0xffe066, 0).setOrigin(0.5, 1).setDepth(D - 1).setBlendMode('ADD');
+        this.tweens.add({ targets: pillar, fillAlpha: 0.45, duration: 250 });
+        const hammer = this.add.container(tx, -150).setDepth(D);
+        hammer.add(this.add.rectangle(0, -40, 16, 120, 0x8a5a2a).setStrokeStyle(3, 0x3a2410));
+        hammer.add(this.add.rectangle(0, 30, 110, 60, 0xffd24a).setStrokeStyle(4, 0x7a5a10));
+        hammer.add(this.add.image(0, 30, 'glow').setScale(8).setTint(0xfff0a0).setBlendMode('ADD'));
+        this.tweens.add({
+          targets: hammer,
+          y: ty - 40,
+          angle: 15,
+          duration: 450,
+          delay: 250,
+          ease: 'Quad.In',
+          onComplete: () => {
+            impact();
+            this.tweens.add({ targets: [hammer, pillar], alpha: 0, duration: 500, delay: 200, onComplete: () => { hammer.destroy(); pillar.destroy(); } });
+          },
+        });
+        break;
+      }
+      case 'bones': {
+        const bones: Phaser.GameObjects.Image[] = [];
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2;
+          const b = this.add.image(tx + Math.cos(a) * 110, ty + Math.sin(a) * 60 + 20, 'minion_skeleton').setScale(0).setDepth(D).setFlipX(Math.cos(a) > 0);
+          bones.push(b);
+          this.puff(b.x, b.y, 0xb070ff);
+          this.tweens.add({ targets: b, scale: 4, duration: 260, delay: i * 90, ease: 'Back.Out' });
+        }
+        this.time.delayedCall(5 * 90 + 350, () => {
+          this.tweens.add({
+            targets: bones,
+            x: tx,
+            y: ty,
+            duration: 200,
+            ease: 'Quad.In',
+            onComplete: () => {
+              impact();
+              this.tweens.add({ targets: bones, alpha: 0, scale: 2, duration: 400, onComplete: () => bones.forEach((b) => b.destroy()) });
+            },
+          });
+        });
+        break;
+      }
+      case 'vines': {
+        const spikes: Phaser.GameObjects.Triangle[] = [];
+        for (let i = 0; i < 9; i++) {
+          const x = tx - 100 + i * 25;
+          const h = 70 + Math.random() * 60;
+          const sp = this.add.triangle(x, ty + 50, 0, h, 12, 0, 24, h, i % 2 ? 0x3a8a2a : 0x6ad04a).setOrigin(0.5, 1).setScale(1, 0).setDepth(D);
+          spikes.push(sp);
+          this.tweens.add({ targets: sp, scaleY: 1, duration: 160, delay: i * 50, ease: 'Back.Out' });
+        }
+        this.burst(tx, ty, 0x9aff6a, 30, D);
+        this.time.delayedCall(9 * 50 + 220, () => {
+          impact();
+          this.tweens.add({ targets: spikes, scaleY: 0, alpha: 0, duration: 400, delay: 300, onComplete: () => spikes.forEach((x) => x.destroy()) });
+        });
+        break;
+      }
+    }
   }
 
   // ------------------------------------------------------------ actions
@@ -291,6 +521,15 @@ export class BattleScene extends Phaser.Scene {
   private perform(sk: SkillDef, target: Foe, correct: boolean) {
     const p = current();
     const after = () => this.time.delayedCall(350, () => this.afterPlayerAction());
+    if (sk.id === 'power') {
+      this.powerAnim(classOf(p).power, target, () => {
+        const r = this.calcDamage(sk, target, correct);
+        this.hit(target, r, correct, sk.fx);
+        this.floatText(target.sprite.x, target.sprite.y - 140, correct ? 'x3 POWER!' : 'x1.5 (half power)', correct ? classOf(p).power.css : '#ffb36b', 26);
+        this.time.delayedCall(500, after);
+      });
+      return;
+    }
     this.say(`${p.name} uses ${sk.name}!${correct ? '' : ' (half power)'}`);
 
     switch (sk.kind) {

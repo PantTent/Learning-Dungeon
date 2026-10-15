@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { playMusic } from '../audio/audio';
-import { GRADES, groupsForGrade, type TopicGroup } from '../questions/curriculum';
+import { GRADES, groupsForGrade, TOPIC_GROUPS, type TopicGroup } from '../questions/curriculum';
 import { current, saveProfile } from '../state/profile';
 import { C, W, H, button, panel, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
@@ -76,10 +76,60 @@ export class PracticeScene extends Phaser.Scene {
       const on = s.groups.includes(g.id);
       const cx = x + 16 + (i % 2) * (chipW + 16) + chipW / 2;
       const cy = 184 + Math.floor(i / 2) * 66;
-      c.add(button(this, cx, cy, chipW, 56, `${on ? '✔ ' : ''}${g.label}`, () => {
+      const focus = g.id === 'multiply' ? s.focus.multiply : g.id === 'divide' ? s.focus.divide : [];
+      const label = focus.length ? `${g.label} (${focus.join(', ')})` : g.label;
+      c.add(button(this, cx, cy, chipW, 56, `${on ? '✔ ' : ''}${label}`, () => {
         s.groups = on ? s.groups.filter((id) => id !== g.id) : [...s.groups, g.id];
         this.draw();
-      }, { size: g.label.length > 18 ? 15 : 17, color: on ? 0x2f7a3a : 0x2a2340, textColor: on ? '#ffffff' : C.dim }));
+      }, { size: label.length > 18 ? 15 : 17, color: on ? 0x2f7a3a : 0x2a2340, textColor: on ? '#ffffff' : C.dim }));
     });
+
+    // Focus practice: drill specific times tables (e.g. only the 5s).
+    if (title === 'Math') {
+      const bw = (colW - 48) / 2;
+      const m = s.focus.multiply;
+      const d = s.focus.divide;
+      c.add(button(this, x + 16 + bw / 2, 434, bw, 40, m.length ? `x tables: ${m.join(', ')}` : 'x tables: all', () => this.focusPicker('multiply'), { size: 15, color: 0x5a3a8a }));
+      c.add(button(this, x + 32 + bw * 1.5, 434, bw, 40, d.length ? `/ facts: ${d.join(', ')}` : '/ facts: all', () => this.focusPicker('divide'), { size: 15, color: 0x5a3a8a }));
+    }
+  }
+
+  /** Pick "everything for the grade" or specific tables, like only the 5s. */
+  private focusPicker(kind: 'multiply' | 'divide') {
+    const s = current().settings;
+    const c = this.add.container(0, 0).setDepth(100);
+    const redraw = () => {
+      c.removeAll(true);
+      const chosen = s.focus[kind];
+      c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setInteractive());
+      c.add(panel(this, 90, 40, W - 180, H - 80, 0x1d1730, 0xb98aff));
+      c.add(txt(this, W / 2, 70, kind === 'multiply' ? 'Multiplying: what should we practice?' : 'Dividing: what should we practice?', 24, '#ffd24a').setOrigin(0.5));
+      c.add(button(this, W / 2, 128, 420, 52, `Everything for grade ${s.grade}`, () => {
+        s.focus[kind] = [];
+        redraw();
+      }, { size: 20, color: chosen.length ? 0x2a2340 : 0x2f7a3a }));
+      c.add(txt(this, W / 2, 178, kind === 'multiply' ? 'Or only these times tables:' : 'Or only dividing by:', 19, C.dim).setOrigin(0.5));
+      for (let n = 1; n <= 12; n++) {
+        const on = chosen.includes(n);
+        const col = (n - 1) % 6;
+        const row = Math.floor((n - 1) / 6);
+        c.add(button(this, W / 2 - 5 * 52 + col * 104, 230 + row * 74, 90, 62, `${kind === 'multiply' ? 'x' : '/'}${n}`, () => {
+          s.focus[kind] = on ? chosen.filter((v) => v !== n) : [...chosen, n].sort((a, b) => a - b);
+          if (!s.groups.includes(kind)) s.groups.push(kind);
+          redraw();
+        }, { size: 24, color: on ? 0x2f7a3a : 0x3d3266 }));
+      }
+      c.add(txt(this, W / 2, 396, chosen.length ? `Every ${kind === 'multiply' ? 'multiplying' : 'dividing'} question will use: ${chosen.join(', ')}` : 'All the multiplying and dividing for the grade.', 17, '#ffe9a0').setOrigin(0.5));
+      const only = s.groups.length === 1 && s.groups[0] === kind;
+      c.add(button(this, W / 2 - 150, 452, 330, 52, only ? '\u2714 Only practicing this' : 'Practice ONLY this', () => {
+        s.groups = only ? s.groups.concat(TOPIC_GROUPS.map((g) => g.id).filter((id) => id !== kind)) : [kind];
+        redraw();
+      }, { size: 19, color: only ? 0x2f7a3a : 0x7a4ab0 }));
+      c.add(button(this, W / 2 + 160, 452, 200, 52, 'Done', () => {
+        c.destroy();
+        this.draw();
+      }, { size: 24, color: 0x2f9a4a }));
+    };
+    redraw();
   }
 }

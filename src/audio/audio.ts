@@ -168,7 +168,7 @@ export type Sfx =
   | 'click' | 'correct' | 'wrong' | 'slash' | 'arrow' | 'fire' | 'frost' | 'arcane' | 'holy'
   | 'shadow' | 'nature' | 'fel' | 'hit' | 'crit' | 'hurt' | 'die' | 'heal' | 'summon'
   | 'levelup' | 'victory' | 'defeat' | 'coin' | 'chest' | 'equip' | 'encounter' | 'stairs'
-  | 'roar' | 'potion' | 'teacher';
+  | 'roar' | 'potion' | 'teacher' | 'power' | 'boom' | 'ready';
 
 export function sfx(name: Sfx) {
   const c = ensure();
@@ -296,6 +296,21 @@ export function sfx(name: Sfx) {
       tone(90, t, 0.9, { type: 'sawtooth', vol: 0.16, slideTo: 60, vibrato: 18 });
       tone(135, t, 0.9, { type: 'square', vol: 0.06, slideTo: 80, vibrato: 25 });
       noise(t, 0.9, { filter: 700, filterTo: 200, vol: 0.3 });
+      break;
+    case 'power':
+      // Rising charge-up whoosh.
+      tone(110, t, 0.9, { type: 'sawtooth', vol: 0.08, slideTo: 880 });
+      tone(220, t, 0.9, { type: 'square', vol: 0.04, slideTo: 1760, vibrato: 10 });
+      noise(t, 0.9, { filter: 300, filterTo: 6000, vol: 0.2 });
+      break;
+    case 'boom':
+      noise(t, 0.9, { filter: 2500, filterTo: 60, vol: 0.7 });
+      tone(90, t, 0.7, { type: 'sine', vol: 0.4, slideTo: 30 });
+      tone(180, t, 0.25, { type: 'square', vol: 0.12, slideTo: 50 });
+      break;
+    case 'ready':
+      arp(['G5', 'C6', 'E6', 'G6', 'C7'], t, 0.05, { type: 'square', vol: 0.07 });
+      tone(freq('C7'), t + 0.25, 0.3, { type: 'sine', vol: 0.12, vibrato: 8 });
       break;
     case 'teacher':
       arp(['E5', 'G5', 'C6'], t, 0.08, { type: 'sine', vol: 0.14 });

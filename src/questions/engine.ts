@@ -2,7 +2,7 @@
 // and bringing missed questions back a few turns later for another try.
 import type { Difficulty, Question, Subject } from './types';
 import { makeMathQuestion, mathTopicLevels } from './math';
-import { ALL_GROUP_IDS, enabledTopics, GRADE_BAND, mathTopicsForGrade, TOPIC_LESSONS, type Grade } from './curriculum';
+import { ALL_GROUP_IDS, TOPIC_GROUPS, enabledTopics, GRADE_BAND, mathTopicsForGrade, TOPIC_LESSONS, type Grade } from './curriculum';
 import { READING_BANK } from './readingBank';
 import { clamp, pick, shuffle } from '../util/rng';
 
@@ -32,6 +32,8 @@ export interface LearningSettings {
   grade: Grade;
   /** Topic groups the child chose to practice (see curriculum.ts). */
   groups: string[];
+  /** Focus practice: only these times tables / divisors (empty = everything for the grade). */
+  focus: { multiply: number[]; divide: number[] };
 }
 
 export function newLearningStats(): LearningStats {
@@ -47,7 +49,7 @@ export function newLearningStats(): LearningStats {
 }
 
 export function defaultLearningSettings(): LearningSettings {
-  return { mathPercent: 60, readAloud: false, grade: 4, groups: [...ALL_GROUP_IDS] };
+  return { mathPercent: 60, readAloud: false, grade: 4, groups: [...ALL_GROUP_IDS], focus: { multiply: [], divide: [] } };
 }
 
 /** Fill in settings added after a save was created. */
@@ -58,6 +60,7 @@ export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings 
     readAloud: s.readAloud ?? d.readAloud,
     grade: s.grade ?? d.grade,
     groups: s.groups && s.groups.length ? s.groups : d.groups,
+    focus: { multiply: s.focus?.multiply ?? [], divide: s.focus?.divide ?? [] },
   };
 }
 
@@ -97,7 +100,19 @@ export class QuestionEngine {
   /** Math topics allowed right now: in the child's grade AND in a chosen group. */
   private mathTopics(): string[] {
     const on = enabledTopics(this.settings.groups);
-    return mathTopicsForGrade(this.settings.grade).filter((t) => on.has(t));
+    const { multiply, divide } = this.settings.focus;
+    const groups = this.settings.groups;
+    // A focus (e.g. "only the 5s") replaces the whole group with focused questions.
+    const focusMult = multiply.length > 0 && groups.includes('multiply');
+    const focusDiv = divide.length > 0 && groups.includes('divide');
+    const multTopics = new Set(TOPIC_GROUPS.find((g) => g.id === 'multiply')!.topics);
+    const divTopics = new Set(TOPIC_GROUPS.find((g) => g.id === 'divide')!.topics);
+    const topics = mathTopicsForGrade(this.settings.grade).filter(
+      (t) => on.has(t) && !(focusMult && multTopics.has(t)) && !(focusDiv && divTopics.has(t)),
+    );
+    if (focusMult) topics.push('times-table');
+    if (focusDiv) topics.push('div-table');
+    return topics;
   }
 
   private readingTopics(): Set<string> {
@@ -115,7 +130,7 @@ export class QuestionEngine {
     const due = this.stats.retry.findIndex((r) => r.due <= this.stats.totalAsked);
     if (due >= 0) {
       const [r] = this.stats.retry.splice(due, 1);
-      return r.q;
+      return { ...r.q, isRetry: true };
     }
 
     let subject: Subject = Math.random() * 100 < this.settings.mathPercent ? 'math' : 'reading';
@@ -128,7 +143,8 @@ export class QuestionEngine {
     const d = pickDifficulty(this.stats.level[subject], band);
     const q = subject === 'math' ? this.mathQuestion(d, mathTopics) : this.readingQuestion(d, readingTopics);
     this.stats.recent.push(q.id);
-    if (this.stats.recent.length > 60) this.stats.recent.shift();
+    // Remember lots of past questions so repeats are rare.
+    if (this.stats.recent.length > 250) this.stats.recent.shift();
     return q;
   }
 
@@ -153,11 +169,12 @@ export class QuestionEngine {
         break;
       }
     }
-    for (let tries = 0; tries < 5; tries++) {
-      const q = makeMathQuestion(topic, d);
+    const factors = topic === 'times-table' ? this.settings.focus.multiply : topic === 'div-table' ? this.settings.focus.divide : undefined;
+    for (let tries = 0; tries < 20; tries++) {
+      const q = makeMathQuestion(topic, d, factors);
       if (!this.stats.recent.includes(q.id)) return q;
     }
-    return makeMathQuestion(topic, d);
+    return makeMathQuestion(topic, d, factors);
   }
 
   private readingQuestion(d: Difficulty, topics: Set<string>): Question {

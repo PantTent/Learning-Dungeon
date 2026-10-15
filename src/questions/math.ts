@@ -6,6 +6,8 @@ import type { Difficulty, Question } from './types';
 import { pick, ri, shuffle } from '../util/rng';
 
 export const MATH_TOPICS: Record<string, string> = {
+  'times-table': 'Times tables (focus practice)',
+  'div-table': 'Division facts (focus practice)',
   'mult-facts': 'Multiplication facts',
   'mult-2x1': '2-digit x 1-digit',
   'mult-big': '3- and 4-digit x 1-digit',
@@ -39,7 +41,7 @@ export const MATH_TOPICS: Record<string, string> = {
 /** Format with thousands commas: 12345 -> "12,345". */
 export const fmt = (n: number) => n.toLocaleString('en-US');
 
-type Gen = (d: Difficulty) => Omit<Question, 'id' | 'subject' | 'topic' | 'difficulty'>;
+type Gen = (d: Difficulty, factors?: number[]) => Omit<Question, 'id' | 'subject' | 'topic' | 'difficulty'>;
 
 function num(prompt: string, answer: number, explanation: string, teach: string) {
   return { prompt, input: 'number' as const, answer: String(answer), explanation, teach };
@@ -83,16 +85,105 @@ function dec(n: number): string {
 const PLACE_NAMES = ['ones', 'tens', 'hundreds', 'thousands', 'ten thousands', 'hundred thousands'];
 
 const GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }> = {
+  // Focus practice: only the times tables the parent picked (e.g. just the 5s),
+  // asked lots of different ways so it doesn't get boring.
+  'times-table': {
+    levels: [1, 2, 3],
+    gen: (d, factors = [5]) => {
+      const f = pick(factors);
+      const a = ri(1, 12);
+      const p = f * a;
+      const forms = d === 1 ? [0, 1, 2] : d === 2 ? [0, 1, 2, 3, 4, 5, 6] : [0, 2, 3, 4, 5, 6, 7, 8];
+      const TEACH = `Skip-count by ${f}s and count how many jumps you need. Or start from a ${f}s fact you already know (like ${f} x 10) and add or take away ${f}s until you get there.`;
+      switch (pick(forms)) {
+        case 0:
+          return num(`${f} x ${a} = ?`, p, `${f} groups of ${a} make ${p}.`, TEACH);
+        case 1:
+          return num(`${a} x ${f} = ?`, p, `${a} groups of ${f} make ${p}. Order doesn't matter: ${f} x ${a} is the same.`, TEACH);
+        case 2:
+          return num(`What is ${a} times ${f}?`, p, `${a} x ${f} = ${p}.`, TEACH);
+        case 3:
+          return num(`? x ${f} = ${p}`, a, `${a} x ${f} = ${p}, so the missing number is ${a}.`, `How many ${f}s make ${p}? Skip-count by ${f} and count how many jumps it takes to reach ${p}.`);
+        case 4: {
+          const start = ri(1, 7);
+          const seq = [0, 1, 2, 3].map((i) => f * (start + i));
+          return num(`Count by ${f}s. What comes next?\n${seq.join(', ')}, ?`, f * (start + 4), `Add ${f} each time: ${seq[3]} + ${f} = ${f * (start + 4)}.`, `Each number is ${f} more than the one before. Add ${f} to the last number.`);
+        }
+        case 5: {
+          const wrong: string[] = [];
+          for (let tries = 0; wrong.length < 3 && tries < 200 && f > 1; tries++) {
+            const w = p + ri(-2 * f, 2 * f);
+            if (w > 0 && w % f !== 0 && !wrong.includes(String(w))) wrong.push(String(w));
+          }
+          if (f === 1) return num(`${f} x ${a} = ?`, p, `Anything times 1 stays the same: ${p}.`, TEACH);
+          return choice(`Which number is a MULTIPLE of ${f}?`, String(p), wrong, `${a} x ${f} = ${p}, so ${p} is a multiple of ${f}.`, `Multiples of ${f} are the numbers you land on when you skip-count by ${f}. Which choice is on that list?`);
+        }
+        case 6:
+          return num(
+            pick([
+              `A knight has ${a} bags with ${f} coins in each. How many coins in all?`,
+              `There are ${a} dragons. Each dragon has ${f} gems. How many gems?`,
+              `${a} wizards each cast ${f} spells. How many spells in all?`,
+            ]),
+            p,
+            `${a} groups of ${f}: ${a} x ${f} = ${p}.`,
+            `Equal groups means multiply: how many groups (${a}) times how many in each group (${f}).`,
+          );
+        case 7: {
+          const big = ri(13, 49);
+          const parts = expand(big);
+          return num(`${big} x ${f} = ?`, big * f, `${parts.map((x) => `${x} x ${f} = ${x * f}`).join(', ')}. Add them: ${big * f}.`, `Break ${big} into tens and ones: ${parts.join(' + ')}. Multiply each part by ${f}, then add.`);
+        }
+        default: {
+          return num(`${f} x ${a} x 10 = ?`, p * 10, `${f} x ${a} = ${p}, then times 10 adds a zero: ${p * 10}.`, `First do ${f} x ${a} using your ${f}s facts. Then multiplying by 10 just adds a zero on the end.`);
+        }
+      }
+    },
+  },
+
+  'div-table': {
+    levels: [1, 2, 3],
+    gen: (d, factors = [5]) => {
+      const f = pick(factors);
+      const a = ri(1, 12);
+      const p = f * a;
+      const forms = d === 1 ? [0, 1] : d === 2 ? [0, 1, 2, 3] : [0, 2, 3, 4];
+      const TEACH = `Division is multiplication backwards. Ask: ${f} times WHAT equals the big number? Skip-count by ${f}s and count the jumps.`;
+      switch (pick(forms)) {
+        case 0:
+          return num(`${p} / ${f} = ?`, a, `${f} x ${a} = ${p}, so ${p} / ${f} = ${a}.`, TEACH);
+        case 1:
+          return num(`How many groups of ${f} are in ${p}?`, a, `${a} groups of ${f} make ${p}.`, TEACH);
+        case 2:
+          return num(`? / ${f} = ${a}`, p, `${a} x ${f} = ${p}, so ${p} / ${f} = ${a}.`, `The missing number is what you split into ${f} equal groups to get ${a} in each. Multiply ${a} by ${f}.`);
+        case 3:
+          return num(
+            pick([
+              `${p} gems are shared equally by ${f} goblins. How many gems does each goblin get?`,
+              `${p} arrows go into ${f} quivers equally. How many arrows in each quiver?`,
+            ]),
+            a,
+            `${p} / ${f} = ${a} each.`,
+            `"Shared equally" means divide: the total divided by the number of groups.`,
+          );
+        default: {
+          const q = ri(13, 40);
+          return num(`${q * f} / ${f} = ?`, q, `${f} x ${q} = ${q * f}, so the answer is ${q}.`, `Break ${q * f} into parts you know how to divide by ${f} (like ${f * 10}), divide each part, and add the answers.`);
+        }
+      }
+    },
+  },
+
   'mult-facts': {
     levels: [1],
     gen: () => {
-      const a = ri(3, 12);
-      const b = ri(3, 12);
+      const a = ri(2, 12);
+      const b = ri(2, 12);
       return num(
         `${a} x ${b} = ?`,
         a * b,
         `${a} groups of ${b} make ${a * b}.`,
-        `"${a} x ${b}" means ${a} groups of ${b}. You can skip-count by ${b}, ${a} times: ${b}, ${b * 2}... Or use a fact you know, like ${a} x 10, and adjust.`,
+        `"${a} x ${b}" means ${a} groups of ${b}. You can skip-count by ${b}, ${a} times. Or use a fact you know, like ${a} x 10, and adjust.`,
       );
     },
   },
@@ -869,9 +960,9 @@ export function mathTopicLevels(topic: string): Difficulty[] {
   return GENERATORS[topic]?.levels ?? [];
 }
 
-export function makeMathQuestion(topic: string, d: Difficulty): Question {
+export function makeMathQuestion(topic: string, d: Difficulty, factors?: number[]): Question {
   const g = GENERATORS[topic];
   const level = g.levels.includes(d) ? d : g.levels.reduce((best, l) => (Math.abs(l - d) < Math.abs(best - d) ? l : best), g.levels[0]);
-  const q = g.gen(level);
+  const q = g.gen(level, factors && factors.length ? factors : undefined);
   return { ...q, id: `m:${topic}:${q.prompt}`, subject: 'math', topic, difficulty: level };
 }

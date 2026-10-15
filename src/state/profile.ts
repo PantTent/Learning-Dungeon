@@ -29,6 +29,8 @@ export interface Profile {
   /** Highest floor reached (0-based). 3 = boss lair unlocked. */
   maxFloor: number;
   bossKills: number;
+  /** Right answers in a row (3 = power attack ready). Carries over between fights. */
+  streak?: number;
   learning: LearningStats;
   settings: LearningSettings;
   createdAt: number;
@@ -69,6 +71,7 @@ export function newProfile(name: string, classId: string, grade: Grade = 4): Pro
     bag: [],
     maxFloor: 0,
     bossKills: 0,
+    streak: 0,
     learning: newLearningStats(),
     settings: { ...defaultLearningSettings(), grade },
     createdAt: Date.now(),
@@ -110,7 +113,9 @@ export function derive(p: Profile): DerivedStats {
     ...s,
     maxHp: Math.round(30 + s.sta * 5 + p.level * 6),
     maxMp: Math.round(14 + p.level * 2 + (cls.primary === 'int' ? s.int * 0.8 : s.int * 0.4 + 6)),
-    power: (weaponDmg[0] + weaponDmg[1]) / 2 + primary * 0.9 + p.level,
+    // One-handed weapons hit harder per swing so sword-and-shield heroes keep up
+    // with two-handed staves and bows (the off-hand adds defense, not damage).
+    power: ((weaponDmg[0] + weaponDmg[1]) / 2) * (p.equipped.mainhand && !isTwoHanded(p.equipped.mainhand.base) ? 1.5 : 1) + primary * 0.9 + p.level,
     weaponDmg,
   };
 }

@@ -27,6 +27,8 @@ export interface Question {
    * without giving away the answer. Falls back to a topic lesson if missing.
    */
   teach?: string;
+  /** True when a missed question is being asked again. */
+  isRetry?: boolean;
 }
 
 /** A hand-written question before it gets an id/subject attached. */

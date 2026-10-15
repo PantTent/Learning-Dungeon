@@ -190,3 +190,48 @@ describe('teacher hints and grades', () => {
 function mathTopicLevelsIn(topic: string, lo: number, hi: number) {
   return mathTopicLevels(topic).some((l) => l >= lo && l <= hi);
 }
+
+describe('focus practice', () => {
+  it('times-table questions only use the chosen tables and are correct', () => {
+    for (let i = 0; i < 2000; i++) {
+      const d = (1 + (i % 3)) as Difficulty;
+      const q = makeMathQuestion('times-table', d, [5]);
+      expect(q.prompt).toMatch(/5/);
+      const p = q.prompt;
+      let m: RegExpMatchArray | null;
+      if ((m = p.match(/^(\d+) x (\d+) = \?$/))) expect(Number(q.answer)).toBe(Number(m[1]) * Number(m[2]));
+      else if ((m = p.match(/^What is (\d+) times (\d+)\?$/))) expect(Number(q.answer)).toBe(Number(m[1]) * Number(m[2]));
+      else if ((m = p.match(/^\? x (\d+) = (\d+)$/))) expect(Number(q.answer) * Number(m[1])).toBe(Number(m[2]));
+      else if ((m = p.match(/^(\d+) x (\d+) x 10 = \?$/))) expect(Number(q.answer)).toBe(Number(m[1]) * Number(m[2]) * 10);
+      else if (p.startsWith('Which number is a MULTIPLE of 5')) {
+        expect(Number(q.answer) % 5).toBe(0);
+        for (const c of q.choices!.filter((x) => x !== q.answer)) expect(Number(c) % 5).not.toBe(0);
+      } else if (p.startsWith('Count by 5s')) {
+        const seq = p.split('\n')[1].match(/\d+/g)!.map(Number);
+        expect(Number(q.answer)).toBe(seq[seq.length - 1] + 5);
+      } else {
+        const nums = p.match(/\d+/g)!.map(Number);
+        expect(Number(q.answer), p).toBe(nums[0] * nums[1]);
+      }
+    }
+  });
+
+  it('works for every table 1-12 without getting stuck', () => {
+    for (let f = 1; f <= 12; f++) for (let i = 0; i < 200; i++) {
+      const q = makeMathQuestion('times-table', 2, [f]);
+      if (q.choices) expect(q.choices).toContain(q.answer);
+      const dq = makeMathQuestion('div-table', (1 + (i % 3)) as Difficulty, [f]);
+      const m = dq.prompt.match(/^(\d+) \/ (\d+) = \?$/);
+      if (m) expect(Number(dq.answer)).toBe(Number(m[1]) / Number(m[2]));
+    }
+  });
+
+  it('the engine sends only focused multiplying when 5s are chosen', () => {
+    const e = new QuestionEngine(newLearningStats(), { ...defaultLearningSettings(), mathPercent: 100, groups: ['multiply'], focus: { multiply: [5], divide: [] } });
+    for (let i = 0; i < 300; i++) {
+      const q = e.next();
+      expect(q.topic).toBe('times-table');
+      e.record(q, i % 4 !== 0);
+    }
+  });
+});
