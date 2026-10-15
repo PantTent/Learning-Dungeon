@@ -1,4 +1,5 @@
-import { makeItem } from '../data/items';
+import { getClass } from '../data/classes';
+import { makeItem, type Rarity } from '../data/items';
 import { derive, equip, gainXp, newProfile, LEVEL_CAP } from './profile';
 
 describe('gear', () => {
@@ -46,5 +47,42 @@ describe('boss rule', () => {
       const dealt = right * unit + (5 - right) * (unit / 2);
       expect(dealt >= hp).toBe(right >= 4);
     }
+  });
+});
+
+describe('leveling and loot balance', () => {
+  it('each level gives +2 main stat and +1 to the others', () => {
+    for (const id of ['warrior', 'mage', 'ranger', 'paladin', 'necromancer', 'druid', 'demonologist']) {
+      const p = newProfile('T', id);
+      const a = derive(p);
+      p.level = 2;
+      const b = derive(p);
+      const main = getClass(id).primary;
+      for (const k of ['str', 'int', 'agi', 'sta'] as const) expect(b[k] - a[k]).toBe(k === main ? 2 : 1);
+    }
+  });
+
+  it('rangers can only use bows', () => {
+    const ranger = getClass('ranger');
+    expect(ranger.weapons).toEqual(['bow']);
+    for (let i = 0; i < 300; i++) {
+      const it = makeItem(3, { cls: ranger, boss: true, base: undefined });
+      if (it.dmg) expect(it.base).toBe('bow');
+    }
+  });
+
+  it('low level items have small stats, higher rarity has more', () => {
+    const total = (r: Rarity, ilvl: number) => {
+      let sum = 0;
+      for (let i = 0; i < 300; i++) {
+        const it = makeItem(ilvl, { rarity: r, base: 'hands' });
+        sum += Object.entries(it.stats).reduce((s, [k, v]) => s + (k === 'armor' ? v / 2 : k === 'crit' ? v * 2 : v), 0);
+      }
+      return sum / 300;
+    };
+    expect(total('uncommon', 3)).toBeLessThanOrEqual(3);
+    expect(total('legendary', 3)).toBeLessThanOrEqual(7);
+    const order: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+    for (let i = 1; i < order.length; i++) expect(total(order[i], 8)).toBeGreaterThan(total(order[i - 1], 8));
   });
 });

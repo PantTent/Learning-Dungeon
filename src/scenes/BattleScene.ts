@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { Fx, SkillDef } from '../data/classes';
 import { BOSS, makeEnemy, type EnemyInstance } from '../data/enemies';
-import { ICON, makeItem, RARITY, type Item } from '../data/items';
+import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
 import { LAIR } from '../state/world';
@@ -495,9 +495,116 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     p.gold += this.earnedGold;
+    const before = derive(p);
+    const fromLevel = p.level;
     const levels = gainXp(p, this.earnedXp);
     saveProfile(p);
-    this.time.delayedCall(500, () => this.victoryPanel(kept, loot.length - kept.length, levels, perfect));
+    const showVictory = () => this.victoryPanel(kept, loot.length - kept.length, levels, perfect);
+    if (levels > 0) this.time.delayedCall(600, () => this.levelUpCelebration(fromLevel, before, showVictory));
+    else this.time.delayedCall(500, showVictory);
+  }
+
+  /** Big, sparkly level-up screen showing exactly which stats went up. */
+  private levelUpCelebration(fromLevel: number, before: ReturnType<typeof derive>, onDone: () => void) {
+    const p = current();
+    const cls = classOf(p);
+    const after = derive(p);
+    const c = this.add.container(0, 0).setDepth(5000);
+    c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.78).setOrigin(0).setInteractive());
+
+    // Rotating golden light rays behind everything.
+    const rays = this.add.graphics({ x: W / 2, y: 150 });
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      rays.fillStyle(i % 2 ? 0xffd24a : 0xfff0a0, 0.13);
+      rays.fillTriangle(0, 0, Math.cos(a - 0.09) * 700, Math.sin(a - 0.09) * 700, Math.cos(a + 0.09) * 700, Math.sin(a + 0.09) * 700);
+    }
+    c.add(rays);
+    this.tweens.add({ targets: rays, angle: 360, duration: 14000, repeat: -1 });
+
+    // Stars bursting out from the title, then a gentle shower of falling stars.
+    const starColors = [0xffd24a, 0xffffff, 0x7dff9a, 0x7fd3ff, 0xff9af0];
+    const star = (x: number, y: number, size: number) =>
+      this.add.star(x, y, 5, size * 0.45, size, Phaser.Utils.Array.GetRandom(starColors)).setStrokeStyle(2, 0x5a2a00, 0.6);
+    for (let i = 0; i < 36; i++) {
+      const s = star(W / 2, 150, ri(8, 18));
+      c.add(s);
+      const a = Math.random() * Math.PI * 2;
+      const d = ri(180, 520);
+      this.tweens.add({
+        targets: s,
+        x: W / 2 + Math.cos(a) * d,
+        y: 150 + Math.sin(a) * d,
+        angle: ri(-360, 360),
+        alpha: 0,
+        scale: 0.3,
+        duration: ri(900, 1600),
+        ease: 'Cubic.Out',
+      });
+    }
+    this.time.addEvent({
+      delay: 140,
+      repeat: 40,
+      callback: () => {
+        const s = star(ri(0, W), -20, ri(6, 12));
+        c.add(s);
+        this.tweens.add({ targets: s, y: H + 30, angle: ri(180, 540), duration: ri(2200, 3400), onComplete: () => s.destroy() });
+      },
+    });
+    this.cameras.main.flash(300, 255, 230, 120);
+
+    const title = txt(this, W / 2, 150, 'LEVEL UP!', 84, '#ffd24a').setOrigin(0.5);
+    title.setStroke('#7a3a00', 12);
+    c.add(title);
+    this.tweens.add({ targets: title, scale: { from: 0.2, to: 1 }, duration: 600, ease: 'Elastic.Out' });
+    this.tweens.add({ targets: title, scale: 1.08, duration: 700, yoyo: true, repeat: -1, delay: 700, ease: 'Sine.InOut' });
+    c.add(txt(this, W / 2, 222, `Level ${fromLevel}  ->  Level ${p.level}`, 28, '#ffffff').setOrigin(0.5));
+
+    const hero = this.add.image(170, 360, cls.sprite).setScale(9);
+    c.add(hero);
+    this.tweens.add({ targets: hero, y: 340, duration: 380, yoyo: true, repeat: -1, ease: 'Quad.Out' });
+
+    // Stat gains pop in one at a time.
+    const gains: [string, number, string][] = [
+      ['Health', after.maxHp - before.maxHp, ''],
+      ['Mana', after.maxMp - before.maxMp, ''],
+      [STAT_LABEL.str, after.str - before.str, ''],
+      [STAT_LABEL.int, after.int - before.int, ''],
+      [STAT_LABEL.agi, after.agi - before.agi, ''],
+      [STAT_LABEL.sta, after.sta - before.sta, ''],
+      ['Crit chance', after.crit - before.crit, '%'],
+    ];
+    const mainLabel = STAT_LABEL[cls.primary];
+    // Main stat gets its own big row first, the rest go in two columns below.
+    const shown = gains.filter(([, v]) => v > 0).sort((a, b) => Number(b[0] === mainLabel) - Number(a[0] === mainLabel));
+    shown.forEach(([label, v, unit], i) => {
+      const main = label === mainLabel;
+      const j = i - 1;
+      const x = main ? 330 : 330 + (j % 2) * 290;
+      const y = main ? 268 : 316 + Math.floor(j / 2) * 40;
+      const t = txt(this, x, y, `+${v}${unit} ${label}${main ? '   (your main stat!)' : ''}`, main ? 28 : 22, main ? '#ffd24a' : '#7dff9a').setAlpha(0);
+      c.add(t);
+      this.tweens.add({ targets: t, alpha: 1, x: { from: x - 30, to: x }, scale: { from: 1.5, to: 1 }, duration: 300, delay: 700 + i * 220, ease: 'Back.Out' });
+      this.time.delayedCall(700 + i * 220, () => this.burst(x + 10, y + 14, main ? 0xffd24a : 0x7dff9a, 10, 5100));
+    });
+
+    const unlocked = cls.skills.find((sk) => sk.unlock > fromLevel && sk.unlock <= p.level);
+    const after1 = 700 + shown.length * 220 + 200;
+    if (unlocked) {
+      const t = txt(this, W / 2 + 40, 478, `NEW SKILL: ${unlocked.name}!`, 28, '#ff9af0').setOrigin(0.5).setAlpha(0);
+      c.add(t);
+      this.tweens.add({ targets: t, alpha: 1, scale: { from: 2, to: 1 }, duration: 400, delay: after1, ease: 'Back.Out' });
+    }
+    const go = button(this, W - 120, H - 50, 190, 56, 'Awesome!', () => {
+      c.destroy();
+      onDone();
+    }, { color: 0x2f9a4a, size: 24 });
+    go.setAlpha(0).disableInteractive();
+    c.add(go);
+    this.time.delayedCall(after1 + 300, () => {
+      go.setInteractive({ useHandCursor: true });
+      this.tweens.add({ targets: go, alpha: 1, duration: 250 });
+    });
   }
 
   private victoryPanel(loot: Item[], dropped: number, levels: number, perfect: boolean) {
@@ -538,7 +645,7 @@ export class BattleScene extends Phaser.Scene {
         c.add(g);
         c.add(this.add.image(W / 2 - 200, iy + 20, ICON[it.base]).setScale(2));
         c.add(txt(this, W / 2 - 168, iy + 8, `${it.name}  (${r.name})`, 19, r.css));
-        if (it.rarity === 'epic' || it.rarity === 'legendary') this.burst(W / 2 - 200, iy + 20, r.color, 20, 4100);
+        if (r.rank >= 3) this.burst(W / 2 - 200, iy + 20, r.color, 20, 4100);
       });
       y += loot.length * 46;
     }

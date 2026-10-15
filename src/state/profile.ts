@@ -1,4 +1,4 @@
-import { getClass, type ClassDef, type StatKey } from '../data/classes';
+import { getClass, growthPerLevel, type ClassDef, type StatKey } from '../data/classes';
 import { isTwoHanded, slotsFor, starterItem, type Item, type Slot } from '../data/items';
 import {
   defaultLearningSettings,
@@ -85,11 +85,12 @@ export function newProfile(name: string, classId: string): Profile {
 export function derive(p: Profile): DerivedStats {
   const cls = getClass(p.classId);
   const lv = p.level - 1;
+  const g = growthPerLevel(cls);
   const s = {
-    str: Math.round(cls.base.str + cls.growth.str * lv),
-    int: Math.round(cls.base.int + cls.growth.int * lv),
-    agi: Math.round(cls.base.agi + cls.growth.agi * lv),
-    sta: Math.round(cls.base.sta + cls.growth.sta * lv),
+    str: cls.base.str + g.str * lv,
+    int: cls.base.int + g.int * lv,
+    agi: cls.base.agi + g.agi * lv,
+    sta: cls.base.sta + g.sta * lv,
     armor: 0,
     crit: 5,
   };
@@ -100,7 +101,8 @@ export function derive(p: Profile): DerivedStats {
     for (const [k, v] of Object.entries(item.stats) as [StatKey, number][]) s[k] += v;
     if (item.dmg) weaponDmg = item.dmg;
   }
-  s.crit += Math.floor(s.agi / 5);
+  // Dexterity raises crit chance: +1% per 4 Dexterity.
+  s.crit += Math.floor(s.agi / 4);
   const primary = s[cls.primary];
   return {
     ...s,

@@ -73,7 +73,7 @@ export class CreateScene extends Phaser.Scene {
     d.add(panel(this, 40, 228, W - 80, 196, C.panel, cls.color));
     d.add(txt(this, 64, 242, `${cls.name}  -  ${cls.role}`, 26, '#ffd24a'));
     d.add(txt(this, 64, 280, cls.blurb, 19, C.text, { wordWrap: { width: 520 } }));
-    const primaryName = { str: 'Strength', int: 'Intellect', agi: 'Agility' }[cls.primary];
+    const primaryName = { str: 'Strength', int: 'Intellect', agi: 'Dexterity' }[cls.primary];
     d.add(txt(this, 64, 320, `Main stat: ${primaryName}`, 17, C.dim));
     d.add(
       txt(this, 64, 344, `Weapons: ${cls.weapons.map((w) => WEAPON_NAMES[w]).join(', ')}${cls.offhands.length ? `  |  Off-hand: ${cls.offhands.map((o) => WEAPON_NAMES[o]).join(', ')}` : ''}`, 16, C.dim, {
@@ -85,14 +85,14 @@ export class CreateScene extends Phaser.Scene {
       ['Health', cls.base.sta / 12],
       ['Melee', cls.base.str / 12],
       ['Magic', cls.base.int / 12],
-      ['Speed', cls.base.agi / 12],
+      ['Dexterity', cls.base.agi / 12],
     ];
     stats.forEach(([n, v], i) => {
       const y = 250 + i * 28;
       d.add(txt(this, 640, y, n, 16, C.dim));
       const g = this.add.graphics();
-      g.fillStyle(0x0b0812, 1).fillRoundedRect(710, y + 3, 190, 14, 4);
-      g.fillStyle(cls.color, 1).fillRoundedRect(710, y + 3, 190 * Math.min(1, v), 14, 4);
+      g.fillStyle(0x0b0812, 1).fillRoundedRect(732, y + 3, 170, 14, 4);
+      g.fillStyle(cls.color, 1).fillRoundedRect(732, y + 3, 170 * Math.min(1, v), 14, 4);
       d.add(g);
     });
     d.add(txt(this, 640, 368, 'Skills:', 16, C.dim));

@@ -12,14 +12,25 @@ export type ArmorType = 'head' | 'chest' | 'legs' | 'hands' | 'feet';
 export type JewelryType = 'ring' | 'neck';
 export type BaseType = ArmorType | JewelryType | WeaponType | OffhandType;
 
-export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-export const RARITY: Record<Rarity, { name: string; color: number; css: string; stats: number; mult: number; rank: number }> = {
-  common: { name: 'Common', color: 0xd8d8d8, css: '#d8d8d8', stats: 1, mult: 1, rank: 0 },
-  uncommon: { name: 'Uncommon', color: 0x3ed34a, css: '#3ed34a', stats: 2, mult: 1.15, rank: 1 },
-  rare: { name: 'Rare', color: 0x3d8bff, css: '#3d8bff', stats: 3, mult: 1.3, rank: 2 },
-  epic: { name: 'Epic', color: 0xb24dff, css: '#b24dff', stats: 4, mult: 1.5, rank: 3 },
-  legendary: { name: 'Legendary', color: 0xff9a1f, css: '#ff9a1f', stats: 5, mult: 1.8, rank: 4 },
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+/**
+ * stats  = how many different stats the item rolls
+ * budget = how many total stat points it gets, relative to an Uncommon item
+ * mult   = scales weapon damage and armor
+ */
+export const RARITY: Record<Rarity, { name: string; color: number; css: string; stats: number; budget: number; mult: number; rank: number }> = {
+  common: { name: 'Common', color: 0xd8d8d8, css: '#d8d8d8', stats: 1, budget: 0.6, mult: 1, rank: 0 },
+  uncommon: { name: 'Uncommon', color: 0x3ed34a, css: '#3ed34a', stats: 2, budget: 1, mult: 1.1, rank: 1 },
+  rare: { name: 'Rare', color: 0x3d8bff, css: '#3d8bff', stats: 2, budget: 1.5, mult: 1.2, rank: 2 },
+  epic: { name: 'Epic', color: 0xb24dff, css: '#b24dff', stats: 3, budget: 2.2, mult: 1.35, rank: 3 },
+  legendary: { name: 'Legendary', color: 0xff9a1f, css: '#ff9a1f', stats: 3, budget: 3, mult: 1.5, rank: 4 },
+  mythic: { name: 'Mythic', color: 0xff4d6d, css: '#ff4d6d', stats: 4, budget: 3.8, mult: 1.7, rank: 5 },
 };
+
+/** Total stat points an item gets: small at low levels, growing with item level and rarity. */
+export function statBudget(ilvl: number, rarity: Rarity): number {
+  return Math.max(RARITY[rarity].stats, Math.round((0.5 + ilvl * 0.4) * RARITY[rarity].budget));
+}
 
 export const TWO_HANDED: WeaponType[] = ['greatsword', 'greataxe', 'staff', 'bow'];
 const ONE_HANDED: WeaponType[] = ['sword', 'axe', 'mace', 'dagger', 'wand'];
@@ -58,7 +69,7 @@ const ARMOR_FACTOR: Partial<Record<BaseType, number>> = {
 };
 
 export const STAT_LABEL: Record<StatKey, string> = {
-  str: 'Strength', int: 'Intellect', agi: 'Agility', sta: 'Stamina', armor: 'Armor', crit: 'Crit %',
+  str: 'Strength', int: 'Intellect', agi: 'Dexterity', sta: 'Stamina', armor: 'Armor', crit: 'Crit %',
 };
 
 const PREFIX: Record<StatKey, string[]> = {
@@ -107,7 +118,7 @@ export function canUse(cls: ClassDef, item: Item): boolean {
 
 export function rollRarity(boss: boolean): Rarity {
   return boss
-    ? weighted({ rare: 55, epic: 35, legendary: 10 } as Record<Rarity, number>)
+    ? weighted({ rare: 55, epic: 33, legendary: 10, mythic: 2 } as Record<Rarity, number>)
     : weighted({ common: 52, uncommon: 32, rare: 13, epic: 3 } as Record<Rarity, number>);
 }
 
@@ -141,25 +152,32 @@ export function makeItem(ilvl: number, opts: { rarity?: Rarity; cls?: ClassDef; 
   const af = ARMOR_FACTOR[base];
   if (af) item.armor = Math.round((ilvl * 2 + 4) * af * r.mult * rf(0.9, 1.1));
 
-  // Pick stats: favor the class primary stat + stamina when we know the class.
+  // Pick stats: favor the class main stat + stamina when we know the class.
   const pool: StatKey[] = ['str', 'int', 'agi', 'sta', 'sta', 'crit'];
   if (af) pool.push('armor');
   if (opts.cls) pool.push(opts.cls.primary, opts.cls.primary, opts.cls.primary);
   const chosen: StatKey[] = [];
   while (chosen.length < r.stats) {
     const s = pick(pool);
-    if (!chosen.includes(s) || chosen.length >= 5) chosen.push(s);
-    if (chosen.length >= 6) break;
+    if (!chosen.includes(s)) chosen.push(s);
   }
-  const budget = (ilvl * 0.9 + 2) * r.mult;
-  for (const s of chosen) {
-    const v = s === 'crit' ? Math.max(1, Math.round(budget * 0.35 * rf(0.75, 1.25))) : Math.max(1, Math.round(budget * rf(0.75, 1.25)));
-    item.stats[s] = (item.stats[s] ?? 0) + v;
-  }
+  // Split one shared budget across the stats (each gets at least 1).
+  const total = Math.max(chosen.length, Math.round(statBudget(ilvl, rarity) * rf(0.9, 1.1)));
+  const weights = chosen.map((_, i) => rf(1, 2) + (i === 0 ? 1 : 0));
+  const wsum = weights.reduce((a, b) => a + b, 0);
+  const pts = weights.map((w) => Math.max(1, Math.floor((total * w) / wsum)));
+  pts[0] += Math.max(0, total - pts.reduce((a, b) => a + b, 0));
+  chosen.forEach((s, i) => {
+    // Crit % is strong, so it costs double; armor is weak, so it gives more.
+    const v = s === 'crit' ? Math.max(1, Math.round(pts[i] / 2)) : s === 'armor' ? pts[i] * 2 : pts[i];
+    item.stats[s] = v;
+  });
 
   const top = (Object.entries(item.stats) as [StatKey, number][]).sort((a, b) => b[1] - a[1]);
   const mat = material(base, ilvl);
-  if (rarity === 'legendary') {
+  if (rarity === 'mythic') {
+    item.name = `${pick(['Starforged', 'Eternal', 'Dragonbone'])} ${BASE_NAME[base]} of Grukk`;
+  } else if (rarity === 'legendary') {
     item.name = `Grukk's ${pick(['Royal', 'Golden', 'Mighty', 'Crowned'])} ${BASE_NAME[base]}`;
   } else {
     const prefix = rarity === 'common' ? '' : pick(PREFIX[top[0][0]]) + ' ';

@@ -67,13 +67,13 @@ export class InventoryScene extends Phaser.Scene {
       ['Weapon', `${s.weaponDmg[0]}-${s.weaponDmg[1]}`],
       ['Strength', `${s.str}`],
       ['Intellect', `${s.int}`],
-      ['Agility', `${s.agi}`],
+      ['Dexterity', `${s.agi}`],
       ['Stamina', `${s.sta}`],
       ['Armor', `${s.armor}`],
       ['Crit', `${s.crit}%`],
     ];
     rows.forEach(([k, v], i) => {
-      const main = (k === 'Strength' && cls.primary === 'str') || (k === 'Intellect' && cls.primary === 'int') || (k === 'Agility' && cls.primary === 'agi');
+      const main = (k === 'Strength' && cls.primary === 'str') || (k === 'Intellect' && cls.primary === 'int') || (k === 'Dexterity' && cls.primary === 'agi');
       c.add(txt(this, sx, 96 + i * 30, k, 17, main ? '#ffd24a' : C.dim));
       c.add(txt(this, sx + 170, 96 + i * 30, v, 17, main ? '#ffd24a' : C.text).setOrigin(1, 0));
     });
@@ -170,7 +170,7 @@ export class InventoryScene extends Phaser.Scene {
     let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag');
     if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing'));
     bottom += 8;
-    if (compare) {
+    if (compare && canUse(cls, it)) {
       const diff = itemScore(it, cls) - itemScore(compare, cls);
       body.add(
         txt(this, W / 2, bottom, diff > 0 ? 'This looks like an UPGRADE!' : diff < 0 ? 'Your current item is better.' : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),

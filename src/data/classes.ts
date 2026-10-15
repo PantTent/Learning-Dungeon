@@ -34,7 +34,6 @@ export interface ClassDef {
   color: number;
   primary: PrimaryStat;
   base: Record<'str' | 'int' | 'agi' | 'sta', number>;
-  growth: Record<'str' | 'int' | 'agi' | 'sta', number>;
   weapons: WeaponType[];
   offhands: OffhandType[];
   startWeapon: WeaponType;
@@ -53,7 +52,6 @@ export const CLASSES: ClassDef[] = [
     color: 0xd04a3a,
     primary: 'str',
     base: { str: 10, int: 3, agi: 5, sta: 10 },
-    growth: { str: 2.2, int: 0.4, agi: 0.8, sta: 2.2 },
     weapons: ['sword', 'axe', 'mace', 'greatsword', 'greataxe'],
     offhands: ['shield'],
     startWeapon: 'sword',
@@ -73,7 +71,6 @@ export const CLASSES: ClassDef[] = [
     color: 0x4a7ad0,
     primary: 'int',
     base: { str: 3, int: 12, agi: 5, sta: 7 },
-    growth: { str: 0.4, int: 2.6, agi: 0.8, sta: 1.5 },
     weapons: ['wand', 'dagger', 'staff'],
     offhands: ['tome'],
     startWeapon: 'staff',
@@ -87,13 +84,12 @@ export const CLASSES: ClassDef[] = [
     id: 'ranger',
     name: 'Ranger',
     role: 'Sharp shooter',
-    blurb: 'Fast and precise with a bow. Lands lots of critical hits.',
+    blurb: 'An archer with high Dexterity, so lots of critical hits.',
     sprite: 'hero_ranger',
     color: 0x4ea84a,
     primary: 'agi',
     base: { str: 5, int: 4, agi: 11, sta: 8 },
-    growth: { str: 0.8, int: 0.5, agi: 2.4, sta: 1.8 },
-    weapons: ['bow', 'dagger', 'sword', 'axe'],
+    weapons: ['bow'],
     offhands: [],
     startWeapon: 'bow',
     skills: [
@@ -111,7 +107,6 @@ export const CLASSES: ClassDef[] = [
     color: 0xe8c450,
     primary: 'str',
     base: { str: 9, int: 6, agi: 4, sta: 10 },
-    growth: { str: 2, int: 1, agi: 0.6, sta: 2.2 },
     weapons: ['mace', 'sword', 'greatsword'],
     offhands: ['shield'],
     startWeapon: 'mace',
@@ -131,7 +126,6 @@ export const CLASSES: ClassDef[] = [
     color: 0x8a4ac8,
     primary: 'int',
     base: { str: 3, int: 11, agi: 5, sta: 8 },
-    growth: { str: 0.4, int: 2.4, agi: 0.8, sta: 1.7 },
     weapons: ['wand', 'dagger', 'staff'],
     offhands: ['tome'],
     startWeapon: 'staff',
@@ -151,7 +145,6 @@ export const CLASSES: ClassDef[] = [
     color: 0x9a7a3a,
     primary: 'int',
     base: { str: 5, int: 10, agi: 5, sta: 9 },
-    growth: { str: 0.7, int: 2.2, agi: 0.8, sta: 1.9 },
     weapons: ['staff', 'mace', 'dagger'],
     offhands: ['tome'],
     startWeapon: 'staff',
@@ -170,7 +163,6 @@ export const CLASSES: ClassDef[] = [
     color: 0x5ad04a,
     primary: 'int',
     base: { str: 3, int: 11, agi: 5, sta: 8 },
-    growth: { str: 0.4, int: 2.4, agi: 0.8, sta: 1.7 },
     weapons: ['wand', 'dagger', 'staff'],
     offhands: ['tome'],
     startWeapon: 'wand',
@@ -183,6 +175,13 @@ export const CLASSES: ClassDef[] = [
     ],
   },
 ];
+
+/** Stats gained per level: +2 to the class's main stat, +1 to everything else. */
+export function growthPerLevel(cls: ClassDef): Record<'str' | 'int' | 'agi' | 'sta', number> {
+  const g = { str: 1, int: 1, agi: 1, sta: 1 };
+  g[cls.primary] = 2;
+  return g;
+}
 
 export function getClass(id: string): ClassDef {
   return CLASSES.find((c) => c.id === id) ?? CLASSES[0];
