@@ -1,5 +1,7 @@
 # Learning Dungeon
 
+![Screenshots](docs/screenshots.png)
+
 A top-down, turn-based dungeon crawler for a 4th grader. Every attack is a
 question. Answer right for **full damage**, wrong for **half damage**, and the
 game always shows the correct answer with a short explanation.
