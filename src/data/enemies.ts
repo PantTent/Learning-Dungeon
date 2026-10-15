@@ -1,4 +1,4 @@
-import { pick, ri } from '../util/rng';
+import { chance, pick, ri } from '../util/rng';
 
 export interface EnemyDef {
   id: string;
@@ -61,9 +61,22 @@ export interface EnemyInstance {
   stunned: boolean;
 }
 
-export function makeEnemy(id: string, level: number): EnemyInstance {
+/**
+ * Roughly how hard a hero of this level hits with level-appropriate gear.
+ * Enemy health is set from this so a same-level fight takes 2-3 right answers.
+ */
+export function expectedHeroHit(level: number): number {
+  return 12.4 + level * 5.2;
+}
+
+/** Hits needed (with right answers) to beat a same-level enemy, before per-monster variety. */
+export const HITS_TO_KILL = 2.4;
+
+export function makeEnemy(id: string, level: number, groupSize = 1): EnemyInstance {
   const def = ENEMIES[id];
-  const maxHp = Math.round((16 + level * 9) * def.hp);
+  // Groups are a bit squishier per monster so fights don't drag on.
+  const groupScale = groupSize === 1 ? 1 : groupSize === 2 ? 0.7 : 0.55;
+  const maxHp = Math.round(expectedHeroHit(level) * HITS_TO_KILL * def.hp * groupScale + level * 1.5 * def.armor * 0.4 * HITS_TO_KILL);
   return {
     def,
     level,
@@ -71,7 +84,7 @@ export function makeEnemy(id: string, level: number): EnemyInstance {
     hp: maxHp,
     atk: Math.round((4 + level * 2.4) * def.atk),
     armor: Math.round(level * 1.5 * def.armor),
-    xp: Math.round(8 + level * 4.5),
+    xp: Math.round(12 + level * 6),
     gold: ri(1, 3) + level * 2,
     stunned: false,
   };
@@ -79,10 +92,22 @@ export function makeEnemy(id: string, level: number): EnemyInstance {
 
 /** A random group for a floor, keeping groups smaller when the hero is low level. */
 export function makeGroup(floor: FloorDef, heroLevel: number): EnemyInstance[] {
-  const size = ri(1, Math.min(floor.maxGroup, heroLevel <= 2 ? 1 : heroLevel <= 4 ? 2 : 3));
+  let size = heroLevel <= 3 ? 1 : chance(0.6) ? 1 : 2;
+  if (floor.maxGroup >= 3 && heroLevel >= 7 && chance(0.15)) size = 3;
+  size = Math.min(size, floor.maxGroup);
   const group: EnemyInstance[] = [];
   for (let i = 0; i < size; i++) {
-    group.push(makeEnemy(pick(floor.enemies), ri(floor.levels[0], floor.levels[1])));
+    group.push(makeEnemy(pick(floor.enemies), ri(floor.levels[0], floor.levels[1]), size));
   }
   return group;
+}
+
+/**
+ * XP for beating a monster, adjusted by level difference: monsters below
+ * your level give much less, so heroes move on to deeper floors.
+ */
+export function xpFor(e: EnemyInstance, heroLevel: number): number {
+  const diff = e.level - heroLevel;
+  const factor = diff >= 0 ? Math.min(1.3, 1 + diff * 0.1) : Math.max(0.1, 1 + diff * 0.25);
+  return Math.max(1, Math.round(e.xp * factor));
 }

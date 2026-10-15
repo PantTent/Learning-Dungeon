@@ -68,7 +68,7 @@ export class ParentScene extends Phaser.Scene {
     const L = p.learning;
     const pct = L.totalAsked ? Math.round((100 * L.totalCorrect) / L.totalAsked) : 0;
     c.add(panel(this, 16, 66, 440, 128));
-    c.add(txt(this, 32, 76, `${p.name} - Level ${p.level} ${getClass(p.classId).name}`, 20));
+    c.add(txt(this, 32, 76, `${p.name} - Level ${p.level} ${getClass(p.classId).name} - Grade ${p.settings.grade}`, 20));
     c.add(txt(this, 32, 106, `Questions answered: ${L.totalAsked}   Correct: ${L.totalCorrect} (${pct}%)`, 16, C.text));
     c.add(txt(this, 32, 130, `Math level: ${L.level.math.toFixed(1)} / 3    Reading level: ${L.level.reading.toFixed(1)} / 3`, 16, C.dim));
     const days = Object.entries(L.days).sort(([a], [b]) => (a < b ? 1 : -1)).slice(0, 4);

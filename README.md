@@ -20,6 +20,13 @@ Questions follow the **Massachusetts 2017 Grade 4 curriculum frameworks**:
   figurative language, homophones, grammar, spelling, and short reading
   comprehension passages.
 
+**Grades 3, 4 and 5** can be picked per hero (grade 4 is the full set; grade 3
+is easier, and grade 5 adds 3-digit x 2-digit, dividing by 2-digit numbers,
+order of operations, unlike fractions, decimal adding and subtracting, and
+volume). Each time a hero is played, the child picks which topics to practice.
+An **"I need a teacher!"** button explains how to think about the question
+without giving away the answer.
+
 Difficulty adapts per subject. Missed questions come back a few turns later.
 
 ## What's in v0.1

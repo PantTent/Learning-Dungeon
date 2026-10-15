@@ -3,9 +3,11 @@ import { isTwoHanded, slotsFor, starterItem, type Item, type Slot } from '../dat
 import {
   defaultLearningSettings,
   newLearningStats,
+  upgradeSettings,
   type LearningSettings,
   type LearningStats,
 } from '../questions/engine';
+import type { Grade } from '../questions/curriculum';
 import { uid } from '../util/rng';
 
 export const LEVEL_CAP = 10;
@@ -50,7 +52,7 @@ export function xpToNext(level: number): number {
   return Math.round(45 + level * level * 14);
 }
 
-export function newProfile(name: string, classId: string): Profile {
+export function newProfile(name: string, classId: string, grade: Grade = 4): Profile {
   const cls = getClass(classId);
   const p: Profile = {
     version: 1,
@@ -68,7 +70,7 @@ export function newProfile(name: string, classId: string): Profile {
     maxFloor: 0,
     bossKills: 0,
     learning: newLearningStats(),
-    settings: defaultLearningSettings(),
+    settings: { ...defaultLearningSettings(), grade },
     createdAt: Date.now(),
     lastPlayed: Date.now(),
   };
@@ -187,7 +189,10 @@ const KEY = 'learning-dungeon.profiles.v1';
 export function loadProfiles(): Profile[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Profile[]) : [];
+    const list = raw ? (JSON.parse(raw) as Profile[]) : [];
+    // Older saves are missing newer settings (grade, topics).
+    for (const p of list) p.settings = upgradeSettings(p.settings ?? {});
+    return list;
   } catch {
     return [];
   }

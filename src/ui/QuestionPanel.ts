@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { Question } from '../questions/types';
-import { isCorrect } from '../questions/engine';
+import { isCorrect, teacherHelp } from '../questions/engine';
 import { MATH_TOPICS } from '../questions/math';
 import { READING_TOPICS } from '../questions/readingBank';
 import { C, H, W, button, panel, txt } from './widgets';
@@ -57,7 +57,7 @@ export class QuestionPanel {
     if (this.opts.header) root.add(txt(scene, W - 64, 32, this.opts.header, 16, '#ffd24a').setOrigin(1, 0));
 
     const isNumber = q.input === 'number';
-    const promptW = isNumber ? 470 : W - 150;
+    const promptW = isNumber ? 470 : W - 270;
     const long = q.prompt.length > 170;
     const prompt = txt(scene, 64, 62, q.prompt, long ? 19 : q.prompt.length > 90 ? 23 : 30, C.text, {
       wordWrap: { width: promptW, useAdvancedWrap: true },
@@ -65,12 +65,40 @@ export class QuestionPanel {
     });
     root.add(prompt);
 
-    const speaker = button(scene, W - 86, 78, 56, 44, 'Say', () => speak(q.prompt), { size: 16, color: 0x2e5a7a });
-    root.add(speaker);
+    // Read-aloud and teacher help: right column for choices, under the question for the number pad.
+    if (isNumber) {
+      const y = Math.min(345, Math.max(prompt.y + prompt.height + 34, 320));
+      root.add(button(scene, 120, y, 100, 46, 'Say', () => speak(q.prompt), { size: 18, color: 0x2e5a7a }));
+      root.add(button(scene, 310, y, 250, 46, 'I need a teacher!', () => this.showTeacher(), { size: 19, color: 0x7a4ab0 }));
+    } else {
+      root.add(button(scene, W - 130, 84, 130, 40, 'Say', () => speak(q.prompt), { size: 17, color: 0x2e5a7a }));
+      root.add(button(scene, W - 130, 142, 130, 58, 'I need a\nteacher!', () => this.showTeacher(), { size: 17, color: 0x7a4ab0 }));
+    }
     if (this.opts.readAloud) speak(q.prompt);
 
     if (isNumber) this.buildNumberPad();
     else this.buildChoices(Math.max(prompt.y + prompt.height + 24, long ? 300 : 230));
+  }
+
+  /** Explains how to think about the question, without giving the answer. */
+  private showTeacher() {
+    if (this.answered) return;
+    const { scene, q } = this;
+    const help = teacherHelp(q);
+    const t = scene.add.container(0, 0).setDepth(3200).setScrollFactor(0);
+    t.add(scene.add.rectangle(0, 0, W, H, 0x000000, 0.45).setOrigin(0).setInteractive());
+    t.add(panel(scene, 90, 70, W - 180, H - 140, 0x241a3a, 0xb98aff));
+    const teacher = scene.add.image(160, 150, 'hero_mage').setScale(6).setFlipX(true);
+    t.add(teacher);
+    scene.tweens.add({ targets: teacher, y: 142, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    t.add(txt(scene, 220, 96, 'Teacher says:', 26, '#d7b8ff'));
+    t.add(
+      txt(scene, 220, 140, help, 21, '#ffffff', { wordWrap: { width: W - 340, useAdvancedWrap: true }, lineSpacing: 6 }),
+    );
+    t.add(button(scene, W / 2 - 110, H - 112, 170, 54, 'Read it to me', () => speak(help), { size: 18, color: 0x2e5a7a }));
+    t.add(button(scene, W / 2 + 110, H - 112, 200, 54, "Got it! Let me try", () => t.destroy(), { size: 18, color: 0x2f9a4a }));
+    this.root.once('destroy', () => t.destroy());
+    if (this.opts.readAloud) speak(help);
   }
 
   private buildNumberPad() {

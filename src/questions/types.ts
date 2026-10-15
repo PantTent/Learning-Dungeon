@@ -22,6 +22,11 @@ export interface Question {
   choices?: string[];
   /** Shown after answering, right or wrong. One or two short kid-friendly sentences. */
   explanation: string;
+  /**
+   * "I need a teacher!" help for THIS question: how to think about it,
+   * without giving away the answer. Falls back to a topic lesson if missing.
+   */
+  teach?: string;
 }
 
 /** A hand-written question before it gets an id/subject attached. */

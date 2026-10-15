@@ -71,10 +71,9 @@ export class TitleScene extends Phaser.Scene {
     txt(this, x + w / 2, y + 194, `Level ${p.level} ${cls.name}`, 18, C.dim).setOrigin(0.5);
     button(this, x + w / 2, y + 250, w - 40, 56, 'Play', () => {
       session.profile = p;
-      this.scene.start('Dungeon');
+      this.scene.start('Practice');
     }, { color: 0x2f9a4a, size: 26 });
-    const del = txt(this, x + w - 16, y + 10, 'x', 22, '#ff8a8a').setOrigin(1, 0).setInteractive({ useHandCursor: true });
-    del.on('pointerup', () => this.confirmDelete(p));
+    button(this, x + w - 46, y + 24, 76, 32, 'Delete', () => this.confirmDelete(p), { size: 14, color: 0x8a3a3a });
   }
 
   private emptyCard(x: number, y: number, w: number) {

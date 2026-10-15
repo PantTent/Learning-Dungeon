@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { Fx, SkillDef } from '../data/classes';
-import { BOSS, makeEnemy, type EnemyInstance } from '../data/enemies';
+import { BOSS, makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
@@ -49,6 +49,7 @@ export class BattleScene extends Phaser.Scene {
   private pips: Phaser.GameObjects.Arc[] = [];
   private earnedXp = 0;
   private earnedGold = 0;
+  private lowLevelXp = false;
   private questionsRight = 0;
   private questionsAsked = 0;
 
@@ -67,6 +68,7 @@ export class BattleScene extends Phaser.Scene {
     this.bossRight = 0;
     this.earnedXp = 0;
     this.earnedGold = 0;
+    this.lowLevelXp = false;
     this.questionsRight = 0;
     this.questionsAsked = 0;
 
@@ -475,7 +477,8 @@ export class BattleScene extends Phaser.Scene {
     const cls = classOf(p);
     const loot: Item[] = [];
     for (const f of this.foes) {
-      this.earnedXp += f.e.xp;
+      this.earnedXp += this.isBoss ? f.e.xp : xpFor(f.e, p.level);
+      if (!this.isBoss && f.e.level < p.level - 1) this.lowLevelXp = true;
       this.earnedGold += f.e.gold;
       if (!this.isBoss && chance(0.35)) loot.push(makeItem(Math.min(10, f.e.level), { cls }));
     }
@@ -620,6 +623,10 @@ export class BattleScene extends Phaser.Scene {
     c.add(txt(this, W / 2, y, `Questions: ${this.questionsRight} / ${this.questionsAsked} right${perfect ? '  -  PERFECT! +25% XP' : ''}`, 20, perfect ? C.good : C.text).setOrigin(0.5));
     y += 34;
     c.add(txt(this, W / 2, y, p.level >= LEVEL_CAP && levels === 0 ? `+${this.earnedGold} gold (max level!)` : `+${this.earnedXp} XP    +${this.earnedGold} gold`, 22).setOrigin(0.5));
+    if (this.lowLevelXp && p.level < LEVEL_CAP) {
+      y += 26;
+      c.add(txt(this, W / 2, y, 'Easy monsters give less XP. Try a deeper floor!', 16, '#ffb36b').setOrigin(0.5));
+    }
     y += 40;
     if (levels > 0) {
       const lv = txt(this, W / 2, y, `LEVEL UP! You are now level ${p.level}!`, 28, '#7dff9a').setOrigin(0.5);

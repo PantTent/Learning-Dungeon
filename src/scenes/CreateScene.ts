@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { CLASSES, type ClassDef } from '../data/classes';
 import { WEAPON_NAMES } from './shared';
 import { newProfile, saveProfile, session } from '../state/profile';
-import { C, W, button, panel, sprite, txt } from '../ui/widgets';
+import { C, W, button, panel, sprite, txt, type Button } from '../ui/widgets';
+import { GRADES, type Grade } from '../questions/curriculum';
 import { menuBackground } from './TitleScene';
 
 const NAMES = ['Max', 'Nova', 'Rex', 'Luna', 'Finn', 'Zara', 'Leo', 'Ivy', 'Kai', 'Milo', 'Ash', 'Sky'];
@@ -12,6 +13,8 @@ export class CreateScene extends Phaser.Scene {
   private detail?: Phaser.GameObjects.Container;
   private cards: Phaser.GameObjects.Graphics[] = [];
   private nameInput?: HTMLInputElement;
+  private grade: Grade = 4;
+  private gradeButtons: Button[] = [];
 
   constructor() {
     super('Create');
@@ -45,6 +48,13 @@ export class CreateScene extends Phaser.Scene {
         style="width:200px;font-size:24px;padding:8px 12px;border-radius:10px;border:3px solid #5b4a82;background:#0f0b1a;color:#fff;font-family:inherit;outline:none" />`,
     );
     this.nameInput = dom.node.querySelector('input') as HTMLInputElement;
+
+    // School grade picks how hard the questions are.
+    txt(this, 470, 438, 'Grade:', 20);
+    this.gradeButtons = GRADES.map((g, i) =>
+      button(this, 494 + i * 62, 486, 54, 46, `${g}`, () => this.setGrade(g), { size: 22 }),
+    );
+    this.setGrade(this.grade);
 
     button(this, 120, 510, 160, 46, 'Back', () => this.scene.start('Title'), { size: 20, color: 0x3a3450 });
     button(this, W - 170, 490, 280, 70, 'Start Adventure!', () => this.start(), { color: 0x2f9a4a, size: 26 });
@@ -99,11 +109,21 @@ export class CreateScene extends Phaser.Scene {
     d.add(txt(this, 640, 390, cls.skills.map((s) => s.name).join(' / '), 15, C.text, { wordWrap: { width: 280 } }));
   }
 
+  private setGrade(g: Grade) {
+    this.grade = g;
+    GRADES.forEach((x, i) => {
+      const b = this.gradeButtons[i];
+      const label = b.label.text;
+      b.destroy();
+      this.gradeButtons[i] = button(this, 494 + i * 62, 486, 54, 46, label, () => this.setGrade(x), { size: 22, color: x === g ? 0x2f9a4a : 0x4b3a78 });
+    });
+  }
+
   private start() {
     const name = (this.nameInput?.value ?? '').trim().slice(0, 12) || 'Hero';
-    const p = newProfile(name, this.selected.id);
+    const p = newProfile(name, this.selected.id, this.grade);
     saveProfile(p);
     session.profile = p;
-    this.scene.start('Dungeon');
+    this.scene.start('Practice');
   }
 }

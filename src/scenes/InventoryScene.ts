@@ -132,13 +132,14 @@ export class InventoryScene extends Phaser.Scene {
     }
   }
 
-  private itemLines(it: Item): string[] {
-    const lines: string[] = [];
-    lines.push(`${RARITY[it.rarity].name} ${weaponLabel(it.base)}   (item level ${it.ilvl})`);
-    if (it.dmg) lines.push(`Damage: ${it.dmg[0]} - ${it.dmg[1]}`);
-    if (it.armor) lines.push(`Armor: ${it.armor}`);
-    for (const [k, v] of Object.entries(it.stats) as [StatKey, number][]) lines.push(`+${v} ${STAT_LABEL[k]}`);
-    return lines;
+  /** Comparable numbers on an item: average damage, armor, and each stat. */
+  private values(it: Item | null): Record<string, number> {
+    const v: Record<string, number> = {};
+    if (!it) return v;
+    if (it.dmg) v.dmg = (it.dmg[0] + it.dmg[1]) / 2;
+    if (it.armor) v.armor = it.armor;
+    for (const [k, n] of Object.entries(it.stats) as [StatKey, number][]) v[`stat:${k}`] = n;
+    return v;
   }
 
   private showItem(it: Item, equippedSlot: Slot | null) {
@@ -155,25 +156,56 @@ export class InventoryScene extends Phaser.Scene {
 
     // Lay out the content first, then size the window around it.
     const body = this.add.container(0, 0);
-    const col = (x: number, item: Item, title: string): number => {
+    const main = cls.primary;
+    const mainLabel = STAT_LABEL[main];
+    /**
+     * One column of item info. When `against` is given, each line gets a
+     * green up arrow (better) or red down arrow (worse) compared to it.
+     */
+    const col = (x: number, item: Item, title: string, against: Item | null): number => {
       body.add(txt(this, x, 0, title, 15, C.dim));
       const name = txt(this, x + 60, 24, item.name, 21, RARITY[item.rarity].css, { wordWrap: { width: colW - 60 } });
       body.add(name);
       body.add(this.add.image(x + 24, 24 + Math.max(name.height, 44) / 2, ICON[item.base]).setScale(3));
       let y = 24 + Math.max(name.height, 44) + 14;
-      this.itemLines(item).forEach((l, i) => {
-        body.add(txt(this, x, y, l, 18, i === 0 ? C.dim : C.text));
+      body.add(txt(this, x, y, `${RARITY[item.rarity].name} ${weaponLabel(item.base)}   (item level ${item.ilvl})`, 17, C.dim));
+      y += 28;
+
+      const mine = this.values(item);
+      const theirs = this.values(against);
+      const keys = Object.keys(against ? { ...mine, ...theirs } : mine);
+      const order = (k: string) => (k === 'dmg' ? 0 : k === 'armor' ? 1 : k === `stat:${main}` ? 2 : 3);
+      keys.sort((a, b) => order(a) - order(b));
+      for (const k of keys) {
+        const v = mine[k] ?? 0;
+        const isMain = k === `stat:${main}`;
+        let label: string;
+        if (k === 'dmg') label = item.dmg ? `Damage: ${item.dmg[0]} - ${item.dmg[1]}` : 'Damage: none';
+        else if (k === 'armor') label = `Armor: ${v || 'none'}`;
+        else {
+          const sk = k.slice(5) as StatKey;
+          label = v ? `+${v} ${STAT_LABEL[sk]}` : `${STAT_LABEL[sk]}: none`;
+        }
+        if (isMain) label += '  (main)';
+        body.add(txt(this, x, y, label, 18, isMain ? '#ffd24a' : v ? C.text : C.dim));
+        if (against) {
+          const d = Math.round((v - (theirs[k] ?? 0)) * 10) / 10;
+          if (d !== 0) {
+            const up = d > 0;
+            body.add(txt(this, x + colW - 8, y, `${up ? '\u25B2' : '\u25BC'} ${Math.abs(d)}`, 18, up ? C.good : C.bad).setOrigin(1, 0));
+          }
+        }
         y += 26;
-      });
+      }
       return y;
     };
-    let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag');
-    if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing'));
+    let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag', compare);
+    if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing', null));
     bottom += 8;
     if (compare && canUse(cls, it)) {
       const diff = itemScore(it, cls) - itemScore(compare, cls);
       body.add(
-        txt(this, W / 2, bottom, diff > 0 ? 'This looks like an UPGRADE!' : diff < 0 ? 'Your current item is better.' : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),
+        txt(this, W / 2, bottom, diff > 0 ? `UPGRADE for a ${cls.name}! (${mainLabel} is your main stat)` : diff < 0 ? `Your current item is better for a ${cls.name}.` : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),
       );
       bottom += 30;
     }

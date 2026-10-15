@@ -25,7 +25,7 @@ export class DungeonScene extends Phaser.Scene {
   private moving = false;
   private busy = false;
   private graceUntil = 0;
-  private hud!: { hp: Bar; mp: Bar; xp: Bar; info: Phaser.GameObjects.Text; gold: Phaser.GameObjects.Text; pots: Phaser.GameObjects.Text; today: Phaser.GameObjects.Text };
+  private hud!: { hp: Bar; mp: Bar; xp: Bar; xpBig: Bar; xpLeft: Phaser.GameObjects.Text; xpRight: Phaser.GameObjects.Text; info: Phaser.GameObjects.Text; gold: Phaser.GameObjects.Text; pots: Phaser.GameObjects.Text; today: Phaser.GameObjects.Text };
   private marker!: Phaser.GameObjects.Rectangle;
   private keys?: Record<string, Phaser.Input.Keyboard.Key>;
 
@@ -207,12 +207,17 @@ export class DungeonScene extends Phaser.Scene {
     const xp = new Bar(this, 84, 84, 240, 10, C.xp, false);
     const gold = txt(this, 20, 96, '', 15, '#ffd24a');
     const pots = txt(this, 84, 98, '', 14, C.dim);
-    const today = txt(this, W - 16, H - 16, '', 15, C.good).setOrigin(1, 1);
-    [gold, pots, today].forEach((t) => hud.add(t));
+    const today = txt(this, W - 16, H - 46, '', 15, C.good).setOrigin(1, 1);
+    // Big XP bar along the bottom so progress is always visible.
+    hud.add(panel(this, 8, H - 40, W - 16, 32, 0x1d1730, C.xp));
+    const xpLeft = txt(this, 22, H - 24, '', 16, '#e0c8ff').setOrigin(0, 0.5);
+    const xpRight = txt(this, W - 22, H - 24, '', 15, C.dim).setOrigin(1, 0.5);
+    const xpBig = new Bar(this, 130, H - 33, W - 330, 18, C.xp);
+    [gold, pots, today, xpLeft, xpRight].forEach((t) => hud.add(t));
     // Bars are drawn outside the container, so pin them to the screen too.
-    for (const b of [hp, mp, xp]) b.setDepth(1001).pin();
+    for (const b of [hp, mp, xp, xpBig]) b.setDepth(1001).pin();
 
-    this.hud = { hp, mp, xp, info, gold, pots, today };
+    this.hud = { hp, mp, xp, xpBig, xpLeft, xpRight, info, gold, pots, today };
 
     const floorName = this.world.floor === LAIR ? "Grukk's Throne Room" : FLOORS[this.world.floor].name;
     txt(this, W / 2, 14, floorName, 18, '#ffe9a0').setOrigin(0.5, 0).setScrollFactor(0).setDepth(1000);
@@ -236,7 +241,11 @@ export class DungeonScene extends Phaser.Scene {
     this.hud.info.setText(`${p.name}  Lv ${p.level}${p.level >= LEVEL_CAP ? ' (MAX)' : ''}`);
     this.hud.hp.set(p.hp, s.maxHp, animate);
     this.hud.mp.set(p.mp, s.maxMp, animate);
-    this.hud.xp.set(p.level >= LEVEL_CAP ? 1 : p.xp, p.level >= LEVEL_CAP ? 1 : xpToNext(p.level), animate);
+    const maxed = p.level >= LEVEL_CAP;
+    this.hud.xp.set(maxed ? 1 : p.xp, maxed ? 1 : xpToNext(p.level), animate);
+    this.hud.xpBig.set(maxed ? 1 : p.xp, maxed ? 1 : xpToNext(p.level), animate);
+    this.hud.xpLeft.setText(`Level ${p.level}`);
+    this.hud.xpRight.setText(maxed ? 'MAX LEVEL!' : `XP to level ${p.level + 1}`);
     this.hud.gold.setText(`${p.gold}g`);
     this.hud.pots.setText(`Potions: ${p.potions.hp} red, ${p.potions.mp} blue`);
     const d = new Date();

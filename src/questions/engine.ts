@@ -1,7 +1,8 @@
 // Picks the next question for the child, adapting difficulty per subject
 // and bringing missed questions back a few turns later for another try.
 import type { Difficulty, Question, Subject } from './types';
-import { makeMathQuestion, mathTopicsFor } from './math';
+import { makeMathQuestion, mathTopicLevels } from './math';
+import { ALL_GROUP_IDS, enabledTopics, GRADE_BAND, mathTopicsForGrade, TOPIC_LESSONS, type Grade } from './curriculum';
 import { READING_BANK } from './readingBank';
 import { clamp, pick, shuffle } from '../util/rng';
 
@@ -27,6 +28,10 @@ export interface LearningSettings {
   /** 0-100: share of questions that are math (the rest are reading). */
   mathPercent: number;
   readAloud: boolean;
+  /** School grade the questions are pitched at. */
+  grade: Grade;
+  /** Topic groups the child chose to practice (see curriculum.ts). */
+  groups: string[];
 }
 
 export function newLearningStats(): LearningStats {
@@ -42,7 +47,23 @@ export function newLearningStats(): LearningStats {
 }
 
 export function defaultLearningSettings(): LearningSettings {
-  return { mathPercent: 60, readAloud: false };
+  return { mathPercent: 60, readAloud: false, grade: 4, groups: [...ALL_GROUP_IDS] };
+}
+
+/** Fill in settings added after a save was created. */
+export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings {
+  const d = defaultLearningSettings();
+  return {
+    mathPercent: s.mathPercent ?? d.mathPercent,
+    readAloud: s.readAloud ?? d.readAloud,
+    grade: s.grade ?? d.grade,
+    groups: s.groups && s.groups.length ? s.groups : d.groups,
+  };
+}
+
+/** The "I need a teacher!" text for a question. */
+export function teacherHelp(q: Question): string {
+  return q.teach ?? TOPIC_LESSONS[q.topic] ?? 'Read the question again slowly. What is it asking you to find? Cross out choices that cannot be right, then pick the best one left.';
 }
 
 function today(): string {
@@ -50,12 +71,12 @@ function today(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function pickDifficulty(level: number): Difficulty {
+function pickDifficulty(level: number, [lo, hi]: [Difficulty, Difficulty]): Difficulty {
   // Occasionally give an easier one to keep confidence up.
-  if (Math.random() < 0.15) return clamp(Math.floor(level) - 1, 1, 3) as Difficulty;
+  if (Math.random() < 0.15) return clamp(Math.floor(level) - 1, lo, hi) as Difficulty;
   const base = Math.floor(level);
   const frac = level - base;
-  return clamp(Math.random() < frac ? base + 1 : base, 1, 3) as Difficulty;
+  return clamp(Math.random() < frac ? base + 1 : base, lo, hi) as Difficulty;
 }
 
 /** Normalize a typed answer so "1,200" and " 1200 " both match "1200". */
@@ -73,24 +94,51 @@ export class QuestionEngine {
     private settings: LearningSettings,
   ) {}
 
-  next(opts: { minDifficulty?: Difficulty } = {}): Question {
+  /** Math topics allowed right now: in the child's grade AND in a chosen group. */
+  private mathTopics(): string[] {
+    const on = enabledTopics(this.settings.groups);
+    return mathTopicsForGrade(this.settings.grade).filter((t) => on.has(t));
+  }
+
+  private readingTopics(): Set<string> {
+    const on = enabledTopics(this.settings.groups);
+    return new Set(READING_BANK.map((b) => b.topic).filter((t) => on.has(t)));
+  }
+
+  next(): Question {
+    const mathTopics = this.mathTopics();
+    const readingTopics = this.readingTopics();
+    const allowed = (q: Question) => (q.subject === 'math' ? mathTopics.includes(q.topic) : readingTopics.has(q.topic));
+
+    // Re-ask a missed question when it's due (if its topic is still chosen).
+    this.stats.retry = this.stats.retry.filter((r) => allowed(r.q));
     const due = this.stats.retry.findIndex((r) => r.due <= this.stats.totalAsked);
-    if (due >= 0 && !opts.minDifficulty) {
+    if (due >= 0) {
       const [r] = this.stats.retry.splice(due, 1);
       return r.q;
     }
-    const subject: Subject = Math.random() * 100 < this.settings.mathPercent ? 'math' : 'reading';
-    let d = pickDifficulty(this.stats.level[subject]);
-    if (opts.minDifficulty && d < opts.minDifficulty) d = opts.minDifficulty;
-    const q = subject === 'math' ? this.mathQuestion(d) : this.readingQuestion(d);
+
+    let subject: Subject = Math.random() * 100 < this.settings.mathPercent ? 'math' : 'reading';
+    if (subject === 'math' && mathTopics.length === 0) subject = 'reading';
+    if (subject === 'reading' && readingTopics.size === 0) subject = 'math';
+    if (subject === 'math' && mathTopics.length === 0) subject = 'reading'; // nothing chosen at all: fall back to reading
+
+    const band = GRADE_BAND[this.settings.grade];
+    this.stats.level[subject] = clamp(this.stats.level[subject], band[0], band[1] + 0.49);
+    const d = pickDifficulty(this.stats.level[subject], band);
+    const q = subject === 'math' ? this.mathQuestion(d, mathTopics) : this.readingQuestion(d, readingTopics);
     this.stats.recent.push(q.id);
     if (this.stats.recent.length > 60) this.stats.recent.shift();
     return q;
   }
 
-  private mathQuestion(d: Difficulty): Question {
+  private mathQuestion(d: Difficulty, allowed: string[]): Question {
+    const [lo, hi] = GRADE_BAND[this.settings.grade];
+    // Prefer topics that have questions at this difficulty; otherwise any allowed topic.
+    let topics = allowed.filter((t) => mathTopicLevels(t).includes(d));
+    if (!topics.length) topics = allowed.filter((t) => mathTopicLevels(t).some((l) => l >= lo && l <= hi));
+    if (!topics.length) topics = allowed;
     // Favor topics the child is weaker at.
-    const topics = mathTopicsFor(d);
     const weights = topics.map((t) => {
       const s = this.stats.topics[t];
       if (!s || s.asked < 3) return 1.5;
@@ -112,11 +160,14 @@ export class QuestionEngine {
     return makeMathQuestion(topic, d);
   }
 
-  private readingQuestion(d: Difficulty): Question {
+  private readingQuestion(d: Difficulty, topics: Set<string>): Question {
     const recent = new Set(this.stats.recent);
-    let pool = READING_BANK.map((item, i) => ({ item, i })).filter((x) => x.item.difficulty === d && !recent.has(`r:${x.i}`));
-    if (pool.length === 0) pool = READING_BANK.map((item, i) => ({ item, i })).filter((x) => !recent.has(`r:${x.i}`));
-    if (pool.length === 0) pool = READING_BANK.map((item, i) => ({ item, i }));
+    const all = READING_BANK.map((item, i) => ({ item, i })).filter((x) => topics.size === 0 || topics.has(x.item.topic));
+    const [lo, hi] = GRADE_BAND[this.settings.grade];
+    let pool = all.filter((x) => x.item.difficulty === d && !recent.has(`r:${x.i}`));
+    if (pool.length === 0) pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !recent.has(`r:${x.i}`));
+    if (pool.length === 0) pool = all.filter((x) => !recent.has(`r:${x.i}`));
+    if (pool.length === 0) pool = all.length ? all : READING_BANK.map((item, i) => ({ item, i }));
     const { item, i } = pick(pool);
     return {
       id: `r:${i}`,
@@ -142,7 +193,8 @@ export class QuestionEngine {
     day.asked++;
     if (correct) day.correct++;
 
-    s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), 1, 3.49);
+    const [lo, hi] = GRADE_BAND[this.settings.grade];
+    s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), lo, hi + 0.49);
 
     if (!correct && !s.retry.some((r) => r.q.id === q.id)) {
       // Ask it again in a few questions with fresh answer order.
