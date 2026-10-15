@@ -62,6 +62,16 @@ describe('math generators', () => {
     }
   });
 
+  it('comparing-numbers answers are right', () => {
+    for (let i = 0; i < 1000; i++) {
+      const q = makeMathQuestion('compare', (1 + (i % 2)) as Difficulty);
+      const [a, b] = q.prompt.replace(/,/g, '').match(/\d+/g)!.map(Number);
+      const sym = a > b ? '>' : a < b ? '<' : '=';
+      expect(q.answer.startsWith(sym), q.prompt).toBe(true);
+      expect(q.prompt).toContain('______');
+    }
+  });
+
   it('fraction compare answers are right', () => {
     for (let i = 0; i < 500; i++) {
       const q = makeMathQuestion('fractions-compare', 3);

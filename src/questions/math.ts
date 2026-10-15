@@ -337,13 +337,14 @@ const GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }> = {
       let b = Math.random() < 0.6 ? a + ri(-999, 999) : ri(lo, hi);
       if (Math.random() < 0.12) b = a;
       const sym = a > b ? '>' : a < b ? '<' : '=';
+      const label = { '>': '>   greater than', '<': '<   less than', '=': '=   equal to' };
       const words = { '>': 'greater than', '<': 'less than', '=': 'equal to' }[sym];
       return choice(
-        `Which symbol makes this true?\n${fmt(a)}  ?  ${fmt(b)}`,
-        sym,
-        ['>', '<', '='],
-        `Compare from the biggest place first. ${fmt(a)} is ${words} ${fmt(b)}.`,
-        '">" means greater than, "<" means less than. The open mouth always eats the BIGGER number! Compare the digits from the left. The first place where they are different tells you which is bigger.',
+        `Which symbol goes in the blank?\n${fmt(a)}   ______   ${fmt(b)}`,
+        label[sym],
+        [label['>'], label['<'], label['=']],
+        `${fmt(a)} ${sym} ${fmt(b)}. Compare from the biggest place first: ${fmt(a)} is ${words} ${fmt(b)}.`,
+        'Read it from left to right: is the FIRST number greater than, less than, or equal to the SECOND number? Compare the digits from the left. The first place where they are different tells you which is bigger. The open side of > or < always faces the BIGGER number!',
       );
     },
   },

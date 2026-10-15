@@ -14,7 +14,7 @@ export function speak(text: string) {
     if (!synth) return;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(
-      text.replace(/ x /g, ' times ').replace(/ \/ /g, ' divided by ').replace(/(\d)\/(\d)/g, '$1 over $2').replace(/\?/g, '?'),
+      text.replace(/ x /g, ' times ').replace(/ \/ /g, ' divided by ').replace(/(\d)\/(\d)/g, '$1 over $2').replace(/_+/g, ' blank ').replace(/\?/g, '?'),
     );
     u.rate = 0.92;
     synth.speak(u);
