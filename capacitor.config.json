@@ -1,0 +1,8 @@
+{
+  "appId": "com.learningdungeon.game",
+  "appName": "Learning Dungeon",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#14101e"
+  }
+}
