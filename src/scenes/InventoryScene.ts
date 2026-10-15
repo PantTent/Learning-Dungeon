@@ -97,8 +97,13 @@ export class InventoryScene extends Phaser.Scene {
       const icon = this.add.image(x + (cell - 6) / 2, y + (cell - 6) / 2, ICON[it.base]).setScale(3);
       if (!canUse(cls, it)) icon.setTint(0xff7070);
       c.add(icon);
-      if (canUse(cls, it) && itemScore(it, cls) > this.bestEquippedScore(it)) {
-        c.add(txt(this, x + cell - 12, y + 2, '^', 18, C.good).setOrigin(1, 0));
+      // Quick hint right in the bag: green up = upgrade, red down = worse than what you wear.
+      if (canUse(cls, it)) {
+        const mine = itemScore(it, cls);
+        const worn = this.bestEquippedScore(it);
+        const slotFilled = slotsFor(it.base).some((sl) => p.equipped[sl]);
+        if (mine > worn) c.add(txt(this, x + cell - 10, y + 1, '\u25B2', 14, C.good).setOrigin(1, 0));
+        else if (slotFilled && mine < worn) c.add(txt(this, x + cell - 10, y + 1, '\u25BC', 14, C.bad).setOrigin(1, 0));
       }
       const z = this.add.zone(x, y, cell - 6, cell - 6).setOrigin(0).setInteractive({ useHandCursor: true });
       z.on('pointerup', () => this.showItem(it, null));
@@ -202,6 +207,43 @@ export class InventoryScene extends Phaser.Scene {
     let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag', compare);
     if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing', null));
     bottom += 8;
+    // What actually happens to your hero's totals if you put this on.
+    if (!equippedSlot && canUse(cls, it)) {
+      const sim = JSON.parse(JSON.stringify(p)) as typeof p;
+      const simItem = sim.bag.find((b) => b.id === it.id);
+      if (simItem && equip(sim, simItem)) {
+        const before = derive(p);
+        const after = derive(sim);
+        const rows: [string, number, string][] = [
+          ['Damage', Math.round(after.power) - Math.round(before.power), ''],
+          ['Armor', after.armor - before.armor, ''],
+          ['Health', after.maxHp - before.maxHp, ''],
+          ['Mana', after.maxMp - before.maxMp, ''],
+          [STAT_LABEL.str, after.str - before.str, ''],
+          [STAT_LABEL.int, after.int - before.int, ''],
+          [STAT_LABEL.agi, after.agi - before.agi, ''],
+          [STAT_LABEL.sta, after.sta - before.sta, ''],
+          ['Crit', after.crit - before.crit, '%'],
+        ];
+        const changed = rows.filter(([, d]) => d !== 0);
+        body.add(txt(this, px + 24, bottom, 'If you equip this:', 17, '#d7b8ff'));
+        let cx = px + 24 + 160;
+        let cy = bottom;
+        if (!changed.length) body.add(txt(this, cx, cy, 'no change', 17, C.dim));
+        for (const [label, d, unit] of changed) {
+          const up = d > 0;
+          const t = txt(this, cx, cy, `${label} ${up ? '\u25B2' : '\u25BC'}${Math.abs(d)}${unit}`, 17, up ? C.good : C.bad);
+          if (cx + t.width > px + pw - 24) {
+            cx = px + 24 + 160;
+            cy += 24;
+            t.setPosition(cx, cy);
+          }
+          body.add(t);
+          cx += t.width + 18;
+        }
+        bottom = cy + 30;
+      }
+    }
     if (compare && canUse(cls, it)) {
       const diff = itemScore(it, cls) - itemScore(compare, cls);
       body.add(
