@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sfx } from '../audio/audio';
 import type { StatKey } from '../data/classes';
 import {
   canUse, ICON, isTwoHanded, itemScore, RARITY, SLOT_LABEL, slotsFor, STAT_LABEL, weaponLabel,
@@ -277,12 +278,14 @@ export class InventoryScene extends Phaser.Scene {
       : [
           { label: 'Equip', color: 0x2f9a4a, enabled: canUse(cls, it), fn: () => {
             if (!equip(p, it)) toast(this, 'Bag is full!', C.bad);
+            else sfx('equip');
             saveProfile(p);
             this.draw();
           } },
           { label: `Sell ${it.value}g`, color: 0x6a5a2a, fn: () => {
             p.bag = p.bag.filter((x) => x.id !== it.id);
             p.gold += it.value;
+            sfx('coin');
             saveProfile(p);
             this.draw();
           } },
@@ -305,6 +308,7 @@ export class InventoryScene extends Phaser.Scene {
     const gold = commons.reduce((s, i) => s + i.value, 0);
     p.bag = p.bag.filter((i) => i.rarity !== 'common');
     p.gold += gold;
+    sfx('coin');
     saveProfile(p);
     this.draw();
     toast(this, `Sold ${commons.length} items for ${gold} gold`, '#ffd24a');

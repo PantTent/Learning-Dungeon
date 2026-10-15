@@ -9,6 +9,7 @@ import { PracticeScene } from './scenes/PracticeScene';
 import { ShopScene, TravelScene } from './scenes/ShopScene';
 import { TitleScene } from './scenes/TitleScene';
 import { H, W } from './ui/widgets';
+import { unlockAudio } from './audio/audio';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -17,11 +18,14 @@ const game = new Phaser.Game({
   height: H,
   backgroundColor: '#14101e',
   pixelArt: true,
-  dom: { createContainer: true },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 2 },
   scene: [BootScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene],
 });
+
+// Browsers only allow sound after the player taps or presses a key.
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
 
 // Handy for debugging in the browser console.
 (window as unknown as { game: Phaser.Game }).game = game;

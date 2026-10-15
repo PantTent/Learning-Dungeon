@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playMusic } from '../audio/audio';
 import { getClass } from '../data/classes';
 import { MATH_TOPICS } from '../questions/math';
 import { READING_TOPICS } from '../questions/readingBank';
@@ -16,6 +17,7 @@ export class ParentScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     this.index = 0;
     this.scrollY = 0;
     this.cameras.main.setBackgroundColor(0x14101e);

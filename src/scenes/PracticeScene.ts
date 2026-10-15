@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playMusic } from '../audio/audio';
 import { GRADES, groupsForGrade, type TopicGroup } from '../questions/curriculum';
 import { current, saveProfile } from '../state/profile';
 import { C, W, H, button, panel, txt } from '../ui/widgets';
@@ -16,6 +17,7 @@ export class PracticeScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     menuBackground(this);
     this.draw();
   }

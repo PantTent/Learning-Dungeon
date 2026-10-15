@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
+import { playMusic } from '../audio/audio';
 import { getClass } from '../data/classes';
 import { deleteProfile, loadProfiles, session, type Profile } from '../state/profile';
-import { C, H, W, button, panel, sprite, txt } from '../ui/widgets';
+import { C, H, W, button, panel, soundButton, sprite, txt } from '../ui/widgets';
 
 export const MAX_PROFILES = 3;
 
@@ -33,7 +34,9 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     menuBackground(this);
+    soundButton(this, W - 76, 30, 130, 40);
     const title = txt(this, W / 2, 62, 'LEARNING DUNGEON', 56, '#ffd24a').setOrigin(0.5);
     title.setStroke('#5a2a00', 10);
     this.tweens.add({ targets: title, y: 70, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });

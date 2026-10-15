@@ -4,7 +4,8 @@ import { FLOOR, findPath, type Pt } from '../data/mapgen';
 import { makeItem, RARITY } from '../data/items';
 import { classOf, current, derive, saveProfile, xpToNext, LEVEL_CAP, BAG_SIZE } from '../state/profile';
 import { enterFloor, LAIR, respawnOne, worldState, type World, type WorldMonster } from '../state/world';
-import { Bar, C, H, W, button, panel, toast, txt } from '../ui/widgets';
+import { Bar, C, H, W, button, panel, soundButton, toast, txt } from '../ui/widgets';
+import { playMusic, sfx } from '../audio/audio';
 import { ri } from '../util/rng';
 
 const T = 16;
@@ -61,6 +62,7 @@ export class DungeonScene extends Phaser.Scene {
     saveProfile(p);
 
     this.cameras.main.setBackgroundColor(0x0d0a14);
+    playMusic('dungeon');
     this.drawMap();
     this.drawObjects();
 
@@ -232,6 +234,7 @@ export class DungeonScene extends Phaser.Scene {
       worldState.world = null;
       this.scene.start('Title');
     }, 0x3a3450).label.setFontSize(15);
+    soundButton(this, bx, 268).setScrollFactor(0).setDepth(1000);
     this.refreshHud(false);
   }
 
@@ -260,6 +263,7 @@ export class DungeonScene extends Phaser.Scene {
     if (p.potions.hp <= 0) return toast(this, 'No health potions! Buy some at the camp shop.', C.bad);
     if (p.hp >= s.maxHp) return toast(this, 'Already at full health!');
     p.potions.hp--;
+    sfx('potion');
     p.hp = Math.min(s.maxHp, p.hp + Math.round(s.maxHp * 0.5));
     this.healFx(this.player);
     this.refreshHud();
@@ -457,6 +461,7 @@ export class DungeonScene extends Phaser.Scene {
       p.mp = s.maxMp;
       this.healFx(this.player);
       toast(this, 'The fountain heals you completely!', C.good);
+      sfx('heal');
       this.refreshHud();
       saveProfile(p);
     } else if (c && pt.x === c.merchant.x && pt.y === c.merchant.y) {
@@ -478,6 +483,7 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     this.world.openedChests.add(key);
+    sfx('chest');
     this.chestSprites.get(key)?.setTexture('tile_chest_open');
     const fl = this.world.floor;
     const ilvl = Math.min(10, ri(FLOORS[fl].levels[0], FLOORS[fl].levels[1]) + 1);
@@ -493,6 +499,7 @@ export class DungeonScene extends Phaser.Scene {
   private useExit() {
     const p = current();
     const w = this.world;
+    if (!(w.floor + 1 === LAIR && p.level < 7)) sfx('stairs');
     if (w.floor === LAIR) {
       this.cameras.main.fadeOut(300);
       this.time.delayedCall(300, () => this.scene.restart({ floor: LAIR - 1 }));
@@ -552,6 +559,7 @@ export class DungeonScene extends Phaser.Scene {
   private startBattle(mon: WorldMonster) {
     this.busy = true;
     this.path = [];
+    sfx('encounter');
     this.cameras.main.shake(200, 0.01);
     this.cameras.main.flash(250, 255, 255, 255);
     this.time.delayedCall(350, () => this.scene.start('Battle', { monsterId: mon.id, group: mon.group }));

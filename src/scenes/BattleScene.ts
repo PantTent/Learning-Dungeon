@@ -6,6 +6,7 @@ import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
 import { LAIR } from '../state/world';
 import { QuestionPanel } from '../ui/QuestionPanel';
+import { playMusic, sfx, stopMusic, type Sfx } from '../audio/audio';
 import { Bar, C, H, W, button, panel, txt } from '../ui/widgets';
 import { chance, rf, ri } from '../util/rng';
 
@@ -75,6 +76,8 @@ export class BattleScene extends Phaser.Scene {
     const p = current();
     this.engine = new QuestionEngine(p.learning, p.settings);
     this.drawBackground();
+    playMusic(this.isBoss ? 'boss' : 'battle');
+    if (this.isBoss) this.time.delayedCall(300, () => sfx('roar'));
 
     const cls = classOf(p);
     this.hero = this.add.image(this.heroHome.x, this.heroHome.y, cls.sprite).setScale(6).setFlipX(true).setDepth(10);
@@ -298,6 +301,7 @@ export class BattleScene extends Phaser.Scene {
           p.hp = Math.min(s.maxHp, p.hp + amt);
           this.heroHp.set(p.hp, s.maxHp);
           this.sparkle(this.hero, FX_COLOR.heal);
+          sfx('heal');
           this.floatText(this.hero.x, this.hero.y - 60, `+${amt}`, '#7dff9a', 34);
           after();
         });
@@ -307,6 +311,7 @@ export class BattleScene extends Phaser.Scene {
         const cls = classOf(p);
         this.castPose(() => {
           this.summon(cls.summon!.sprite, correct ? 4 : 2, sk.power);
+          sfx('summon');
           this.say(`${cls.summon!.name} joins the fight for ${correct ? 4 : 2} turns!`);
           after();
         });
@@ -421,6 +426,7 @@ export class BattleScene extends Phaser.Scene {
         p.hp = Math.max(this.isBoss ? 1 : 0, p.hp - dmg);
         this.heroHp.set(p.hp, s.maxHp);
         this.flash(this.hero, 0xff4040);
+        sfx('hurt');
         this.cameras.main.shake(140, 0.008);
         this.floatText(this.hero.x, this.hero.y - 60, `-${dmg}`, '#ff6b6b', 30);
         this.burst(this.hero.x - 10, this.hero.y, 0xff6060, 10);
@@ -435,6 +441,7 @@ export class BattleScene extends Phaser.Scene {
     if (p.potions.hp <= 0) return;
     this.closeMenu();
     p.potions.hp--;
+    sfx('potion');
     const amt = Math.round(s.maxHp * 0.5);
     p.hp = Math.min(s.maxHp, p.hp + amt);
     this.heroHp.set(p.hp, s.maxHp);
@@ -450,6 +457,7 @@ export class BattleScene extends Phaser.Scene {
     if (p.potions.mp <= 0) return;
     this.closeMenu();
     p.potions.mp--;
+    sfx('potion');
     p.mp = s.maxMp;
     this.heroMp.set(p.mp, s.maxMp);
     this.sparkle(this.hero, 0x5a9aff);
@@ -473,6 +481,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private win() {
+    stopMusic();
+    this.time.delayedCall(250, () => sfx('victory'));
     const p = current();
     const cls = classOf(p);
     const loot: Item[] = [];
@@ -509,6 +519,7 @@ export class BattleScene extends Phaser.Scene {
 
   /** Big, sparkly level-up screen showing exactly which stats went up. */
   private levelUpCelebration(fromLevel: number, before: ReturnType<typeof derive>, onDone: () => void) {
+    sfx('levelup');
     const p = current();
     const cls = classOf(p);
     const after = derive(p);
@@ -662,6 +673,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private bossFail() {
+    stopMusic();
+    sfx('defeat');
     this.say('');
     const boss = this.foes[0];
     this.tweens.add({ targets: boss.sprite, x: -200, duration: 800, ease: 'Quad.In' });
@@ -675,6 +688,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private lose() {
+    stopMusic();
+    sfx('defeat');
     this.say('');
     this.tweens.add({ targets: this.hero, angle: 90, alpha: 0.4, y: this.heroHome.y + 30, duration: 600 });
     const c = this.add.container(0, 0).setDepth(4000);
@@ -707,6 +722,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private attackAnim(sk: SkillDef, target: Foe | null, onHit: () => void) {
+    sfx(sk.fx as Sfx);
     const color = FX_COLOR[sk.fx];
     const aim = target ?? this.alive()[Math.floor(this.alive().length / 2)];
     if (sk.melee) {
@@ -747,6 +763,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private hit(f: Foe, r: { dmg: number; crit: boolean }, correct: boolean, fx: Fx) {
+    sfx(r.crit ? 'crit' : 'hit');
     f.e.hp = Math.max(0, f.e.hp - r.dmg);
     f.bar.set(f.e.hp, f.e.maxHp);
     this.flash(f.sprite, 0xffffff);
@@ -762,6 +779,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private die(f: Foe) {
+    this.time.delayedCall(120, () => sfx('die'));
     this.tweens.killTweensOf(f.sprite);
     f.sprite.disableInteractive();
     f.sprite.setTint(0xff6060);

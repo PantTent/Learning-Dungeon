@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sfx } from '../audio/audio';
 import { BOSS, FLOORS } from '../data/enemies';
 import { current, saveProfile } from '../state/profile';
 import { LAIR } from '../state/world';
@@ -47,6 +48,7 @@ export class ShopScene extends Phaser.Scene {
     if (p.gold < cost) return toast(this, 'Not enough gold!', C.bad);
     p.gold -= cost;
     p.potions[kind]++;
+    sfx('coin');
     saveProfile(p);
     this.refresh();
   }
@@ -58,6 +60,7 @@ export class ShopScene extends Phaser.Scene {
     const gold = commons.reduce((s, i) => s + i.value, 0);
     p.bag = p.bag.filter((i) => i.rarity !== 'common');
     p.gold += gold;
+    sfx('coin');
     saveProfile(p);
     this.refresh();
     toast(this, `Sold ${commons.length} items for ${gold} gold`, '#ffd24a');

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { Question } from '../questions/types';
 import { isCorrect, teacherHelp } from '../questions/engine';
+import { sfx } from '../audio/audio';
 import { MATH_TOPICS } from '../questions/math';
 import { READING_TOPICS } from '../questions/readingBank';
 import { C, H, W, button, panel, txt } from './widgets';
@@ -83,6 +84,7 @@ export class QuestionPanel {
   /** Explains how to think about the question, without giving the answer. */
   private showTeacher() {
     if (this.answered) return;
+    sfx('teacher');
     const { scene, q } = this;
     const help = teacherHelp(q);
     const t = scene.add.container(0, 0).setDepth(3200).setScrollFactor(0);
@@ -178,6 +180,7 @@ export class QuestionPanel {
     if (this.answered) return;
     this.answered = true;
     const correct = isCorrect(this.q, given);
+    sfx(correct ? 'correct' : 'wrong');
     this.showResult(correct, given);
   }
 

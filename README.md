@@ -46,6 +46,10 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 - **Parent dashboard** (hold the button on the title screen): accuracy by
   topic, weakest first. You can also set the math/reading mix and turn on
   read-aloud.
+- **Sound**: chiptune music for the menus, dungeon, battles and the boss, plus
+  sound effects for every attack, spell, answer, level-up and treasure chest. All
+  of it is synthesized in code (`src/audio/audio.ts`), with no audio files. The
+  Sound button switches between all sound on, music off, and all sound off.
 - Up to 3 hero save slots. Saves are on the device for now; cloud login comes
   next.
 
@@ -92,6 +96,5 @@ off-hand, rings), the level cap, and the boss's 4-of-5 rule.
 
 ## Roadmap
 - Cloud save + login (Google / email) so progress follows the child across devices
-- Sound effects and music
 - Areas 2+ and a higher level cap
 - iOS build

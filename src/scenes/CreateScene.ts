@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playMusic } from '../audio/audio';
 import { CLASSES, type ClassDef } from '../data/classes';
 import { WEAPON_NAMES } from './shared';
 import { newProfile, saveProfile, session } from '../state/profile';
@@ -12,7 +13,8 @@ export class CreateScene extends Phaser.Scene {
   private selected: ClassDef = CLASSES[0];
   private detail?: Phaser.GameObjects.Container;
   private cards: Phaser.GameObjects.Graphics[] = [];
-  private nameInput?: HTMLInputElement;
+  private heroName = '';
+  private nameText?: Phaser.GameObjects.Text;
   private grade: Grade = 4;
   private gradeButtons: Button[] = [];
 
@@ -21,6 +23,7 @@ export class CreateScene extends Phaser.Scene {
   }
 
   create() {
+    playMusic('title');
     this.cards = [];
     menuBackground(this);
     txt(this, W / 2, 30, 'Choose your hero!', 34, '#ffd24a').setOrigin(0.5);
@@ -41,13 +44,15 @@ export class CreateScene extends Phaser.Scene {
       zone.on('pointerup', () => this.select(cls));
     });
 
-    // Name entry (a real text box so the phone keyboard pops up).
+    // Name entry: our own on-screen keyboard, so it works on every device.
     txt(this, 40, 450, 'Hero name:', 22);
-    const dom = this.add.dom(330, 465).createFromHTML(
-      `<input type="text" maxlength="12" value="${NAMES[Math.floor(Math.random() * NAMES.length)]}"
-        style="width:200px;font-size:24px;padding:8px 12px;border-radius:10px;border:3px solid #5b4a82;background:#0f0b1a;color:#fff;font-family:inherit;outline:none" />`,
-    );
-    this.nameInput = dom.node.querySelector('input') as HTMLInputElement;
+    this.heroName = NAMES[Math.floor(Math.random() * NAMES.length)];
+    const box = this.add.graphics();
+    box.fillStyle(0x0f0b1a, 1).fillRoundedRect(210, 440, 236, 50, 10);
+    box.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(210, 440, 236, 50, 10);
+    this.nameText = txt(this, 224, 465, this.heroName, 24).setOrigin(0, 0.5);
+    txt(this, 432, 465, 'Edit', 15, '#7fd3ff').setOrigin(1, 0.5);
+    this.add.zone(210, 440, 236, 50).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () => this.openKeyboard());
 
     // School grade picks how hard the questions are.
     txt(this, 470, 438, 'Grade:', 20);
@@ -119,8 +124,59 @@ export class CreateScene extends Phaser.Scene {
     });
   }
 
+  /** Big friendly keyboard for typing the hero's name. */
+  private openKeyboard() {
+    const c = this.add.container(0, 0).setDepth(500);
+    c.add(this.add.rectangle(0, 0, W, 540, 0x000000, 0.75).setOrigin(0).setInteractive());
+    c.add(panel(this, 40, 20, W - 80, 500, 0x1d1730, 0x7fd3ff));
+    c.add(txt(this, W / 2, 50, "What's your hero's name?", 26, '#ffd24a').setOrigin(0.5));
+    const g = this.add.graphics();
+    g.fillStyle(0x0f0b1a, 1).fillRoundedRect(W / 2 - 200, 78, 400, 58, 10);
+    g.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(W / 2 - 200, 78, 400, 58, 10);
+    c.add(g);
+    const shown = txt(this, W / 2, 107, '', 32).setOrigin(0.5);
+    c.add(shown);
+    let name = this.heroName;
+    const refresh = () => shown.setText(name.length ? name : ' ');
+    refresh();
+    const type = (k: string) => {
+      if (k === 'DEL') name = name.slice(0, -1);
+      else if (k === 'SPACE') {
+        if (name.length && name.length < 12 && !name.endsWith(' ')) name += ' ';
+      } else if (name.length < 12) name += name.length === 0 || name.endsWith(' ') ? k.toUpperCase() : k.toLowerCase();
+      refresh();
+    };
+    const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+    const kw = 70;
+    const kh = 60;
+    rows.forEach((row, r) => {
+      const x0 = W / 2 - (row.length * (kw + 8)) / 2 + kw / 2;
+      [...row].forEach((ch, i) => c.add(button(this, x0 + i * (kw + 8), 182 + r * (kh + 10), kw, kh, ch, () => type(ch), { size: 26 })));
+    });
+    c.add(button(this, W / 2 + 4 * 78 + 30, 182 + 2 * 70, 116, kh, 'Delete', () => type('DEL'), { size: 20, color: 0x8a3a3a }));
+    c.add(button(this, W / 2 - 4 * 78 - 30, 182 + 2 * 70, 116, kh, 'Space', () => type('SPACE'), { size: 20, color: 0x3a3450 }));
+    c.add(button(this, W / 2 - 180, 460, 200, 60, 'Random name', () => {
+      name = NAMES[Math.floor(Math.random() * NAMES.length)];
+      refresh();
+    }, { size: 20, color: 0x2e5a7a }));
+    const onKey = (e: KeyboardEvent) => {
+      if (/^[a-zA-Z]$/.test(e.key)) type(e.key);
+      else if (e.key === 'Backspace') type('DEL');
+      else if (e.key === ' ') type('SPACE');
+      else if (e.key === 'Enter') done();
+    };
+    const done = () => {
+      this.input.keyboard?.off('keydown', onKey);
+      this.heroName = name.trim() || this.heroName;
+      this.nameText?.setText(this.heroName);
+      c.destroy();
+    };
+    this.input.keyboard?.on('keydown', onKey);
+    c.add(button(this, W / 2 + 140, 460, 220, 60, 'Done', done, { size: 24, color: 0x2f9a4a }));
+  }
+
   private start() {
-    const name = (this.nameInput?.value ?? '').trim().slice(0, 12) || 'Hero';
+    const name = this.heroName.trim().slice(0, 12) || 'Hero';
     const p = newProfile(name, this.selected.id, this.grade);
     saveProfile(p);
     session.profile = p;

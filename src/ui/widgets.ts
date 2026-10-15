@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { cycleSoundMode, sfx, soundModeLabel } from '../audio/audio';
 
 export const W = 960;
 export const H = 540;
@@ -87,7 +88,10 @@ export function button(
   c.on('pointerout', () => c.setScale(1));
   c.on('pointerup', () => {
     c.setScale(1);
-    if (enabled) onClick();
+    if (enabled) {
+      sfx('click');
+      onClick();
+    }
   });
   c.setEnabled = (on: boolean) => {
     enabled = on;
@@ -173,4 +177,10 @@ export function toast(scene: Phaser.Scene, message: string, color = C.text) {
 /** Pixel sprite scaled up, keeping crisp edges. */
 export function sprite(scene: Phaser.Scene, x: number, y: number, key: string, scale = 4) {
   return scene.add.image(x, y, key).setScale(scale);
+}
+
+/** Button that cycles Sound ON -> Music OFF -> Sound OFF. */
+export function soundButton(scene: Phaser.Scene, x: number, y: number, w = 120, h = 50): Button {
+  const b = button(scene, x, y, w, h, soundModeLabel(), () => b.label.setText(soundModeLabel(cycleSoundMode())), { size: 15, color: 0x2e4a5a });
+  return b;
 }
