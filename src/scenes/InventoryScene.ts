@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/audio';
+import { openSellMenu } from '../ui/sellMenu';
 import type { StatKey } from '../data/classes';
 import {
   canUse, ICON, isTwoHanded, itemScore, RARITY, SLOT_LABEL, slotsFor, STAT_LABEL, weaponLabel,
@@ -110,7 +111,7 @@ export class InventoryScene extends Phaser.Scene {
       z.on('pointerup', () => this.showItem(it, null));
       c.add(z);
     }
-    c.add(button(this, bx + 180, H - 50, 230, 44, 'Sell all Common', () => this.sellCommons(), { size: 17, color: 0x6a5a2a }));
+    c.add(button(this, bx + 180, H - 50, 230, 44, 'Sell items...', () => openSellMenu(this, () => this.draw()), { size: 18, color: 0x6a5a2a }));
   }
 
   private bestEquippedScore(it: Item): number {
@@ -299,18 +300,5 @@ export class InventoryScene extends Phaser.Scene {
       if (a.enabled === false) b.setEnabled(false);
       c.add(b);
     });
-  }
-
-  private sellCommons() {
-    const p = current();
-    const commons = p.bag.filter((i) => i.rarity === 'common');
-    if (!commons.length) return toast(this, 'No common items to sell.');
-    const gold = commons.reduce((s, i) => s + i.value, 0);
-    p.bag = p.bag.filter((i) => i.rarity !== 'common');
-    p.gold += gold;
-    sfx('coin');
-    saveProfile(p);
-    this.draw();
-    toast(this, `Sold ${commons.length} items for ${gold} gold`, '#ffd24a');
   }
 }

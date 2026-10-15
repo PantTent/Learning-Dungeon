@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/audio';
+import { openSellMenu } from '../ui/sellMenu';
 import { BOSS, FLOORS } from '../data/enemies';
 import { current, saveProfile } from '../state/profile';
 import { LAIR } from '../state/world';
@@ -29,7 +30,7 @@ export class ShopScene extends Phaser.Scene {
 
     button(this, W / 2 - 120, 290, 220, 64, `Health Potion\n${HP_COST} gold`, () => this.buy('hp', HP_COST), { size: 18, color: 0x8a2a3a });
     button(this, W / 2 + 120, 290, 220, 64, `Mana Potion\n${MP_COST} gold`, () => this.buy('mp', MP_COST), { size: 18, color: 0x2a4a8a });
-    button(this, W / 2, 370, 300, 50, 'Sell all Common items', () => this.sellCommons(), { size: 18, color: 0x6a5a2a });
+    button(this, W / 2, 370, 300, 50, 'Sell items...', () => openSellMenu(this, () => this.refresh()), { size: 18, color: 0x6a5a2a });
     button(this, W / 2, H - 110, 180, 50, 'Bye!', () => {
       this.scene.stop();
       this.onClose?.();
@@ -51,19 +52,6 @@ export class ShopScene extends Phaser.Scene {
     sfx('coin');
     saveProfile(p);
     this.refresh();
-  }
-
-  private sellCommons() {
-    const p = current();
-    const commons = p.bag.filter((i) => i.rarity === 'common');
-    if (!commons.length) return toast(this, 'No common items to sell.');
-    const gold = commons.reduce((s, i) => s + i.value, 0);
-    p.bag = p.bag.filter((i) => i.rarity !== 'common');
-    p.gold += gold;
-    sfx('coin');
-    saveProfile(p);
-    this.refresh();
-    toast(this, `Sold ${commons.length} items for ${gold} gold`, '#ffd24a');
   }
 }
 
