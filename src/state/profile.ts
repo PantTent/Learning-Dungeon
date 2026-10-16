@@ -1,5 +1,6 @@
 import { getClass, growthPerLevel, type ClassDef, type StatKey } from '../data/classes';
-import { isTwoHanded, slotsFor, starterItem, type Item, type Slot } from '../data/items';
+import { isTwoHanded, makeItem, slotsFor, starterItem, type BaseType, type Item, type Slot } from '../data/items';
+import { AREAS, PLACES } from '../data/areas';
 import {
   defaultLearningSettings,
   newLearningStats,
@@ -38,6 +39,8 @@ export interface Profile {
   bossesBeaten?: string[];
   /** Right answers in a row (3 = power attack ready). Carries over between fights. */
   streak?: number;
+  /** Developer hero: everything unlocked and the power attack is always ready. */
+  dev?: boolean;
   learning: LearningStats;
   settings: LearningSettings;
   createdAt: number;
@@ -102,6 +105,45 @@ export function newProfile(name: string, classId: string, grade: Grade = 4): Pro
   p.hp = s.maxHp;
   p.mp = s.maxMp;
   return p;
+}
+
+/** The secret developer code (stored lightly scrambled so it isn't in plain sight). */
+export function isDevCode(code: string): boolean {
+  return btoa(code.trim().toLowerCase()) === 'Y2lzY29kb2c=';
+}
+
+/**
+ * Turn a new hero into a developer hero: max level, the best (Mythic) gear in
+ * every slot, every place and boss unlocked, lots of gold and potions.
+ */
+export function makeDeveloper(p: Profile): void {
+  const cls = getClass(p.classId);
+  p.dev = true;
+  p.level = LEVEL_CAP;
+  p.xp = 0;
+  p.gold = 99999;
+  p.maxFloor = PLACES.length - 1;
+  p.bossesBeaten = AREAS.map((a) => a.boss.id);
+  p.streak = 3;
+  p.potions = { hp4: 20, mp4: 20, hp3: 10, mp3: 10 };
+  p.spells = undefined;
+  const mythic = (base: BaseType) => makeItem(LEVEL_CAP, { rarity: 'mythic', cls, base, lootName: "Gnarlroot's" });
+  const weapon = cls.startWeapon;
+  p.equipped = {
+    head: mythic('head'),
+    neck: mythic('neck'),
+    chest: mythic('chest'),
+    hands: mythic('hands'),
+    legs: mythic('legs'),
+    feet: mythic('feet'),
+    ring1: mythic('ring'),
+    ring2: mythic('ring'),
+    mainhand: mythic(weapon),
+  };
+  if (!isTwoHanded(weapon) && cls.offhands.length) p.equipped.offhand = mythic(cls.offhands[0]);
+  const s = derive(p);
+  p.hp = s.maxHp;
+  p.mp = s.maxMp;
 }
 
 export function derive(p: Profile): DerivedStats {

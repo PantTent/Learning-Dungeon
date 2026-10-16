@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { playMusic } from '../audio/audio';
 import { CLASSES, type ClassDef } from '../data/classes';
 import { WEAPON_NAMES } from './shared';
-import { newProfile, saveProfile, session } from '../state/profile';
-import { C, W, button, panel, sprite, txt, type Button } from '../ui/widgets';
+import { isDevCode, makeDeveloper, newProfile, saveProfile, session } from '../state/profile';
+import { C, W, button, panel, sprite, toast, txt, type Button } from '../ui/widgets';
 import { GRADES, type Grade } from '../questions/curriculum';
 import { menuBackground } from './TitleScene';
 
@@ -17,6 +17,8 @@ export class CreateScene extends Phaser.Scene {
   private nameText?: Phaser.GameObjects.Text;
   private grade: Grade = 4;
   private gradeButtons: Button[] = [];
+  private devMode = false;
+  private codeButton?: Button;
 
   constructor() {
     super('Create');
@@ -52,7 +54,23 @@ export class CreateScene extends Phaser.Scene {
     box.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(210, 440, 236, 50, 10);
     this.nameText = txt(this, 224, 465, this.heroName, 24).setOrigin(0, 0.5);
     txt(this, 432, 465, 'Edit', 15, '#7fd3ff').setOrigin(1, 0.5);
-    this.add.zone(210, 440, 236, 50).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () => this.openKeyboard());
+    this.add.zone(210, 440, 236, 50).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () =>
+      this.openKeyboard("What's your hero's name?", this.heroName, true, (name) => {
+        this.heroName = name.trim() || this.heroName;
+        this.nameText?.setText(this.heroName);
+      }),
+    );
+
+    // Secret code box (for the game's developer).
+    this.devMode = false;
+    this.codeButton = button(this, W - 60, 30, 96, 36, 'Code', () =>
+      this.openKeyboard('Type a secret code', '', false, (code) => {
+        if (!code.trim()) return;
+        this.devMode = isDevCode(code);
+        this.codeButton?.label.setText(this.devMode ? 'DEV ON' : 'Code');
+        toast(this, this.devMode ? 'Developer mode ON! Everything is unlocked.' : 'That code does not work.', this.devMode ? C.good : C.bad);
+      }),
+    { size: 16, color: 0x3a3450 });
 
     // School grade picks how hard the questions are.
     txt(this, 470, 438, 'Grade:', 20);
@@ -110,8 +128,8 @@ export class CreateScene extends Phaser.Scene {
       g.fillStyle(cls.color, 1).fillRoundedRect(732, y + 3, 170 * Math.min(1, v), 14, 4);
       d.add(g);
     });
-    d.add(txt(this, 640, 368, 'Skills:', 16, C.dim));
-    d.add(txt(this, 640, 390, cls.skills.map((s) => s.name).join(' / '), 15, C.text, { wordWrap: { width: 280 } }));
+    d.add(txt(this, 640, 368, `${cls.skills.length} spells, a new one every 2 levels:`, 15, C.dim));
+    d.add(txt(this, 640, 390, `${cls.skills.slice(0, 2).map((s) => s.name).join(', ')}, and more!`, 15, C.text, { wordWrap: { width: 270 } }));
   }
 
   private setGrade(g: Grade) {
@@ -124,26 +142,26 @@ export class CreateScene extends Phaser.Scene {
     });
   }
 
-  /** Big friendly keyboard for typing the hero's name. */
-  private openKeyboard() {
+  /** Big friendly on-screen keyboard (hero name or secret code). */
+  private openKeyboard(title: string, initial: string, nameCase: boolean, onDone: (value: string) => void) {
     const c = this.add.container(0, 0).setDepth(500);
     c.add(this.add.rectangle(0, 0, W, 540, 0x000000, 0.75).setOrigin(0).setInteractive());
     c.add(panel(this, 40, 20, W - 80, 500, 0x1d1730, 0x7fd3ff));
-    c.add(txt(this, W / 2, 50, "What's your hero's name?", 26, '#ffd24a').setOrigin(0.5));
+    c.add(txt(this, W / 2, 50, title, 26, '#ffd24a').setOrigin(0.5));
     const g = this.add.graphics();
     g.fillStyle(0x0f0b1a, 1).fillRoundedRect(W / 2 - 200, 78, 400, 58, 10);
     g.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(W / 2 - 200, 78, 400, 58, 10);
     c.add(g);
     const shown = txt(this, W / 2, 107, '', 32).setOrigin(0.5);
     c.add(shown);
-    let name = this.heroName;
+    let name = initial;
     const refresh = () => shown.setText(name.length ? name : ' ');
     refresh();
     const type = (k: string) => {
       if (k === 'DEL') name = name.slice(0, -1);
       else if (k === 'SPACE') {
         if (name.length && name.length < 12 && !name.endsWith(' ')) name += ' ';
-      } else if (name.length < 12) name += name.length === 0 || name.endsWith(' ') ? k.toUpperCase() : k.toLowerCase();
+      } else if (name.length < 12) name += nameCase && (name.length === 0 || name.endsWith(' ')) ? k.toUpperCase() : k.toLowerCase();
       refresh();
     };
     const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
@@ -155,10 +173,12 @@ export class CreateScene extends Phaser.Scene {
     });
     c.add(button(this, W / 2 + 4 * 78 + 30, 182 + 2 * 70, 116, kh, 'Delete', () => type('DEL'), { size: 20, color: 0x8a3a3a }));
     c.add(button(this, W / 2 - 4 * 78 - 30, 182 + 2 * 70, 116, kh, 'Space', () => type('SPACE'), { size: 20, color: 0x3a3450 }));
-    c.add(button(this, W / 2 - 180, 460, 200, 60, 'Random name', () => {
-      name = NAMES[Math.floor(Math.random() * NAMES.length)];
-      refresh();
-    }, { size: 20, color: 0x2e5a7a }));
+    if (nameCase) {
+      c.add(button(this, W / 2 - 180, 460, 200, 60, 'Random name', () => {
+        name = NAMES[Math.floor(Math.random() * NAMES.length)];
+        refresh();
+      }, { size: 20, color: 0x2e5a7a }));
+    }
     const onKey = (e: KeyboardEvent) => {
       if (/^[a-zA-Z]$/.test(e.key)) type(e.key);
       else if (e.key === 'Backspace') type('DEL');
@@ -167,9 +187,8 @@ export class CreateScene extends Phaser.Scene {
     };
     const done = () => {
       this.input.keyboard?.off('keydown', onKey);
-      this.heroName = name.trim() || this.heroName;
-      this.nameText?.setText(this.heroName);
       c.destroy();
+      onDone(name);
     };
     this.input.keyboard?.on('keydown', onKey);
     c.add(button(this, W / 2 + 140, 460, 220, 60, 'Done', done, { size: 24, color: 0x2f9a4a }));
@@ -178,6 +197,7 @@ export class CreateScene extends Phaser.Scene {
   private start() {
     const name = this.heroName.trim().slice(0, 12) || 'Hero';
     const p = newProfile(name, this.selected.id, this.grade);
+    if (this.devMode) makeDeveloper(p);
     saveProfile(p);
     session.profile = p;
     this.scene.start('Practice');

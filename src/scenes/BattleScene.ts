@@ -114,6 +114,7 @@ export class BattleScene extends Phaser.Scene {
     for (let i = 0; i < 3; i++) {
       this.powerStars.push(this.add.star(W - 110 + i * 34, H - 147, 5, 6, 13, 0x3a2f50).setStrokeStyle(2, 0xffd24a).setDepth(6));
     }
+    if (current().dev) current().streak = 3;
     this.refreshPower();
     this.showPet(false);
 
@@ -263,7 +264,7 @@ export class BattleScene extends Phaser.Scene {
     });
     // Charged power attack!
     if ((p.streak ?? 0) >= 3) {
-      if (this.isBoss) {
+      if (this.isBoss && !p.dev) {
         c.add(txt(this, 320, H - 150, 'Your power is saved for after the boss!', 15, '#ffe9a0').setOrigin(0.5));
       } else {
         const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${cls.power.name}! \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
@@ -357,6 +358,7 @@ export class BattleScene extends Phaser.Scene {
     const before = p.streak ?? 0;
     if (sk.id === 'power') p.streak = 0;
     else if (before < 3) p.streak = correct ? before + 1 : 0;
+    if (p.dev) p.streak = 3; // developer heroes always have their power ready
     this.refreshPower();
     if (before < 3 && (p.streak ?? 0) >= 3) {
       this.time.delayedCall(200, () => {
