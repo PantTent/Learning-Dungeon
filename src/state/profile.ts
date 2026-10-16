@@ -146,6 +146,19 @@ export function makeDeveloper(p: Profile): void {
   p.mp = s.maxMp;
 }
 
+/**
+ * Mana that comes back after winning a fight: each point of Intellect adds
+ * 1% (compounded) of max mana, up to 60%. About 11% at 12 Intellect, 26% at
+ * 30, 40% at 50.
+ */
+export const REGEN_PER_INT = 0.01;
+export const REGEN_CAP = 0.6;
+export function manaRegen(p: Profile): number {
+  const s = derive(p);
+  const pct = Math.min(REGEN_CAP, 1 - (1 - REGEN_PER_INT) ** s.int);
+  return Math.min(s.maxMp - p.mp, Math.max(1, Math.round(s.maxMp * pct)));
+}
+
 export function derive(p: Profile): DerivedStats {
   const cls = getClass(p.classId);
   const lv = p.level - 1;

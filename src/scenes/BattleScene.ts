@@ -7,7 +7,7 @@ import { openPotionMenu } from '../ui/potionMenu';
 import { MAX_CHOSEN, chosenSpells } from '../data/spells';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
-import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
+import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, manaRegen, saveProfile } from '../state/profile';
 import { worldState } from '../state/world';
 import { QuestionPanel } from '../ui/QuestionPanel';
 import { playMusic, sfx, stopMusic, type Sfx } from '../audio/audio';
@@ -65,6 +65,7 @@ export class BattleScene extends Phaser.Scene {
   private powerLabel?: Phaser.GameObjects.Text;
   private questionsRight = 0;
   private questionsAsked = 0;
+  private manaBack = 0;
 
   constructor() {
     super('Battle');
@@ -323,25 +324,31 @@ export class BattleScene extends Phaser.Scene {
 
   private ask(sk: SkillDef, target: Foe) {
     const p = current();
-    const q = this.engine.next();
+    // Developer heroes skip the question: every attack counts as right.
+    const q = p.dev ? undefined : this.engine.next();
+    const done = (correct: boolean) => {
+      if (q) this.engine.record(q, correct);
+      this.updateStreak(sk, correct);
+      this.questionsAsked++;
+      if (correct) this.questionsRight++;
+      saveProfile(p);
+      if (this.isBoss) {
+        this.pips[this.bossAsked].setFillStyle(correct ? 0x3ed34a : 0xe0404a);
+        this.bossAsked++;
+        if (correct) this.bossRight++;
+      }
+      p.mp -= sk.mp;
+      this.heroMp.set(p.mp, derive(p).maxMp);
+      this.perform(sk, target, correct);
+    };
+    if (!q) {
+      done(true);
+      return;
+    }
     new QuestionPanel(this, q, {
       header: this.isBoss ? `BOSS question ${this.bossAsked + 1} of ${BOSS_QUESTIONS}` : sk.name,
       readAloud: p.settings.readAloud,
-      done: (correct) => {
-        this.engine.record(q, correct);
-        this.updateStreak(sk, correct);
-        this.questionsAsked++;
-        if (correct) this.questionsRight++;
-        saveProfile(p);
-        if (this.isBoss) {
-          this.pips[this.bossAsked].setFillStyle(correct ? 0x3ed34a : 0xe0404a);
-          this.bossAsked++;
-          if (correct) this.bossRight++;
-        }
-        p.mp -= sk.mp;
-        this.heroMp.set(p.mp, derive(p).maxMp);
-        this.perform(sk, target, correct);
-      },
+      done,
     });
   }
 
@@ -833,6 +840,9 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     p.gold += this.earnedGold;
+    // Mana comes back after a win, more with more Intellect.
+    this.manaBack = Math.max(0, manaRegen(p));
+    p.mp += this.manaBack;
     const before = derive(p);
     const fromLevel = p.level;
     const levels = gainXp(p, this.earnedXp);
@@ -971,7 +981,8 @@ export class BattleScene extends Phaser.Scene {
     let y = 140;
     c.add(txt(this, W / 2, y, `Questions: ${this.questionsRight} / ${this.questionsAsked} right${perfect ? '  -  PERFECT! +25% XP' : ''}`, 20, perfect ? C.good : C.text).setOrigin(0.5));
     y += 34;
-    c.add(txt(this, W / 2, y, p.level >= LEVEL_CAP && levels === 0 ? `+${this.earnedGold} gold (max level!)` : `+${this.earnedXp} XP    +${this.earnedGold} gold`, 22).setOrigin(0.5));
+    const mana = this.manaBack > 0 ? `    +${this.manaBack} mana` : '';
+    c.add(txt(this, W / 2, y, p.level >= LEVEL_CAP && levels === 0 ? `+${this.earnedGold} gold (max level!)${mana}` : `+${this.earnedXp} XP    +${this.earnedGold} gold${mana}`, 22).setOrigin(0.5));
     if (this.lowLevelXp && p.level < LEVEL_CAP) {
       y += 26;
       c.add(txt(this, W / 2, y, 'Easy monsters give less XP. Try a deeper floor!', 16, '#ffb36b').setOrigin(0.5));

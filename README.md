@@ -37,6 +37,8 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   (I/II/III) unlocks every 2 levels. Pick **3** to bring into battle, plus a
   free basic attack. Mages get fire, ice, arcane and lightning, including
   spells that hit every enemy. Stronger spells cost a lot more mana.
+  After every win some mana comes back: 1% of max mana per point of
+  Intellect (compounded), up to 60%.
 - **Summons** (Necromancer skeleton, Demonologist imp): cast once and the pet
   follows you on the map and into every fight. It has about 1/3 of your
   health, and monsters can attack it and defeat it. Casting again heals or
