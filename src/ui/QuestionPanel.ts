@@ -59,7 +59,13 @@ export class QuestionPanel {
   constructor(
     private scene: Phaser.Scene,
     private q: Question,
-    private opts: { header?: string; readAloud?: boolean; done: (correct: boolean) => void },
+    private opts: {
+      header?: string;
+      readAloud?: boolean;
+      done: (correct: boolean) => void;
+      /** Text for other games (default: battle wording). {answer}/{given} are filled in. */
+      result?: { right: string; wrong: string; go: string };
+    },
   ) {
     this.root = scene.add.container(0, 0).setDepth(3000).setScrollFactor(0);
     this.build();
@@ -219,9 +225,15 @@ export class QuestionPanel {
     res.add(head);
     scene.tweens.add({ targets: head, scale: { from: 0.6, to: 1 }, duration: 260, ease: 'Back.Out' });
 
+    const r = this.opts.result;
+    const vals = { given: display(given, q), answer: display(q.answer, q) };
     const answerLine = correct
-      ? tr('Answer: {answer}\nFULL damage!', { answer: display(q.answer, q) })
-      : tr('You said: {given}\nRight answer: {answer}\n(Half damage this time)', { given: display(given, q), answer: display(q.answer, q) });
+      ? r
+        ? r.right.replace('{answer}', vals.answer)
+        : tr('Answer: {answer}\nFULL damage!', { answer: vals.answer })
+      : r
+        ? r.wrong.replace('{given}', vals.given).replace('{answer}', vals.answer)
+        : tr('You said: {given}\nRight answer: {answer}\n(Half damage this time)', vals);
     const ans = txt(scene, W / 2, 190, answerLine, 23, '#ffffff', {
       align: 'center',
       wordWrap: { width: W - 280, useAdvancedWrap: true },
@@ -237,7 +249,7 @@ export class QuestionPanel {
     );
     if (!correct) speakIfOn(this.opts.readAloud, tr('The answer is {answer}. {explanation}', { answer: q.answer, explanation: q.explanation }));
 
-    const go = button(scene, W / 2, H - 135, 260, 64, correct ? tr('Attack!') : tr('Got it'), () => {
+    const go = button(scene, W / 2, H - 135, 260, 64, correct ? (this.opts.result?.go ?? tr('Attack!')) : tr('Got it'), () => {
       res.destroy();
       this.root.destroy();
       this.opts.done(correct);

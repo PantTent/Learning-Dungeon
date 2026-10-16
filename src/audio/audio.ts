@@ -423,6 +423,32 @@ export const SONGS: Record<string, Song> = {
       },
     ],
   },
+  // Bouncy country tune for Learning Farm, in C major.
+  farm: {
+    bpm: 112,
+    tracks: [
+      {
+        wave: 'square',
+        vol: 0.05,
+        steps: [
+          'C5 . E5 G5 - . E5 . F5 . A5 - G5 - . .',
+          'E5 . G5 C6 - . A5 . G5 . E5 - D5 - . .',
+          'C5 . E5 G5 - . E5 . F5 . A5 - C6 - B5 .',
+          'A5 . G5 . E5 . D5 . C5 - - - . . . .',
+        ].join(' '),
+      },
+      {
+        wave: 'triangle',
+        vol: 0.16,
+        steps: [rep('C3 . G2 .', 2), rep('F2 . C3 .', 2), rep('C3 . G2 .', 2), rep('G2 . D3 .', 2), rep('C3 . G2 .', 2), rep('F2 . C3 .', 2), rep('G2 . D3 .', 2), rep('C3 . G2 .', 2)].join(' '),
+      },
+      {
+        wave: 'triangle',
+        vol: 0.05,
+        steps: [rep('. E4 . G4', 4), rep('. F4 . A4', 2) + ' ' + rep('. E4 . G4', 2), rep('. E4 . G4', 2) + ' ' + rep('. F4 . A4', 2), rep('. D4 . G4', 2) + ' ' + rep('. E4 . G4', 2)].join(' '),
+      },
+    ],
+  },
   // Fast, exciting battle music in E minor.
   battle: {
     bpm: 150,

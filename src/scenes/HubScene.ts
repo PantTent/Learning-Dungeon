@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
-import { GAMES, UNLOCK_PRICE, type GameInfo } from '../hub/games';
+import { GAMES, unlockPrice, type GameInfo } from '../hub/games';
 import { chooseFree, loadOwnership, owns, saveOwnership, type Ownership } from '../hub/ownership';
-import { tr } from '../i18n';
+import { getLang, tr } from '../i18n';
 import { isDevCode } from '../state/profile';
 import { openKeyboard } from '../ui/keyboard';
 import { parentGate } from '../ui/parentGate';
@@ -45,6 +45,7 @@ export class HubScene extends Phaser.Scene {
     if (built) {
       this.tweens.add({ targets: icon, y: icon.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       if (g.id === 'dungeon') sprite(this, x + w / 2 + 70, y + 120, 'enemy_slime', 4).setFlipX(true);
+      if (g.id === 'farm') sprite(this, x + w / 2 + 74, y + 116, 'crop_carrot', 3);
     } else {
       icon.setAlpha(0.35);
       txt(this, x + w / 2, y + 86, '?', 54, '#ffd24a').setOrigin(0.5);
@@ -60,7 +61,7 @@ export class HubScene extends Phaser.Scene {
     } else if (!this.own.free) {
       button(this, x + w / 2, by, w - 40, 56, tr('Play for free'), () => this.confirmFree(g), { size: 22, color: 0x2f9a4a });
     } else {
-      button(this, x + w / 2, by, w - 40, 56, tr('Unlock - {price}', { price: UNLOCK_PRICE }), () => this.unlock(g), { size: 20, color: 0xb07a10 });
+      button(this, x + w / 2, by, w - 40, 56, tr('Unlock - {price}', { price: unlockPrice(getLang()) }), () => this.unlock(g), { size: 20, color: 0xb07a10 });
     }
   }
 

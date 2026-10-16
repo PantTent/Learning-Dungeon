@@ -73,6 +73,12 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   game for free; more games can be unlocked later (store purchases are not set
   up yet). Unlocking and the parent dashboard are behind a grown-ups check
   (type your birth year). The developer code on the picker unlocks every game.
+- **Learning Farm** (second game, `src/farm`, `src/scenes/Farm*.ts`): plant
+  crops that keep growing while the app is closed, harvest them and sell them
+  at the market (a right answer pays full price, a wrong one half). Animals get
+  hungry (a red ! appears); answer a question to feed them (1 right, or 3
+  tries, makes them happy). Happy animals earn a little income. Spend coins on
+  a bigger garden, more stalls, and pigs, chickens, goats and horses.
 - **English and French**: pick the language on the title screen, the hero
   screen or the parent dashboard (each hero keeps its own language). French
   heroes get questions from the Quebec curriculum for 1re, 2e and 3e annee:

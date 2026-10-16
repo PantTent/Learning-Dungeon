@@ -20,9 +20,18 @@ export const GAMES: GameInfo[] = [
     color: 0xffd24a,
     scene: 'Title',
   },
-  { id: 'game2', name: 'Coming soon', blurb: 'A brand new game is on the way!', icon: 'tile_chest', color: 0x7fd3ff },
+  {
+    id: 'farm',
+    name: 'Learning Farm',
+    blurb: 'Grow veggies, care for animals and answer questions to build your farm!',
+    icon: 'animal_horse',
+    color: 0x7ccb4c,
+    scene: 'FarmSetup',
+  },
   { id: 'game3', name: 'Coming soon', blurb: 'Another adventure is being built.', icon: 'tile_chest', color: 0xb26bff },
 ];
 
-/** Price shown for unlocking an extra game. */
-export const UNLOCK_PRICE = '$1.99';
+/** Price shown for unlocking an extra game ("$1.99", or "1,99 $" in French). */
+export function unlockPrice(lang: 'en' | 'fr'): string {
+  return lang === 'fr' ? '1,99\u00a0$' : '$1.99';
+}

@@ -41,4 +41,6 @@ PAL = {
     '!': '#a6e45e', '#': '#7ccb4c', '%': '#5fb03f', '&': '#428f38',
     # deep canopy shadow / deep water
     '@': '#0f3a24', ';': '#1d58a8',
+    # farm (Sunny Farm)
+    '$': '#ffd0de', '<': '#e8c48a', ':': '#2c1810', '^': '#ffb35c',
 }

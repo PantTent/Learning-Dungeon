@@ -6,6 +6,7 @@ import { FR_BATTLE } from './fr/battle';
 import { FR_DATA } from './fr/data';
 import { FR_DUNGEON } from './fr/dungeon';
 import { FR_HUB } from './fr/hub';
+import { FR_FARM } from './fr/farm';
 import { FR_MENUS } from './fr/menus';
 
 export type Lang = 'en' | 'fr';
@@ -15,7 +16,7 @@ export const LANGS: { id: Lang; label: string; speech: string }[] = [
   { id: 'fr', label: 'Français', speech: 'fr-CA' },
 ];
 
-export const FR: Record<string, string> = { ...FR_DATA, ...FR_MENUS, ...FR_DUNGEON, ...FR_BATTLE, ...FR_HUB };
+export const FR: Record<string, string> = { ...FR_DATA, ...FR_MENUS, ...FR_DUNGEON, ...FR_BATTLE, ...FR_HUB, ...FR_FARM };
 
 const KEY = 'learning-dungeon.lang';
 let lang: Lang = 'en';
