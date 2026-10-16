@@ -85,11 +85,11 @@ const SUFFIX: Record<StatKey, string> = {
 };
 
 function material(base: BaseType, ilvl: number): string {
-  const tier = ilvl <= 3 ? 0 : ilvl <= 6 ? 1 : ilvl <= 9 ? 2 : 3;
-  if (base === 'ring' || base === 'neck') return ['Copper', 'Silver', 'Gold', 'Moonstone'][tier];
-  if (base === 'staff' || base === 'wand' || base === 'bow') return ['Oak', 'Ash', 'Yew', 'Elderwood'][tier];
-  if (base === 'tome') return ['Dusty', 'Glowing', 'Runed', 'Ancient'][tier];
-  return ['Copper', 'Iron', 'Steel', 'Mithril'][tier];
+  const tier = ilvl <= 3 ? 0 : ilvl <= 6 ? 1 : ilvl <= 9 ? 2 : ilvl <= 12 ? 3 : ilvl <= 15 ? 4 : ilvl <= 18 ? 5 : 6;
+  if (base === 'ring' || base === 'neck') return ['Copper', 'Silver', 'Gold', 'Moonstone', 'Emerald', 'Sapphire', 'Starstone'][tier];
+  if (base === 'staff' || base === 'wand' || base === 'bow') return ['Oak', 'Ash', 'Yew', 'Elderwood', 'Whisperwood', 'Heartwood', 'Starwood'][tier];
+  if (base === 'tome') return ['Dusty', 'Glowing', 'Runed', 'Ancient', 'Leafbound', 'Arcane', 'Celestial'][tier];
+  return ['Copper', 'Iron', 'Steel', 'Mithril', 'Elven', 'Runed', 'Starmetal'][tier];
 }
 
 export function isWeapon(b: BaseType): b is WeaponType {
@@ -126,7 +126,7 @@ export function rollRarity(boss: boolean): Rarity {
  * Make a random item. If `cls` is given, weapons/off-hands are usually ones
  * the class can actually use, so loot feels rewarding.
  */
-export function makeItem(ilvl: number, opts: { rarity?: Rarity; cls?: ClassDef; base?: BaseType; boss?: boolean } = {}): Item {
+export function makeItem(ilvl: number, opts: { rarity?: Rarity; cls?: ClassDef; base?: BaseType; boss?: boolean; lootName?: string } = {}): Item {
   const rarity = opts.rarity ?? rollRarity(!!opts.boss);
   let base = opts.base;
   if (!base) {
@@ -176,9 +176,9 @@ export function makeItem(ilvl: number, opts: { rarity?: Rarity; cls?: ClassDef; 
   const top = (Object.entries(item.stats) as [StatKey, number][]).sort((a, b) => b[1] - a[1]);
   const mat = material(base, ilvl);
   if (rarity === 'mythic') {
-    item.name = `${pick(['Starforged', 'Eternal', 'Dragonbone'])} ${BASE_NAME[base]} of Grukk`;
+    item.name = `${pick(['Starforged', 'Eternal', 'Dragonbone'])} ${BASE_NAME[base]} of ${(opts.lootName ?? "Grukk's").replace(/'s$/, '')}`;
   } else if (rarity === 'legendary') {
-    item.name = `Grukk's ${pick(['Royal', 'Golden', 'Mighty', 'Crowned'])} ${BASE_NAME[base]}`;
+    item.name = `${opts.lootName ?? "Grukk's"} ${pick(['Royal', 'Golden', 'Mighty', 'Crowned'])} ${BASE_NAME[base]}`;
   } else {
     const prefix = rarity === 'common' ? '' : pick(PREFIX[top[0][0]]) + ' ';
     const suffix = r.rank >= 2 && top[1] ? ' ' + SUFFIX[top[1][0]] : '';

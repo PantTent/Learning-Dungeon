@@ -37,4 +37,8 @@ PAL = {
     '+': '#5ad0b0', '=': '#2a9a8a', '~': '#1a5a5a',
     # rust
     'T': '#b8582a', 't': '#7a3a20',
+    # sunny grass (Area 2 forest)
+    '!': '#a6e45e', '#': '#7ccb4c', '%': '#5fb03f', '&': '#428f38',
+    # deep canopy shadow / deep water
+    '@': '#0f3a24', ';': '#1d58a8',
 }

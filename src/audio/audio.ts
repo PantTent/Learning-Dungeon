@@ -390,6 +390,32 @@ export const SONGS: Record<string, Song> = {
       },
     ],
   },
+  // Cheerful, flute-like forest music in G major.
+  forest: {
+    bpm: 100,
+    tracks: [
+      {
+        wave: 'triangle',
+        vol: 0.15,
+        steps: [
+          'G5 - B5 - D6 - B5 - A5 - G5 - E5 - - -',
+          'D5 - E5 - G5 - - - A5 - B5 - A5 - - -',
+          'G5 - B5 - D6 - E6 - D6 - B5 - G5 - A5 -',
+          'B5 - A5 - G5 - E5 - G5 - - - - - . .',
+        ].join(' '),
+      },
+      {
+        wave: 'triangle',
+        vol: 0.15,
+        steps: [rep('G2 . D3 .', 4), rep('C3 . G3 .', 4), rep('E2 . B2 .', 4), 'D2 . A2 . D2 . A2 . G2 . D3 . G2 . D3 .'].join(' '),
+      },
+      {
+        wave: 'square',
+        vol: 0.02,
+        steps: [rep('B4 D5 G5 D5', 4), rep('C5 E5 G5 E5', 4), rep('B4 E5 G5 E5', 4), rep('A4 D5 F#5 D5', 2) + ' ' + rep('B4 D5 G5 D5', 2)].join(' '),
+      },
+    ],
+  },
   // Fast, exciting battle music in E minor.
   battle: {
     bpm: 150,

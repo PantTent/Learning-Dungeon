@@ -8,9 +8,10 @@ import {
   type LearningStats,
 } from '../questions/engine';
 import type { Grade } from '../questions/curriculum';
+import { upgradePotions, type PotionBag } from '../data/potions';
 import { uid } from '../util/rng';
 
-export const LEVEL_CAP = 10;
+export const LEVEL_CAP = 20;
 export const BAG_SIZE = 30;
 
 export interface Profile {
@@ -23,12 +24,14 @@ export interface Profile {
   gold: number;
   hp: number;
   mp: number;
-  potions: { hp: number; mp: number };
+  potions: PotionBag;
   equipped: Partial<Record<Slot, Item>>;
   bag: Item[];
   /** Highest floor reached (0-based). 3 = boss lair unlocked. */
   maxFloor: number;
   bossKills: number;
+  /** Ids of bosses beaten at least once (unlocks the next area). */
+  bossesBeaten?: string[];
   /** Right answers in a row (3 = power attack ready). Carries over between fights. */
   streak?: number;
   learning: LearningStats;
@@ -51,7 +54,8 @@ export interface DerivedStats {
 }
 
 export function xpToNext(level: number): number {
-  return Math.round(45 + level * level * 14);
+  // About 10-18 monsters per level from level 1 up to 20.
+  return Math.round(40 + 20 * level ** 1.6);
 }
 
 export function newProfile(name: string, classId: string, grade: Grade = 4): Profile {
@@ -66,7 +70,7 @@ export function newProfile(name: string, classId: string, grade: Grade = 4): Pro
     gold: 20,
     hp: 1,
     mp: 1,
-    potions: { hp: 3, mp: 1 },
+    potions: { hp1: 3, mp1: 1 },
     equipped: {},
     bag: [],
     maxFloor: 0,
@@ -196,7 +200,11 @@ export function loadProfiles(): Profile[] {
     const raw = localStorage.getItem(KEY);
     const list = raw ? (JSON.parse(raw) as Profile[]) : [];
     // Older saves are missing newer settings (grade, topics).
-    for (const p of list) p.settings = upgradeSettings(p.settings ?? {});
+    for (const p of list) {
+      p.settings = upgradeSettings(p.settings ?? {});
+      p.potions = upgradePotions(p.potions);
+      p.bossesBeaten ??= p.bossKills > 0 ? ['grukk'] : [];
+    }
     return list;
   } catch {
     return [];

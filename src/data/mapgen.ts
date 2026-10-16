@@ -27,6 +27,8 @@ export interface DungeonMap {
   spawns: Pt[];
   camp?: { fire: Pt; fountain: Pt; merchant: Pt };
   boss?: Pt;
+  /** Lairs only: magic portal to the next area (shown once the boss is beaten). */
+  portal?: Pt;
 }
 
 const center = (r: Room): Pt => ({ x: Math.floor(r.x + r.w / 2), y: Math.floor(r.y + r.h / 2) });
@@ -83,14 +85,15 @@ export function distances(m: { w: number; h: number; tiles: number[][] }, from: 
   return d;
 }
 
-export function generateFloor(floorIndex: number): DungeonMap {
+/** A random floor. The first floor of each area has a camp in its first room. */
+export function generateFloor(hasCamp: boolean): DungeonMap {
   const w = 46;
   const h = 34;
   const tiles = Array.from({ length: h }, () => Array(w).fill(WALL));
   const rooms: Room[] = [];
 
   // The first room on floor 1 is a roomy camp.
-  const first: Room = floorIndex === 0 ? { x: 3, y: 3, w: 9, h: 7 } : { x: ri(2, 8), y: ri(2, 8), w: ri(6, 8), h: ri(5, 6) };
+  const first: Room = hasCamp ? { x: 3, y: 3, w: 9, h: 7 } : { x: ri(2, 8), y: ri(2, 8), w: ri(6, 8), h: ri(5, 6) };
   rooms.push(first);
   let attempts = 0;
   while (rooms.length < 10 && attempts++ < 400) {
@@ -135,7 +138,7 @@ export function generateFloor(floorIndex: number): DungeonMap {
   // Exit sits against the room's top wall so it looks like a doorway/stairwell.
   map.exit = { x: center(far).x, y: far.y };
 
-  if (floorIndex === 0) {
+  if (hasCamp) {
     map.camp = {
       fire: { x: start.x, y: start.y - 1 },
       fountain: { x: rooms[0].x + 1, y: rooms[0].y + 1 },
@@ -174,6 +177,7 @@ export function generateLair(): DungeonMap {
     chests: [],
     spawns: [],
     boss: { x: 8, y: 4 },
+    portal: { x: 13, y: 9 },
   };
 }
 

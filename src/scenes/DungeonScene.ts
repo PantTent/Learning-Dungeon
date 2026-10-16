@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
-import { BOSS, FLOORS } from '../data/enemies';
+import { AREAS, areaOf, campPlace, placeOf, type AreaDef, type Place } from '../data/areas';
 import { FLOOR, findPath, type Pt } from '../data/mapgen';
 import { makeItem, RARITY } from '../data/items';
 import { classOf, current, derive, saveProfile, xpToNext, LEVEL_CAP, BAG_SIZE } from '../state/profile';
-import { enterFloor, LAIR, respawnOne, worldState, type World, type WorldMonster } from '../state/world';
+import { enterFloor, respawnOne, worldState, type World, type WorldMonster } from '../state/world';
 import { Bar, C, H, W, button, panel, soundButton, toast, txt } from '../ui/widgets';
 import { playMusic, sfx } from '../audio/audio';
+import { POTIONS, countPotions, tierForLevel } from '../data/potions';
+import { openPotionMenu } from '../ui/potionMenu';
 import { ri } from '../util/rng';
 
 const T = 16;
@@ -42,15 +44,17 @@ export class DungeonScene extends Phaser.Scene {
     this.moving = false;
     this.busy = false;
 
-    if (data.fromBattle?.result === 'defeat' || !worldState.world) {
-      worldState.world = enterFloor(0, p.level);
+    if (data.floor !== undefined && data.fromBattle?.result !== 'defeat') {
+      worldState.world = enterFloor(data.floor, p.level);
+    } else if (data.fromBattle?.result === 'defeat' || !worldState.world) {
+      // Knocked out (or just starting): wake up at the camp of the current area.
+      const area = worldState.world ? placeOf(worldState.world.floor).area : placeOf(p.maxFloor).area;
+      worldState.world = enterFloor(campPlace(area), p.level);
       if (data.fromBattle?.result === 'defeat') {
         const s = derive(p);
         p.hp = s.maxHp;
         p.mp = s.maxMp;
       }
-    } else if (data.floor !== undefined) {
-      worldState.world = enterFloor(data.floor, p.level);
     }
     this.world = worldState.world!;
     if (data.fromBattle?.result === 'victory' && data.fromBattle.monsterId) {
@@ -58,11 +62,11 @@ export class DungeonScene extends Phaser.Scene {
       if (Math.random() < 0.5) respawnOne(this.world, p.level);
     }
     if (data.fromBattle) this.graceUntil = this.time.now + 2000;
-    if (this.world.floor > p.maxFloor && this.world.floor <= LAIR) p.maxFloor = this.world.floor;
+    if (this.world.floor > p.maxFloor) p.maxFloor = this.world.floor;
     saveProfile(p);
 
-    this.cameras.main.setBackgroundColor(0x0d0a14);
-    playMusic('dungeon');
+    this.cameras.main.setBackgroundColor(this.area().theme.bg);
+    playMusic(this.area().theme.music);
     this.drawMap();
     this.drawObjects();
 
@@ -80,7 +84,7 @@ export class DungeonScene extends Phaser.Scene {
     this.time.addEvent({ delay: 850, loop: true, callback: () => this.moveMonsters() });
     // Slowly bring monsters back so floors never run dry (bosses and monsters can be farmed).
     this.time.addEvent({ delay: 25000, loop: true, callback: () => {
-      if (this.world.monsters.length < (FLOORS[this.world.floor]?.monsters ?? 0)) {
+      if (this.world.monsters.length < (this.place().floor?.monsters ?? 0)) {
         respawnOne(this.world, current().level);
         this.drawMonsters();
       }
@@ -88,25 +92,53 @@ export class DungeonScene extends Phaser.Scene {
 
     if (data.floor !== undefined || !data.fromBattle) this.showFloorBanner();
     if (data.fromBattle?.result === 'defeat') this.dialog(['You were knocked out!', 'You wake up safe at camp, fully healed. Keep trying - every question makes you smarter!']);
-    if (data.fromBattle?.result === 'bossFail') this.dialog(['Grukk escaped back to his throne!', 'You need 4 out of 5 right to beat him. Rest up and try again - you can do it!']);
+    if (data.fromBattle?.result === 'bossFail') this.dialog([`${this.area().boss.shortName} escaped!`, 'You need 4 out of 5 right to beat him. Rest up and try again - you can do it!']);
+  }
+
+  private place(): Place {
+    return placeOf(this.world.floor);
+  }
+
+  private area(): AreaDef {
+    return areaOf(this.world.floor);
   }
 
   // ---------------------------------------------------------------- map
 
   private drawMap() {
     const { map } = this.world;
+    const th = this.area().theme;
     for (let y = 0; y < map.h; y++) {
       for (let x = 0; x < map.w; x++) {
         const t = map.tiles[y][x];
         let key: string;
-        if (t === FLOOR) key = (x * 7 + y * 13) % 9 === 0 ? 'tile_floor_moss' : 'tile_floor';
+        if (t === FLOOR) key = (x * 7 + y * 13) % 9 === 0 ? th.floorAlt : th.floor;
         else {
           const below = y + 1 < map.h ? map.tiles[y + 1][x] : 0;
-          key = below === FLOOR ? 'tile_wall' : 'tile_wall_top';
+          key = below === FLOOR ? th.wall : th.wallTop;
+        }
+        if (th.outdoor && t !== FLOOR) {
+          // Trees stand on grass.
+          this.add.image(x * TS, y * TS, th.floor).setOrigin(0).setScale(S);
+          const tree = this.add.image(x * TS + TS / 2, y * TS + TS / 2, key).setScale(S).setDepth(key === th.wall ? 3 : 0);
+          if (key === th.wallTop) tree.setTint(0xb8d8b0);
+          continue;
         }
         const img = this.add.image(x * TS, y * TS, key).setOrigin(0).setScale(S);
-        if (t !== FLOOR && key === 'tile_wall_top') img.setTint(0xbbbbcc);
+        if (t !== FLOOR && key === th.wallTop) img.setTint(0xbbbbcc);
+        // Little flowers, bushes and logs scattered on the forest floor.
+        if (t === FLOOR && th.deco.length && (x * 37 + y * 53) % 23 === 0 && !this.isObstacle({ x, y })) {
+          this.add.image(x * TS + TS / 2, y * TS + TS / 2, th.deco[(x + y) % th.deco.length]).setScale(S).setDepth(1);
+        }
       }
+    }
+    if (th.outdoor) {
+      // Fireflies drifting through the trees.
+      for (let i = 0; i < 40; i++) {
+        const f = this.add.image(Phaser.Math.Between(0, map.w * TS), Phaser.Math.Between(0, map.h * TS), 'dot').setTint(0xfff27a).setScale(0.5).setBlendMode('ADD').setDepth(25);
+        this.tweens.add({ targets: f, x: f.x + Phaser.Math.Between(-60, 60), y: f.y + Phaser.Math.Between(-60, 60), alpha: { from: 0.1, to: 0.9 }, duration: Phaser.Math.Between(1500, 3500), yoyo: true, repeat: -1 });
+      }
+      return;
     }
     // Wall torches for atmosphere.
     for (let y = 1; y < map.h - 1; y++) {
@@ -124,15 +156,25 @@ export class DungeonScene extends Phaser.Scene {
     const { map } = this.world;
     const at = (pt: Pt, key: string, depth = 4) => this.add.image(pt.x * TS + TS / 2, pt.y * TS + TS / 2, key).setScale(S).setDepth(depth);
 
-    if (this.world.floor < LAIR) {
-      const isBossDoor = this.world.floor === LAIR - 1;
-      const exit = at(map.exit, isBossDoor ? 'tile_door' : 'tile_stairs_down');
+    const th = this.area().theme;
+    if (this.place().kind === 'floor') {
+      const isBossDoor = placeOf(this.world.floor + 1).kind === 'lair';
+      const exit = at(map.exit, isBossDoor ? th.bossDoor : th.exit);
       if (isBossDoor) {
-        const g = this.add.image(exit.x, exit.y, 'glow').setScale(8).setTint(0xff4040).setAlpha(0.3).setBlendMode('ADD').setDepth(3);
+        const g = this.add.image(exit.x, exit.y, 'glow').setScale(8).setTint(th.outdoor ? 0x6aff4a : 0xff4040).setAlpha(0.3).setBlendMode('ADD').setDepth(3);
         this.tweens.add({ targets: g, alpha: 0.6, duration: 800, yoyo: true, repeat: -1 });
       }
     } else {
-      at(map.exit, 'tile_stairs_down');
+      at(map.exit, th.exit);
+      // After beating the boss, a portal opens to the next area.
+      const next = AREAS[this.place().area + 1];
+      if (map.portal && next && current().bossesBeaten?.includes(this.area().boss.id)) {
+        const portal = at(map.portal, 'tile_portal', 5);
+        this.tweens.add({ targets: portal, angle: 360, duration: 4000, repeat: -1 });
+        const g = this.add.image(portal.x, portal.y, 'glow').setScale(10).setTint(0x9a6aff).setAlpha(0.4).setBlendMode('ADD').setDepth(4);
+        this.tweens.add({ targets: g, alpha: 0.7, scale: 11, duration: 700, yoyo: true, repeat: -1 });
+        this.label({ x: map.portal.x, y: map.portal.y - 1 }, `To ${next.name}`);
+      }
     }
 
     for (const c of map.chests) {
@@ -145,7 +187,7 @@ export class DungeonScene extends Phaser.Scene {
       const fire = at(map.camp.fire, 'tile_campfire');
       const glow = this.add.image(fire.x, fire.y, 'glow').setScale(14).setTint(0xff9a40).setAlpha(0.3).setBlendMode('ADD').setDepth(3);
       this.tweens.add({ targets: glow, alpha: 0.45, scale: 15, duration: 400, yoyo: true, repeat: -1 });
-      at(map.camp.fountain, 'tile_fountain');
+      at(map.camp.fountain, th.spring);
       const m = at(map.camp.merchant, 'npc_merchant', 10);
       m.setFlipX(true);
       this.tweens.add({ targets: m, y: m.y - 3, duration: 900, yoyo: true, repeat: -1 });
@@ -155,9 +197,10 @@ export class DungeonScene extends Phaser.Scene {
     }
 
     if (map.boss) {
-      const b = this.add.image(map.boss.x * TS + TS / 2, map.boss.y * TS + TS / 2, BOSS.sprite).setScale(S).setDepth(15).setFlipX(true);
+      const boss = this.area().boss;
+      const b = this.add.image(map.boss.x * TS + TS / 2, map.boss.y * TS + TS / 2, boss.sprite).setScale(S).setDepth(15).setFlipX(true);
       this.tweens.add({ targets: b, scaleY: S * 1.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-      this.label({ x: map.boss.x, y: map.boss.y - 1 }, BOSS.name);
+      this.label({ x: map.boss.x, y: map.boss.y - 1 }, boss.name);
     }
     this.drawMonsters();
   }
@@ -221,7 +264,7 @@ export class DungeonScene extends Phaser.Scene {
 
     this.hud = { hp, mp, xp, xpBig, xpLeft, xpRight, info, gold, pots, today };
 
-    const floorName = this.world.floor === LAIR ? "Grukk's Throne Room" : FLOORS[this.world.floor].name;
+    const floorName = this.place().name;
     txt(this, W / 2, 14, floorName, 18, '#ffe9a0').setOrigin(0.5, 0).setScrollFactor(0).setDepth(1000);
 
     const bx = W - 70;
@@ -250,7 +293,7 @@ export class DungeonScene extends Phaser.Scene {
     this.hud.xpLeft.setText(`Level ${p.level}`);
     this.hud.xpRight.setText(maxed ? 'MAX LEVEL!' : `XP to level ${p.level + 1}`);
     this.hud.gold.setText(`${p.gold}g`);
-    this.hud.pots.setText(`Potions: ${p.potions.hp} red, ${p.potions.mp} blue`);
+    this.hud.pots.setText(`Potions: ${countPotions(p.potions, 'hp')} health, ${countPotions(p.potions, 'mp')} mana`);
     const d = new Date();
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const day = p.learning.days[key];
@@ -258,16 +301,19 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private drinkPotion() {
-    const p = current();
-    const s = derive(p);
-    if (p.potions.hp <= 0) return toast(this, 'No health potions! Buy some at the camp shop.', C.bad);
-    if (p.hp >= s.maxHp) return toast(this, 'Already at full health!');
-    p.potions.hp--;
-    sfx('potion');
-    p.hp = Math.min(s.maxHp, p.hp + Math.round(s.maxHp * 0.5));
-    this.healFx(this.player);
-    this.refreshHud();
-    saveProfile(p);
+    if (this.busy) return;
+    this.busy = true;
+    this.path = [];
+    openPotionMenu(
+      this,
+      (d, gained) => {
+        this.busy = false;
+        this.healFx(this.player);
+        toast(this, `+${gained} ${d.kind === 'hp' ? 'health' : 'mana'}`, C.good);
+        this.refreshHud();
+      },
+      () => (this.busy = false),
+    );
   }
 
   private healFx(target: Phaser.GameObjects.Image) {
@@ -290,7 +336,8 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   private goCamp() {
-    if (this.world.floor === 0) {
+    const camp = campPlace(this.place().area);
+    if (this.world.floor === camp) {
       this.path = [];
       const camp = this.world.map.start;
       this.player.setPosition(camp.x * TS + TS / 2, camp.y * TS + TS / 2);
@@ -298,12 +345,13 @@ export class DungeonScene extends Phaser.Scene {
       return;
     }
     this.cameras.main.fadeOut(300);
-    this.time.delayedCall(300, () => this.scene.restart({ floor: 0 }));
+    this.time.delayedCall(300, () => this.scene.restart({ floor: camp }));
   }
 
   private showFloorBanner() {
-    const name = this.world.floor === LAIR ? "Grukk's Throne Room" : FLOORS[this.world.floor].name;
-    const sub = this.world.floor === LAIR ? 'The Goblin King awaits...' : `Monsters here: level ${FLOORS[this.world.floor].levels.join(' - ')}`;
+    const pl = this.place();
+    const name = pl.name;
+    const sub = pl.floor ? `Monsters here: level ${pl.floor.levels.join(' - ')}` : this.area().boss.lairSub;
     const c = this.add.container(W / 2, H / 2 - 60).setScrollFactor(0).setDepth(2000);
     c.add(txt(this, 0, 0, name, 36, '#ffd24a').setOrigin(0.5));
     c.add(txt(this, 0, 44, sub, 20, C.dim).setOrigin(0.5));
@@ -444,6 +492,13 @@ export class DungeonScene extends Phaser.Scene {
     const pos = this.world.player;
     const m = this.world.map;
     if (this.checkMonsterContact()) return true;
+    const nextArea = this.place().area + 1;
+    if (m.portal && pos.x === m.portal.x && pos.y === m.portal.y && AREAS[nextArea] && current().bossesBeaten?.includes(this.area().boss.id)) {
+      sfx('summon');
+      this.cameras.main.flash(400, 160, 110, 255);
+      this.time.delayedCall(400, () => this.scene.restart({ floor: campPlace(nextArea) }));
+      return true;
+    }
     if (pos.x === m.exit.x && pos.y === m.exit.y) {
       this.useExit();
       return true;
@@ -485,10 +540,16 @@ export class DungeonScene extends Phaser.Scene {
     this.world.openedChests.add(key);
     sfx('chest');
     this.chestSprites.get(key)?.setTexture('tile_chest_open');
-    const fl = this.world.floor;
-    const ilvl = Math.min(10, ri(FLOORS[fl].levels[0], FLOORS[fl].levels[1]) + 1);
+    const levels = this.place().floor?.levels ?? [1, 3];
+    const ilvl = Math.min(20, ri(levels[0], levels[1]) + 1);
     const item = makeItem(ilvl, { cls: classOf(p), rarity: Math.random() < 0.5 ? 'uncommon' : Math.random() < 0.7 ? 'rare' : 'epic' });
-    const gold = ri(5, 12) * (fl + 1);
+    const gold = ri(5, 12) * Math.ceil(ilvl / 3);
+    // Chests often hold a potion too.
+    if (Math.random() < 0.5) {
+      const d = POTIONS.find((x) => x.kind === (Math.random() < 0.7 ? 'hp' : 'mp') && x.tier === tierForLevel(ilvl))!;
+      p.potions[d.id] = (p.potions[d.id] ?? 0) + 1;
+      this.time.delayedCall(1300, () => toast(this, `+1 ${d.name}`, '#ff8a8a'));
+    }
     p.bag.push(item);
     p.gold += gold;
     saveProfile(p);
@@ -499,20 +560,24 @@ export class DungeonScene extends Phaser.Scene {
   private useExit() {
     const p = current();
     const w = this.world;
-    if (!(w.floor + 1 === LAIR && p.level < 7)) sfx('stairs');
-    if (w.floor === LAIR) {
+    const boss = this.area().boss;
+    const next = w.floor + 1;
+    const nextIsLair = this.place().kind === 'floor' && placeOf(next).kind === 'lair';
+    if (this.place().kind === 'lair') {
+      // Leave the lair back to the last floor of the area.
+      sfx('stairs');
       this.cameras.main.fadeOut(300);
-      this.time.delayedCall(300, () => this.scene.restart({ floor: LAIR - 1 }));
+      this.time.delayedCall(300, () => this.scene.restart({ floor: w.floor - 1 }));
       return;
     }
-    const next = w.floor + 1;
-    if (next === LAIR && p.level < 7) {
+    if (nextIsLair && p.level < boss.minLevel) {
       this.dialog([
-        'A heavy door with a crown carved on it...',
-        `You hear a big voice: "Come back when you're stronger, tiny hero!" (Reach level 7 to enter. You are level ${p.level}.)`,
+        this.area().theme.outdoor ? 'A huge gate made of twisted roots, glowing green...' : 'A heavy door with a crown carved on it...',
+        `A deep voice rumbles: "Come back when you're stronger, little hero!" (Reach level ${boss.minLevel} to enter. You are level ${p.level}.)`,
       ]);
       return;
     }
+    sfx('stairs');
     this.cameras.main.fadeOut(300);
     this.time.delayedCall(300, () => this.scene.restart({ floor: next }));
   }
@@ -567,9 +632,9 @@ export class DungeonScene extends Phaser.Scene {
 
   private startBoss() {
     this.busy = true;
-    this.dialog(BOSS.intro, () => {
+    this.dialog(this.area().boss.intro, () => {
       this.cameras.main.shake(400, 0.02);
-      this.time.delayedCall(400, () => this.scene.start('Battle', { boss: true }));
+      this.time.delayedCall(400, () => this.scene.start('Battle', { boss: true, bossArea: this.place().area, lair: this.world.floor }));
     });
   }
 

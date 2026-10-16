@@ -19,7 +19,12 @@ REQUIRED = ('hero_warrior hero_mage hero_ranger hero_paladin hero_necromancer he
             'tile_stairs_down tile_door tile_chest tile_chest_open tile_fountain tile_campfire tile_torch npc_merchant '
             'icon_head icon_chest icon_legs icon_hands icon_feet icon_ring icon_neck icon_sword icon_axe icon_mace '
             'icon_dagger icon_wand icon_greatsword icon_greataxe icon_staff icon_bow icon_shield icon_tome icon_potion '
-            'icon_mana icon_gold').split()
+            'icon_mana icon_gold '
+            # Area 2: Whisperwood Forest
+            'tile_grass tile_grass_flowers tile_tree tile_tree_top tile_forest_exit tile_forest_gate tile_spring '
+            'tile_portal deco_bush deco_mushrooms deco_log deco_flowers enemy_boar enemy_pixie enemy_beetle '
+            'enemy_sapling enemy_snapper enemy_owlbear enemy_bandit enemy_mossgolem boss_treant icon_potion_2 '
+            'icon_potion_3 icon_potion_4 icon_mana_2 icon_mana_3 icon_mana_4').split()
 errs = []
 for n, s in sprites.items():
     if len(s['rows']) != s['h']: errs.append(f'{n}: h mismatch')

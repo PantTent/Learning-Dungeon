@@ -20,18 +20,15 @@ export const ENEMIES: Record<string, EnemyDef> = {
   goblin: { id: 'goblin', name: 'Goblin Sneak', sprite: 'enemy_goblin', hp: 1, atk: 1.1, armor: 1, verb: 'stabs' },
   wolf: { id: 'wolf', name: 'Cave Wolf', sprite: 'enemy_wolf', hp: 1.1, atk: 1.15, armor: 0.8, verb: 'bites' },
   skeleton: { id: 'skeleton', name: 'Rattlebones', sprite: 'enemy_skeleton', hp: 1.2, atk: 1.1, armor: 1.3, verb: 'slashes' },
-};
-
-export const BOSS = {
-  id: 'grukk',
-  name: 'Grukk the Goblin King',
-  sprite: 'boss_goblin_king',
-  level: 10,
-  intro: [
-    'GRUKK: "Who dares enter my throne room?!"',
-    'GRUKK: "Only the smartest heroes can beat Grukk!"',
-    'Answer 4 of 5 questions right to defeat him!',
-  ],
+  // Area 2: Whisperwood Forest
+  boar: { id: 'boar', name: 'Tusk Boar', sprite: 'enemy_boar', hp: 1.1, atk: 1.1, armor: 0.9, verb: 'charges at' },
+  pixie: { id: 'pixie', name: 'Prank Pixie', sprite: 'enemy_pixie', hp: 0.7, atk: 1.1, armor: 0.3, verb: 'zaps' },
+  beetle: { id: 'beetle', name: 'Stag Beetle', sprite: 'enemy_beetle', hp: 1.0, atk: 1.0, armor: 1.4, verb: 'pinches' },
+  sapling: { id: 'sapling', name: 'Grumpy Sapling', sprite: 'enemy_sapling', hp: 1.0, atk: 0.95, armor: 1.0, verb: 'whacks' },
+  snapper: { id: 'snapper', name: 'Snap Plant', sprite: 'enemy_snapper', hp: 0.9, atk: 1.2, armor: 0.6, verb: 'chomps' },
+  owlbear: { id: 'owlbear', name: 'Fluffy Owlbear', sprite: 'enemy_owlbear', hp: 1.25, atk: 1.15, armor: 1.0, verb: 'swipes at' },
+  bandit: { id: 'bandit', name: 'Leaf Bandit', sprite: 'enemy_bandit', hp: 0.95, atk: 1.15, armor: 0.8, verb: 'shoots at' },
+  mossgolem: { id: 'mossgolem', name: 'Moss Golem', sprite: 'enemy_mossgolem', hp: 1.3, atk: 1.0, armor: 1.5, verb: 'thumps' },
 };
 
 export interface FloorDef {
@@ -41,13 +38,6 @@ export interface FloorDef {
   maxGroup: number;
   monsters: number;
 }
-
-/** Area 1: Mossfang Caverns. Floor index 0..2, then the boss lair. */
-export const FLOORS: FloorDef[] = [
-  { name: 'Mossfang Caverns - Floor 1', levels: [1, 3], enemies: ['slime', 'rat', 'bat', 'mushroom'], maxGroup: 2, monsters: 9 },
-  { name: 'Mossfang Caverns - Floor 2', levels: [4, 6], enemies: ['mushroom', 'spider', 'goblin', 'bat', 'wolf'], maxGroup: 3, monsters: 10 },
-  { name: 'Mossfang Caverns - Floor 3', levels: [7, 9], enemies: ['goblin', 'wolf', 'skeleton', 'spider'], maxGroup: 3, monsters: 11 },
-];
 
 export interface EnemyInstance {
   def: EnemyDef;

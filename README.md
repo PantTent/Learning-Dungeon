@@ -39,10 +39,17 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   both hands. One-handed weapons can be paired with a shield or spellbook.
 - **Random loot**: Common, Uncommon, Rare, Epic and Legendary rarities, with
   random stats (Strength, Intellect, Agility, Stamina, Armor, Crit).
-- **Area 1, Mossfang Caverns**: 3 random floors, a camp with a healing
-  fountain, a shop and fast travel, treasure chests, and a **level cap of 10**.
-- **Boss: Grukk the Goblin King**. The fight is 5 questions and you need
-  **4 of 5 (80%)** to win. He can be farmed for Rare, Epic and Legendary loot.
+- **Area 1, Mossfang Caverns** (levels 1-10): 3 random cave floors, a camp
+  with a healing fountain, a shop and fast travel, treasure chests. Boss:
+  **Grukk the Goblin King**.
+- **Area 2, Whisperwood Forest** (levels 11-20): a sunny outdoor forest with
+  new monsters, reached through a portal that opens after beating Grukk. Boss:
+  **Old Gnarlroot the Treant**. Level cap is now **20**.
+- **Boss fights** are 5 questions and you need **4 of 5 (80%)** to win.
+  Bosses can be farmed for Rare to Mythic loot.
+- **Potions** in four strengths (Minor, Medium, Major, Superior) for health
+  and mana. They drop from monsters and chests, scaled by monster level, and
+  stronger ones unlock in the shop as you level up.
 - **Parent dashboard** (hold the button on the title screen): accuracy by
   topic, weakest first. You can also set the math/reading mix and turn on
   read-aloud.
@@ -96,5 +103,6 @@ off-hand, rings), the level cap, and the boss's 4-of-5 rule.
 
 ## Roadmap
 - Cloud save + login (Google / email) so progress follows the child across devices
-- Areas 2+ and a higher level cap
+- More areas
+- Full 3D art with gear that shows on the hero (try the preview: `preview3d.html`)
 - iOS build

@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
 import type { Fx, PowerDef, SkillDef } from '../data/classes';
-import { BOSS, makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
+import { makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
+import { AREAS, areaOf, type AreaDef } from '../data/areas';
+import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
+import { openPotionMenu } from '../ui/potionMenu';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
-import { LAIR } from '../state/world';
+import { worldState } from '../state/world';
 import { QuestionPanel } from '../ui/QuestionPanel';
 import { playMusic, sfx, stopMusic, type Sfx } from '../audio/audio';
 import { Bar, C, H, W, button, panel, txt } from '../ui/widgets';
@@ -14,6 +17,9 @@ interface BattleData {
   monsterId?: number;
   group?: EnemyInstance[];
   boss?: boolean;
+  bossArea?: number;
+  /** Place index of the boss lair, to return to after the fight. */
+  lair?: number;
 }
 
 interface Foe {
@@ -51,6 +57,7 @@ export class BattleScene extends Phaser.Scene {
   private earnedXp = 0;
   private earnedGold = 0;
   private lowLevelXp = false;
+  private potionLoot: PotionDef[] = [];
   private powerStars: Phaser.GameObjects.Star[] = [];
   private powerLabel?: Phaser.GameObjects.Text;
   private questionsRight = 0;
@@ -72,6 +79,7 @@ export class BattleScene extends Phaser.Scene {
     this.earnedXp = 0;
     this.earnedGold = 0;
     this.lowLevelXp = false;
+    this.potionLoot = [];
     this.questionsRight = 0;
     this.questionsAsked = 0;
 
@@ -115,7 +123,15 @@ export class BattleScene extends Phaser.Scene {
 
   // ------------------------------------------------------------ setup
 
+  /** The area this fight happens in (for the boss, its own area). */
+  private area(): AreaDef {
+    if (this.isBoss && this.data0.bossArea !== undefined) return AREAS[this.data0.bossArea];
+    return areaOf(worldState.world?.floor ?? 0);
+  }
+
   private drawBackground() {
+    const th = this.area().theme;
+    if (th.outdoor) return this.drawForestBackground();
     this.cameras.main.setBackgroundColor(0x120e1c);
     const g = this.add.graphics().setDepth(0);
     // Back wall
@@ -137,6 +153,30 @@ export class BattleScene extends Phaser.Scene {
       this.add.image(tx, 250, 'tile_torch').setScale(3);
       const glow = this.add.image(tx, 250, 'glow').setScale(12).setTint(0xffa040).setAlpha(0.3).setBlendMode('ADD');
       this.tweens.add({ targets: glow, alpha: 0.45, duration: 450, yoyo: true, repeat: -1 });
+    }
+  }
+
+  /** Sunny forest clearing: sky, a line of trees, grass, light beams and fireflies. */
+  private drawForestBackground() {
+    const th = this.area().theme;
+    this.cameras.main.setBackgroundColor(0x2a5a2a);
+    const g = this.add.graphics().setDepth(0);
+    g.fillGradientStyle(0x8fd8ff, 0x8fd8ff, 0xc8f0d0, 0xc8f0d0, 1).fillRect(0, 0, W, 200);
+    for (let x = -24; x < W; x += 40) {
+      this.add.image(x, 150 + ((x * 7) % 20), th.wallTop).setOrigin(0).setScale(3).setTint(0x9ac89a);
+    }
+    for (let x = -10; x < W; x += 44) this.add.image(x + 24, 230 + ((x * 13) % 16), th.wall).setScale(3.4);
+    for (let x = 0; x < W; x += 48) {
+      for (let y = 266; y < H; y += 48) this.add.image(x, y, (x + y) % 5 === 0 ? th.floorAlt : th.floor).setOrigin(0).setScale(3);
+    }
+    th.deco.forEach((d, i) => this.add.image(90 + i * 230, 470 - (i % 2) * 150, d).setScale(3).setAlpha(0.95));
+    for (const bx of [120, 460, 800]) {
+      const beam = this.add.rectangle(bx, 0, 70, 360, 0xfff6c0, 0.1).setOrigin(0.5, 0).setAngle(-12).setBlendMode('ADD');
+      this.tweens.add({ targets: beam, fillAlpha: 0.2, duration: 1800, yoyo: true, repeat: -1, delay: bx });
+    }
+    for (let i = 0; i < 18; i++) {
+      const f = this.add.image(Phaser.Math.Between(0, W), Phaser.Math.Between(180, H - 140), 'dot').setTint(0xfff27a).setScale(0.45).setBlendMode('ADD');
+      this.tweens.add({ targets: f, x: f.x + Phaser.Math.Between(-50, 50), y: f.y - Phaser.Math.Between(20, 60), alpha: { from: 0.1, to: 0.8 }, duration: Phaser.Math.Between(1500, 3000), yoyo: true, repeat: -1 });
     }
   }
 
@@ -166,12 +206,13 @@ export class BattleScene extends Phaser.Scene {
     // The boss's health is exactly 4.5 full hits: 4 right + 1 wrong (half) is
     // just enough, 3 right is not. That makes "80% to win" happen naturally.
     this.bossUnit = Math.max(2, Math.round(s.power / 2) * 2);
+    const BOSS = this.area().boss;
     const e = makeEnemy('goblin', BOSS.level);
-    e.def = { ...e.def, id: BOSS.id, name: BOSS.name, sprite: BOSS.sprite, verb: 'smashes' };
+    e.def = { ...e.def, id: BOSS.id, name: BOSS.name, sprite: BOSS.sprite, verb: BOSS.verb };
     e.maxHp = (this.bossUnit * 9) / 2;
     e.hp = e.maxHp;
-    e.xp = 220;
-    e.gold = ri(50, 90);
+    e.xp = 22 * BOSS.level;
+    e.gold = ri(5, 9) * BOSS.level;
     const x = 230;
     const y = 280;
     this.add.ellipse(x, y + 90, 150, 26, 0x000000, 0.4).setDepth(1);
@@ -230,9 +271,9 @@ export class BattleScene extends Phaser.Scene {
       c.add(txt(this, 30, H - 40, `New skill at level ${nextLocked.unlock}: ${nextLocked.name}`, 14, C.dim));
     }
     if (!this.isBoss) {
-      c.add(button(this, 530, H - 98, 110, bh, `Potion (${p.potions.hp})`, () => this.usePotion(), { size: 16, color: 0x8a2a3a }).setEnabled(p.potions.hp > 0));
+      const pots = POTIONS.reduce((n, d) => n + (p.potions[d.id] ?? 0), 0);
+      c.add(button(this, 530, H - 98, 110, bh, `Potions (${pots})`, () => this.usePotion(), { size: 16, color: 0x8a2a3a }).setEnabled(pots > 0));
       c.add(button(this, 530, H - 44, 110, 40, 'Run', () => this.run(), { size: 17, color: 0x3a3450 }));
-      if (p.potions.mp > 0) c.add(button(this, 410, H - 44, 110, 40, `Mana (${p.potions.mp})`, () => this.useManaPotion(), { size: 15, color: 0x2a4a8a }));
     }
   }
 
@@ -674,34 +715,23 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  /** Pick a potion to drink; drinking uses your turn. */
   private usePotion() {
-    const p = current();
-    const s = derive(p);
-    if (p.potions.hp <= 0) return;
     this.closeMenu();
-    p.potions.hp--;
-    sfx('potion');
-    const amt = Math.round(s.maxHp * 0.5);
-    p.hp = Math.min(s.maxHp, p.hp + amt);
-    this.heroHp.set(p.hp, s.maxHp);
-    this.sparkle(this.hero, 0xff6b6b);
-    this.floatText(this.hero.x, this.hero.y - 60, `+${amt}`, '#7dff9a', 32);
-    this.say('You drink a health potion.');
-    this.time.delayedCall(700, () => this.enemyTurn());
-  }
-
-  private useManaPotion() {
-    const p = current();
-    const s = derive(p);
-    if (p.potions.mp <= 0) return;
-    this.closeMenu();
-    p.potions.mp--;
-    sfx('potion');
-    p.mp = s.maxMp;
-    this.heroMp.set(p.mp, s.maxMp);
-    this.sparkle(this.hero, 0x5a9aff);
-    this.say('You drink a mana potion. MP full!');
-    this.time.delayedCall(700, () => this.enemyTurn());
+    openPotionMenu(
+      this,
+      (d, gained) => {
+        const p = current();
+        const s = derive(p);
+        this.heroHp.set(p.hp, s.maxHp);
+        this.heroMp.set(p.mp, s.maxMp);
+        this.sparkle(this.hero, d.kind === 'hp' ? 0xff6b6b : 0x5a9aff);
+        this.floatText(this.hero.x, this.hero.y - 60, `+${gained}`, d.kind === 'hp' ? '#7dff9a' : '#7fb8ff', 32);
+        this.say(`You drink a ${d.name}.`);
+        this.time.delayedCall(700, () => this.enemyTurn());
+      },
+      () => this.playerTurn(),
+    );
   }
 
   private run() {
@@ -729,13 +759,18 @@ export class BattleScene extends Phaser.Scene {
       this.earnedXp += this.isBoss ? f.e.xp : xpFor(f.e, p.level);
       if (!this.isBoss && f.e.level < p.level - 1) this.lowLevelXp = true;
       this.earnedGold += f.e.gold;
-      if (!this.isBoss && chance(0.35)) loot.push(makeItem(Math.min(10, f.e.level), { cls }));
+      if (!this.isBoss && chance(0.35)) loot.push(makeItem(Math.min(20, f.e.level), { cls }));
+      // Potions drop too: stronger ones from higher-level monsters.
+      if (!this.isBoss && chance(0.22)) this.potionLoot.push(this.randomPotion(f.e.level));
     }
     if (this.isBoss) {
-      loot.push(makeItem(10, { cls, boss: true }), makeItem(10, { cls, boss: true }));
+      const boss = this.area().boss;
+      loot.push(makeItem(boss.level, { cls, boss: true, lootName: boss.lootName }), makeItem(boss.level, { cls, boss: true, lootName: boss.lootName }));
       p.bossKills++;
-      if (chance(0.5)) p.potions.hp++;
+      p.bossesBeaten = [...new Set([...(p.bossesBeaten ?? []), boss.id])];
+      this.potionLoot.push(this.randomPotion(boss.level, 'hp'), this.randomPotion(boss.level));
     }
+    for (const d of this.potionLoot) p.potions[d.id] = (p.potions[d.id] ?? 0) + 1;
     // Bonus XP for a perfect battle.
     const perfect = this.questionsAsked > 0 && this.questionsRight === this.questionsAsked;
     if (perfect) this.earnedXp = Math.round(this.earnedXp * 1.25);
@@ -860,6 +895,11 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  private randomPotion(level: number, kind?: 'hp' | 'mp'): PotionDef {
+    const k = kind ?? (chance(0.7) ? 'hp' : 'mp');
+    return POTIONS.find((d) => d.kind === k && d.tier === tierForLevel(level))!;
+  }
+
   private victoryPanel(loot: Item[], dropped: number, levels: number, perfect: boolean) {
     const p = current();
     this.say('');
@@ -890,9 +930,11 @@ export class BattleScene extends Phaser.Scene {
       }
       y += 40;
     }
-    if (loot.length) {
+    if (loot.length || this.potionLoot.length) {
       c.add(txt(this, W / 2, y, 'Loot:', 20, C.dim).setOrigin(0.5));
       y += 30;
+    }
+    if (loot.length) {
       loot.forEach((it, i) => {
         const r = RARITY[it.rarity];
         const iy = y + i * 46;
@@ -906,8 +948,20 @@ export class BattleScene extends Phaser.Scene {
       });
       y += loot.length * 46;
     }
+    if (this.potionLoot.length) {
+      this.potionLoot.forEach((d, i) => {
+        const px = W / 2 - 200 + i * 205;
+        c.add(this.add.image(px, y + 16, d.icon).setScale(2));
+        c.add(txt(this, px + 22, y + 6, d.name.replace(' Potion', ''), 15, d.kind === 'hp' ? '#ff9a9a' : '#9ac0ff'));
+      });
+      y += 36;
+    }
     if (dropped) c.add(txt(this, W / 2, y + 4, `Your bag was full! ${dropped} item(s) left behind.`, 16, C.bad).setOrigin(0.5));
-    if (this.isBoss) c.add(txt(this, W / 2, H - 140, 'Grukk will be back on his throne... fight him again for more loot!', 16, C.dim).setOrigin(0.5));
+    if (this.isBoss) {
+      const next = AREAS[(this.data0.bossArea ?? 0) + 1];
+      const msg = next ? `A magic portal to ${next.name} has opened! (${this.area().boss.shortName} will be back for more loot.)` : `${this.area().boss.shortName} will be back... fight again for more loot!`;
+      c.add(txt(this, W / 2, H - 140, msg, 15, next ? '#c8a8ff' : C.dim, { align: 'center', wordWrap: { width: W - 340 } }).setOrigin(0.5));
+    }
     c.add(button(this, W / 2, H - 92, 240, 60, 'Continue', () => this.exit('victory'), { color: 0x2f9a4a, size: 26 }));
   }
 
@@ -944,7 +998,7 @@ export class BattleScene extends Phaser.Scene {
     saveProfile(current());
     this.cameras.main.fadeOut(250);
     this.time.delayedCall(260, () => {
-      if (this.isBoss && result !== 'defeat') this.scene.start('Dungeon', { floor: LAIR, fromBattle: { result } });
+      if (this.isBoss && result !== 'defeat') this.scene.start('Dungeon', { floor: this.data0.lair, fromBattle: { result } });
       else this.scene.start('Dungeon', { fromBattle: { result, monsterId: this.data0.monsterId } });
     });
   }

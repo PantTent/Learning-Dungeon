@@ -24,7 +24,7 @@ function hitsToKill(classId: string, level: number): number {
 
 describe('class balance', () => {
   it('every class needs about the same number of hits (no class falls behind)', () => {
-    for (const lv of [1, 3, 5, 7, 10]) {
+    for (const lv of [1, 3, 5, 7, 10, 13, 16, 20]) {
       // Average a few runs because gear rolls are random.
       const hits = CLASSES.map((c) => {
         let t = 0;
