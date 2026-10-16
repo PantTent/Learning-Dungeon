@@ -115,7 +115,11 @@ export class BattleScene extends Phaser.Scene {
     for (let i = 0; i < 3; i++) {
       this.powerStars.push(this.add.star(W - 110 + i * 34, H - 147, 5, 6, 13, 0x3a2f50).setStrokeStyle(2, 0xffd24a).setDepth(6));
     }
-    if (current().dev) current().streak = 3;
+    if (current().dev) {
+      current().streak = 3;
+      current().mp = derive(current()).maxMp;
+      this.heroMp.set(current().mp, derive(current()).maxMp, false);
+    }
     this.refreshPower();
     this.showPet(false);
 
@@ -337,7 +341,7 @@ export class BattleScene extends Phaser.Scene {
         this.bossAsked++;
         if (correct) this.bossRight++;
       }
-      p.mp -= sk.mp;
+      if (!p.dev) p.mp -= sk.mp; // developer heroes have unlimited mana
       this.heroMp.set(p.mp, derive(p).maxMp);
       this.perform(sk, target, correct);
     };

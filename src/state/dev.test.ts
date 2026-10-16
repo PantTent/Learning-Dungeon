@@ -46,11 +46,11 @@ describe('mana regen after a fight', () => {
     expect(manaRegen(mage)).toBe(1);
   });
 
-  it('is capped at 60% even with huge Intellect', () => {
+  it('is capped at 25% even with huge Intellect', () => {
     const p = newProfile('D', 'demonologist');
     makeDeveloper(p);
     p.mp = 0;
     const max = derive(p).maxMp;
-    expect(manaRegen(p)).toBeLessThanOrEqual(Math.round(max * 0.6));
+    expect(manaRegen(p)).toBeLessThanOrEqual(Math.round(max * 0.25));
   });
 });

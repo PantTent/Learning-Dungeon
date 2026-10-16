@@ -148,11 +148,11 @@ export function makeDeveloper(p: Profile): void {
 
 /**
  * Mana that comes back after winning a fight: each point of Intellect adds
- * 1% (compounded) of max mana, up to 60%. About 11% at 12 Intellect, 26% at
- * 30, 40% at 50.
+ * 0.5% (compounded) of max mana, up to 25%. About 6% at 12 Intellect, 14% at
+ * 30, 22% at 50 - roughly one big spell, so potions still matter.
  */
-export const REGEN_PER_INT = 0.01;
-export const REGEN_CAP = 0.6;
+export const REGEN_PER_INT = 0.005;
+export const REGEN_CAP = 0.25;
 export function manaRegen(p: Profile): number {
   const s = derive(p);
   const pct = Math.min(REGEN_CAP, 1 - (1 - REGEN_PER_INT) ** s.int);
