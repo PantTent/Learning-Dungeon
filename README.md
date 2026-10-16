@@ -69,10 +69,14 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 - **Potions** in four strengths (Minor, Medium, Major, Superior) for health
   and mana. They drop from monsters and chests, scaled by monster level, and
   stronger ones unlock in the shop as you level up.
-- **Game picker**: the app opens to a list of games. A new player picks one
-  game for free; more games can be unlocked later (store purchases are not set
-  up yet). Unlocking and the parent dashboard are behind a grown-ups check
-  (type your birth year). The developer code on the picker unlocks every game.
+- **Game picker and free tier**: the app opens to a list of games. Every game
+  is free to try with every grade and topic: Learning Dungeon's Mossfang
+  Caverns (incl. Grukk), and Learning Farm up to 6 plots and 2 stalls. The full
+  game ($3.99 each, or $7.99 for every game) unlocks the rest (store purchases
+  are not connected yet; limits are in `src/hub/games.ts`). Players who had
+  heroes before the picker keep the full Learning Dungeon. Unlocking and the
+  parent dashboard are behind a grown-ups check (type your birth year). The
+  developer code on the picker unlocks everything.
 - **Learning Farm** (second game, `src/farm`, `src/scenes/Farm*.ts`): plant
   crops that keep growing while the app is closed, harvest them and sell them
   at the market (a right answer pays full price, a wrong one half). Animals get

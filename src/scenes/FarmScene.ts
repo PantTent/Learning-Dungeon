@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { FREE_LIMITS } from '../hub/games';
+import { fullGame } from '../hub/ownership';
+import { fullGamePrompt } from '../ui/unlockPrompt';
 import { playMusic, sfx } from '../audio/audio';
 import { ANIMALS, CROPS, FEED_TRIES, LAND_TIERS, STALL_TIERS, animal, crop } from '../farm/data';
 import {
@@ -426,17 +429,17 @@ export class FarmScene extends Phaser.Scene {
         c.add(b);
       });
     } else {
-      const rows: { icon: string; title: string; desc: string; cost?: number; buy?: () => boolean }[] = [];
+      const rows: { icon: string; title: string; desc: string; cost?: number; buy?: () => boolean; paid?: boolean }[] = [];
       const land = nextLand(this.f);
       rows.push(
         land
-          ? { icon: 'farm_soil', title: tr('Bigger garden'), desc: tr('{n} more garden plots', { n: land.plots - this.f.plots.length }), cost: land.cost, buy: () => buyLand(this.f) }
+          ? { icon: 'farm_soil', title: tr('Bigger garden'), desc: tr('{n} more garden plots', { n: land.plots - this.f.plots.length }), cost: land.cost, buy: () => buyLand(this.f), paid: this.landIsPaid() }
           : { icon: 'farm_soil', title: tr('Bigger garden'), desc: tr('Your garden is as big as it gets!') },
       );
       const st = nextStalls(this.f);
       rows.push(
         st
-          ? { icon: 'farm_hay', title: tr('More stalls'), desc: st.stalls - stallCount(this.f) === 1 ? tr('1 more animal stall') : tr('{n} more animal stalls', { n: st.stalls - stallCount(this.f) }), cost: st.cost, buy: () => buyStalls(this.f) }
+          ? { icon: 'farm_hay', title: tr('More stalls'), desc: st.stalls - stallCount(this.f) === 1 ? tr('1 more animal stall') : tr('{n} more animal stalls', { n: st.stalls - stallCount(this.f) }), cost: st.cost, buy: () => buyStalls(this.f), paid: this.stallsArePaid() }
           : { icon: 'farm_hay', title: tr('More stalls'), desc: tr('Your barn is full size!') },
       );
       rows.push({ icon: 'farm_portal', title: tr('Magic portal'), desc: tr('A door to a magical world... coming soon!') });
@@ -448,7 +451,11 @@ export class FarmScene extends Phaser.Scene {
         c.add(this.add.image(W / 2 - 290, y + 38, r.icon).setScale(r.icon === 'farm_portal' ? 1.8 : 3));
         c.add(txt(this, W / 2 - 240, y + 14, r.title, 20));
         c.add(txt(this, W / 2 - 240, y + 44, r.desc, 15, C.dim));
-        if (r.buy && r.cost !== undefined) {
+        if (r.paid) {
+          c.add(button(this, W / 2 + 240, y + 38, 150, 46, tr('Full game'), () => {
+            fullGamePrompt(this, 'farm', tr('A bigger farm is part of the full game.'));
+          }, { size: 16, color: 0x7a5a2a }));
+        } else if (r.buy && r.cost !== undefined) {
           const b = button(this, W / 2 + 240, y + 38, 150, 46, tr('{n} coins', { n: fmtNum(r.cost) }), () => {
             if (!r.buy!()) return;
             sfx('levelup');
@@ -465,9 +472,22 @@ export class FarmScene extends Phaser.Scene {
     }
   }
 
+  /** The free farm goes up to FREE_LIMITS; bigger is the full game. */
+  private landIsPaid(): boolean {
+    return this.f.landTier + 1 > FREE_LIMITS.farmLandTier && !fullGame('farm');
+  }
+
+  private stallsArePaid(): boolean {
+    return this.f.stallTier + 1 > FREE_LIMITS.farmStallTier && !fullGame('farm');
+  }
+
   private buyLandSign() {
     const next = nextLand(this.f);
     if (!next) return;
+    if (this.landIsPaid()) {
+      fullGamePrompt(this, 'farm', tr('A bigger farm is part of the full game.'));
+      return;
+    }
     if (this.f.coins < next.cost) {
       toast(this, tr('You need {n} coins for more garden.', { n: fmtNum(next.cost) }), '#ffb36b');
       return;
@@ -478,6 +498,10 @@ export class FarmScene extends Phaser.Scene {
   private buyStallSign() {
     const next = nextStalls(this.f);
     if (!next) return;
+    if (this.stallsArePaid()) {
+      fullGamePrompt(this, 'farm', tr('More animal stalls are part of the full game.'));
+      return;
+    }
     if (this.f.coins < next.cost) {
       toast(this, tr('You need {n} coins for more stalls.', { n: fmtNum(next.cost) }), '#ffb36b');
       return;

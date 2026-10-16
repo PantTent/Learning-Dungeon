@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { FREE_LIMITS } from '../hub/games';
+import { fullGame } from '../hub/ownership';
+import { fullGamePrompt } from '../ui/unlockPrompt';
 import { AREAS, areaOf, campPlace, placeOf, type AreaDef, type Place } from '../data/areas';
 import { FLOOR, findPath, type Pt } from '../data/mapgen';
 import { makeItem, RARITY } from '../data/items';
@@ -569,6 +572,11 @@ export class DungeonScene extends Phaser.Scene {
     if (this.checkMonsterContact()) return true;
     const nextArea = this.place().area + 1;
     if (m.portal && pos.x === m.portal.x && pos.y === m.portal.y && AREAS[nextArea] && current().bossesBeaten?.includes(this.area().boss.id)) {
+      // Later areas are part of the full game.
+      if (nextArea >= FREE_LIMITS.dungeonAreas && !fullGame('dungeon')) {
+        fullGamePrompt(this, 'dungeon', tr('{place} is waiting on the other side of the portal!', { place: tr(AREAS[nextArea].name) }));
+        return true;
+      }
       sfx('summon');
       this.cameras.main.flash(400, 160, 110, 255);
       this.time.delayedCall(400, () => this.scene.restart({ floor: campPlace(nextArea) }));

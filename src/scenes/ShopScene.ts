@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { FREE_LIMITS } from '../hub/games';
+import { fullGame } from '../hub/ownership';
+import { fullGamePrompt } from '../ui/unlockPrompt';
 import { sfx } from '../audio/audio';
 import { openSellMenu } from '../ui/sellMenu';
 import { AREAS, PLACES } from '../data/areas';
@@ -84,7 +87,12 @@ export class TravelScene extends Phaser.Scene {
         const full = tr(pl.name);
         const prefix = `${tr(area.name)} - `;
         const label = pl.kind !== 'lair' && full.startsWith(prefix) ? full.slice(prefix.length) : full;
+        const paid = ai >= FREE_LIMITS.dungeonAreas && !fullGame('dungeon');
         const b = button(this, x, 172 + i * 62, 360, 52, unlocked ? label : tr('{place} (locked)', { place: label }), () => {
+          if (paid) {
+            fullGamePrompt(this, 'dungeon', tr('{place} is part of the full game.', { place: tr(area.name) }));
+            return;
+          }
           this.scene.stop();
           this.scene.stop('Dungeon');
           this.scene.start('Dungeon', { floor: pl.index });

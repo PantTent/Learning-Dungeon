@@ -31,7 +31,25 @@ export const GAMES: GameInfo[] = [
   { id: 'game3', name: 'Coming soon', blurb: 'Another adventure is being built.', icon: 'tile_chest', color: 0xb26bff },
 ];
 
-/** Price shown for unlocking an extra game ("$1.99", or "1,99 $" in French). */
-export function unlockPrice(lang: 'en' | 'fr'): string {
-  return lang === 'fr' ? '1,99\u00a0$' : '$1.99';
+/**
+ * Every game is free to try (all grades and topics). The full game unlocks
+ * the rest: the Dungeon's later areas, the Farm's bigger land and the magic world.
+ */
+export const FREE_LIMITS = {
+  /** Dungeon areas playable for free (Mossfang Caverns, incl. Grukk). */
+  dungeonAreas: 1,
+  /** Farm land / stall upgrades allowed for free (6 plots, 2 stalls). */
+  farmLandTier: 1,
+  farmStallTier: 1,
+};
+
+/** Unlock id for the "everything" bundle. */
+export const ALL_GAMES = 'all';
+
+const PRICES = { game: 3.99, all: 7.99 };
+
+/** "$3.99" / "3,99 $" for one game, or the everything bundle. */
+export function unlockPrice(lang: 'en' | 'fr', what: 'game' | 'all' = 'game'): string {
+  const n = PRICES[what].toFixed(2);
+  return lang === 'fr' ? `${n.replace('.', ',')}\u00a0$` : `$${n}`;
 }

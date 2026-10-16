@@ -1,14 +1,15 @@
-// Which games this player can play: one free pick, plus games they unlock.
+// Which games this player has the full version of. Every game can be played
+// for free (see FREE_LIMITS); buying a game, or the bundle, unlocks the rest.
 // Kept on the device for now; later this moves to the player's account
-// (Google / Apple sign-in) so a reinstall can't switch the free pick.
-import { GAMES } from './games';
+// (Google / Apple sign-in) so purchases follow them.
+import { ALL_GAMES } from './games';
 
 export interface Ownership {
-  /** The game picked for free (set once). */
+  /** Older versions gave one free game; it counts as the full game. */
   free?: string;
-  /** Games unlocked with a purchase. */
+  /** Unlocked games (game ids, or ALL_GAMES). */
   bought: string[];
-  /** Developer code: every game unlocked. */
+  /** Developer code: everything unlocked. */
   devAll?: boolean;
 }
 
@@ -34,10 +35,12 @@ export function loadOwnership(): Ownership {
   } catch {
     /* fall through */
   }
-  // Players from before the game picker already have Learning Dungeon.
-  const hadHeroes = !!s?.getItem(PROFILES_KEY) && s.getItem(PROFILES_KEY) !== '[]';
-  const o: Ownership = hadHeroes ? { free: 'dungeon', bought: [] } : { bought: [] };
-  if (hadHeroes) saveOwnership(o);
+  // First check on this device. Players from before the game picker (they
+  // already have heroes) keep the full Learning Dungeon. Saving right away
+  // means heroes made later don't count.
+  const heroes = s?.getItem(PROFILES_KEY);
+  const o: Ownership = heroes && heroes !== '[]' ? { free: 'dungeon', bought: [] } : { bought: [] };
+  saveOwnership(o);
   return o;
 }
 
@@ -49,19 +52,16 @@ export function saveOwnership(o: Ownership): void {
   }
 }
 
-export function owns(o: Ownership, id: string): boolean {
-  return !!o.devAll || o.free === id || o.bought.includes(id);
+export function hasFullGame(o: Ownership, id: string): boolean {
+  return !!o.devAll || o.free === id || o.bought.includes(id) || o.bought.includes(ALL_GAMES);
 }
 
-/** Pick the one free game. Only works once. */
-export function chooseFree(o: Ownership, id: string): boolean {
-  if (o.free || !GAMES.some((g) => g.id === id && g.scene)) return false;
-  o.free = id;
-  saveOwnership(o);
-  return true;
+/** Shortcut for game code: does this device have the full version of a game? */
+export function fullGame(id: string): boolean {
+  return hasFullGame(loadOwnership(), id);
 }
 
-/** Record an unlocked game (called after a successful purchase). */
+/** Record an unlock (called after a successful purchase). */
 export function unlockGame(o: Ownership, id: string): void {
   if (!o.bought.includes(id)) o.bought.push(id);
   saveOwnership(o);

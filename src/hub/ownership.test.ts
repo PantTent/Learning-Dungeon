@@ -1,4 +1,5 @@
-import { chooseFree, loadOwnership, owns, unlockGame } from './ownership';
+import { ALL_GAMES, unlockPrice } from './games';
+import { hasFullGame, loadOwnership, unlockGame } from './ownership';
 
 // Tests run in Node: give them a small in-memory localStorage.
 const mem = new Map<string, string>();
@@ -15,29 +16,38 @@ Object.defineProperty(globalThis, 'localStorage', {
 describe('game ownership', () => {
   beforeEach(() => localStorage.clear());
 
-  it('new players pick exactly one free game', () => {
+  it('new players have the free version of every game', () => {
     const o = loadOwnership();
-    expect(o.free).toBeUndefined();
-    expect(owns(o, 'dungeon')).toBe(false);
-    expect(chooseFree(o, 'dungeon')).toBe(true);
-    expect(owns(o, 'dungeon')).toBe(true);
-    expect(chooseFree(o, 'dungeon')).toBe(false);
-    expect(loadOwnership().free).toBe('dungeon');
+    expect(hasFullGame(o, 'dungeon')).toBe(false);
+    expect(hasFullGame(o, 'farm')).toBe(false);
   });
 
-  it('cannot pick a game that is not built yet', () => {
-    expect(chooseFree(loadOwnership(), 'game2')).toBe(false);
+  it('heroes made after the first check do not unlock the full game', () => {
+    loadOwnership();
+    localStorage.setItem('learning-dungeon.profiles.v1', JSON.stringify([{ id: 'new' }]));
+    expect(hasFullGame(loadOwnership(), 'dungeon')).toBe(false);
   });
 
-  it('players who already had heroes keep Learning Dungeon', () => {
+  it('players who already had heroes keep the full Learning Dungeon', () => {
     localStorage.setItem('learning-dungeon.profiles.v1', JSON.stringify([{ id: 'x' }]));
-    expect(owns(loadOwnership(), 'dungeon')).toBe(true);
+    const o = loadOwnership();
+    expect(hasFullGame(o, 'dungeon')).toBe(true);
+    expect(hasFullGame(o, 'farm')).toBe(false);
   });
 
-  it('unlocking and the developer code', () => {
+  it('unlocking one game, the bundle, and the developer code', () => {
     const o = loadOwnership();
-    unlockGame(o, 'game2');
-    expect(owns(loadOwnership(), 'game2')).toBe(true);
-    expect(owns({ bought: [], devAll: true }, 'game3')).toBe(true);
+    unlockGame(o, 'farm');
+    expect(hasFullGame(loadOwnership(), 'farm')).toBe(true);
+    expect(hasFullGame(loadOwnership(), 'dungeon')).toBe(false);
+    unlockGame(o, ALL_GAMES);
+    expect(hasFullGame(loadOwnership(), 'dungeon')).toBe(true);
+    expect(hasFullGame({ bought: [], devAll: true }, 'anything')).toBe(true);
+  });
+
+  it('shows prices per language', () => {
+    expect(unlockPrice('en')).toBe('$3.99');
+    expect(unlockPrice('en', 'all')).toBe('$7.99');
+    expect(unlockPrice('fr', 'all')).toBe('7,99\u00a0$');
   });
 });
