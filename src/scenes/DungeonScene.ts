@@ -40,6 +40,7 @@ export class DungeonScene extends Phaser.Scene {
     const p = current();
     this.monsterSprites.clear();
     this.chestSprites.clear();
+    this.glowSpots = [];
     this.path = [];
     this.moving = false;
     this.busy = false;
@@ -76,6 +77,30 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.setBounds(-W / 2, -H / 2, this.world.map.w * TS + W, this.world.map.h * TS + H);
     this.cameras.main.fadeIn(300);
 
+    // The hero's pet trots along one step behind.
+    this.petSprite = undefined;
+    if (p.pet) {
+      this.petSprite = this.add.image(this.player.x - TS, this.player.y, p.pet.sprite).setScale(S * 0.85).setDepth(19);
+      this.tweens.add({ targets: this.petSprite, y: this.petSprite.y - 4, duration: 450, yoyo: true, repeat: -1 });
+    }
+
+    // Caves are dark: torches, the camp and the hero carry their own light.
+    this.dark = undefined;
+    if (!this.area().theme.outdoor) {
+      this.makeLightTexture();
+      this.dark = this.add.renderTexture(0, 0, W, H).setOrigin(0).setScrollFactor(0).setDepth(900);
+      this.brush = this.make.image({ key: 'softlight', add: false });
+      const m = this.world.map;
+      const add = (pt: Pt | undefined, r: number) => pt && this.glowSpots.push({ x: pt.x * TS + TS / 2, y: pt.y * TS + TS / 2, r, flicker: pt.x + pt.y });
+      add(m.camp?.fire, 320);
+      add(m.camp?.fountain, 150);
+      add(m.camp?.merchant, 130);
+      add(m.exit, 170);
+      add(m.portal, 200);
+      add(m.boss, 260);
+      m.chests.forEach((c) => add(c, 90));
+    }
+
     this.marker = this.add.rectangle(0, 0, TS - 6, TS - 6).setStrokeStyle(3, 0xffd24a, 0.8).setVisible(false).setDepth(5);
 
     this.buildHud();
@@ -95,6 +120,39 @@ export class DungeonScene extends Phaser.Scene {
     if (data.fromBattle?.result === 'bossFail') this.dialog([`${this.area().boss.shortName} escaped!`, 'You need 4 out of 5 right to beat him. Rest up and try again - you can do it!']);
   }
 
+  private glowSpots: { x: number; y: number; r: number; flicker: number }[] = [];
+  private dark?: Phaser.GameObjects.RenderTexture;
+  private brush?: Phaser.GameObjects.Image;
+  private petSprite?: Phaser.GameObjects.Image;
+
+  private makeLightTexture() {
+    if (this.textures.exists('softlight')) return;
+    const tex = this.textures.createCanvas('softlight', 256, 256)!;
+    const c = tex.getContext();
+    const g = c.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.7)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 256, 256);
+    tex.refresh();
+  }
+
+  /** Redraw the darkness each frame, cutting soft flickering holes for each light. */
+  private drawDarkness(time: number) {
+    if (!this.dark || !this.brush) return;
+    const view = this.cameras.main.worldView;
+    this.dark.clear();
+    this.dark.fill(0x030206, 0.84);
+    const cut = (x: number, y: number, r: number) => {
+      if (x + r < view.x || x - r > view.right || y + r < view.y || y - r > view.bottom) return;
+      this.brush!.setScale((r * 2) / 256);
+      this.dark!.erase(this.brush!, x - view.x, y - view.y);
+    };
+    for (const l of this.glowSpots) cut(l.x, l.y, l.r * (1 + Math.sin(time / 90 + l.flicker) * 0.04 + Math.sin(time / 37 + l.flicker * 3) * 0.03));
+    cut(this.player.x, this.player.y, 250);
+  }
+
   private place(): Place {
     return placeOf(this.world.floor);
   }
@@ -108,9 +166,15 @@ export class DungeonScene extends Phaser.Scene {
   private drawMap() {
     const { map } = this.world;
     const th = this.area().theme;
+    // Only walls right next to a room or path are drawn; everything else is empty darkness.
+    const nearFloor = (x: number, y: number) => {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (map.tiles[y + dy]?.[x + dx] === FLOOR) return true;
+      return false;
+    };
     for (let y = 0; y < map.h; y++) {
       for (let x = 0; x < map.w; x++) {
         const t = map.tiles[y][x];
+        if (t !== FLOOR && !nearFloor(x, y)) continue;
         let key: string;
         if (t === FLOOR) key = (x * 7 + y * 13) % 9 === 0 ? th.floorAlt : th.floor;
         else {
@@ -143,8 +207,9 @@ export class DungeonScene extends Phaser.Scene {
     // Wall torches for atmosphere.
     for (let y = 1; y < map.h - 1; y++) {
       for (let x = 0; x < map.w; x++) {
-        if (map.tiles[y][x] !== FLOOR && map.tiles[y + 1][x] === FLOOR && (x * 31 + y * 17) % 11 === 0) {
+        if (map.tiles[y][x] !== FLOOR && map.tiles[y + 1][x] === FLOOR && (x * 31 + y * 17) % 6 === 0) {
           const torch = this.add.image(x * TS + TS / 2, y * TS + TS / 2, 'tile_torch').setScale(S).setDepth(2);
+          this.glowSpots.push({ x: torch.x, y: torch.y + 20, r: 230, flicker: x * 3.1 + y });
           const glow = this.add.image(torch.x, torch.y, 'glow').setScale(9).setTint(0xffa040).setAlpha(0.25).setDepth(1).setBlendMode('ADD');
           this.tweens.add({ targets: glow, alpha: 0.4, scale: 10, duration: 500 + ((x * y) % 300), yoyo: true, repeat: -1 });
         }
@@ -270,14 +335,15 @@ export class DungeonScene extends Phaser.Scene {
     const bx = W - 70;
     const mk = (y: number, label: string, fn: () => void, color = 0x4b3a78) => button(this, bx, y, 120, 50, label, fn, { size: 19, color }).setScrollFactor(0).setDepth(1000);
     mk(36, 'Bag', () => this.openOverlay('Inventory'));
-    mk(94, 'Potion', () => this.drinkPotion(), 0x8a2a3a);
-    mk(152, 'Camp', () => this.goCamp(), 0x2e5a7a);
-    mk(210, 'Save & Quit', () => {
+    mk(94, 'Spells', () => this.openOverlay('Spells'), 0x5a3a8a);
+    mk(152, 'Potion', () => this.drinkPotion(), 0x8a2a3a);
+    mk(210, 'Camp', () => this.goCamp(), 0x2e5a7a);
+    mk(268, 'Save & Quit', () => {
       saveProfile(current());
       worldState.world = null;
       this.scene.start('Title');
     }, 0x3a3450).label.setFontSize(15);
-    soundButton(this, bx, 268).setScrollFactor(0).setDepth(1000);
+    soundButton(this, bx, 326).setScrollFactor(0).setDepth(1000);
     this.refreshHud(false);
   }
 
@@ -323,7 +389,7 @@ export class DungeonScene extends Phaser.Scene {
     }
   }
 
-  private openOverlay(key: 'Inventory' | 'Shop' | 'Travel') {
+  private openOverlay(key: 'Inventory' | 'Shop' | 'Travel' | 'Spells') {
     if (this.busy) return;
     this.busy = true;
     this.path = [];
@@ -432,7 +498,8 @@ export class DungeonScene extends Phaser.Scene {
     this.tweens.add({ targets: this.marker, alpha: 0, duration: 600 });
   }
 
-  update() {
+  update(time: number) {
+    this.drawDarkness(time);
     if (this.busy || this.moving || !this.keys) return;
     const k = this.keys;
     let dx = 0;
@@ -469,7 +536,12 @@ export class DungeonScene extends Phaser.Scene {
     }
     this.moving = true;
     if (next.x !== this.world.player.x) this.player.setFlipX(next.x < this.world.player.x);
+    const prev = this.world.player;
     this.world.player = next;
+    if (this.petSprite) {
+      this.petSprite.setFlipX(next.x < prev.x);
+      this.tweens.add({ targets: this.petSprite, x: prev.x * TS + TS / 2, y: prev.y * TS + TS / 2, duration: 130 });
+    }
     this.tweens.add({
       targets: this.player,
       x: next.x * TS + TS / 2,
@@ -514,8 +586,9 @@ export class DungeonScene extends Phaser.Scene {
       const s = derive(p);
       p.hp = s.maxHp;
       p.mp = s.maxMp;
+      if (p.pet) p.pet.hp = p.pet.maxHp;
       this.healFx(this.player);
-      toast(this, 'The fountain heals you completely!', C.good);
+      toast(this, p.pet ? `The water heals you and your ${p.pet.name}!` : 'The water heals you completely!', C.good);
       sfx('heal');
       this.refreshHud();
       saveProfile(p);

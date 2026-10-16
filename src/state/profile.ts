@@ -30,6 +30,10 @@ export interface Profile {
   /** Highest floor reached (0-based). 3 = boss lair unlocked. */
   maxFloor: number;
   bossKills: number;
+  /** The 3 spells the hero brings into battle (ids); undefined = newest 3. */
+  spells?: string[];
+  /** Summoned pet that follows the hero between fights (undefined = none). */
+  pet?: PetState;
   /** Ids of bosses beaten at least once (unlocks the next area). */
   bossesBeaten?: string[];
   /** Right answers in a row (3 = power attack ready). Carries over between fights. */
@@ -38,6 +42,15 @@ export interface Profile {
   settings: LearningSettings;
   createdAt: number;
   lastPlayed: number;
+}
+
+export interface PetState {
+  name: string;
+  sprite: string;
+  hp: number;
+  maxHp: number;
+  /** Damage multiplier vs. the hero's power. */
+  power: number;
 }
 
 export interface DerivedStats {

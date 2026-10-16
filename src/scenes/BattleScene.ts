@@ -4,6 +4,7 @@ import { makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
 import { AREAS, areaOf, type AreaDef } from '../data/areas';
 import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
+import { MAX_CHOSEN, chosenSpells } from '../data/spells';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, saveProfile } from '../state/profile';
@@ -32,7 +33,7 @@ interface Foe {
 
 const FX_COLOR: Record<Fx, number> = {
   slash: 0xffffff, fire: 0xff7a2a, frost: 0x8fd8ff, arcane: 0xd07aff, arrow: 0xe8d8a0,
-  holy: 0xffe680, shadow: 0x9a4aff, nature: 0x7ad04a, fel: 0x6aff4a, heal: 0x7dff9a,
+  holy: 0xffe680, shadow: 0x9a4aff, nature: 0x7ad04a, fel: 0x6aff4a, heal: 0x7dff9a, lightning: 0xbfe8ff,
 };
 
 const BOSS_QUESTIONS = 5;
@@ -48,7 +49,9 @@ export class BattleScene extends Phaser.Scene {
   private menu?: Phaser.GameObjects.Container;
   private log!: Phaser.GameObjects.Text;
   private engine!: QuestionEngine;
-  private minion?: { sprite: Phaser.GameObjects.Image; turns: number; power: number };
+  /** The hero's pet (lives in the profile so it follows between fights). */
+  private petSprite?: Phaser.GameObjects.Image;
+  private petBar?: Bar;
   private isBoss = false;
   private bossAsked = 0;
   private bossRight = 0;
@@ -71,7 +74,8 @@ export class BattleScene extends Phaser.Scene {
     this.data0 = data;
     this.foes = [];
     this.pips = [];
-    this.minion = undefined;
+    this.petSprite = undefined;
+    this.petBar = undefined;
     this.menu = undefined;
     this.isBoss = !!data.boss;
     this.bossAsked = 0;
@@ -111,6 +115,7 @@ export class BattleScene extends Phaser.Scene {
       this.powerStars.push(this.add.star(W - 110 + i * 34, H - 147, 5, 6, 13, 0x3a2f50).setStrokeStyle(2, 0xffd24a).setDepth(6));
     }
     this.refreshPower();
+    this.showPet(false);
 
     this.log = txt(this, W / 2, 16, '', 20, '#ffe9a0', { align: 'center', wordWrap: { width: 600 } }).setOrigin(0.5, 0).setDepth(50);
 
@@ -244,12 +249,13 @@ export class BattleScene extends Phaser.Scene {
     this.menu = c;
     c.add(panel(this, 10, H - 128, W - 320, 118, 0x1d1730));
 
-    const skills = this.isBoss ? [cls.skills[0]] : cls.skills.filter((s) => s.unlock <= p.level);
-    const bw = 150;
+    // The free basic attack plus the 3 spells chosen in the Spellbook.
+    const skills = this.isBoss ? [cls.skills[0]] : [cls.skills[0], ...chosenSpells(cls.skills, p.level, p.spells)];
+    const bw = 200;
     const bh = 48;
     skills.forEach((sk, i) => {
-      const x = 30 + bw / 2 + (i % 3) * (bw + 10);
-      const y = H - 98 + Math.floor(i / 3) * (bh + 8);
+      const x = 30 + bw / 2 + (i % 2) * (bw + 10);
+      const y = H - 98 + Math.floor(i / 2) * (bh + 8);
       const label = sk.mp ? `${sk.name}\n${sk.mp} MP` : sk.name;
       const b = button(this, x, y, bw, bh, label, () => this.chooseSkill(sk), { size: sk.mp ? 15 : 19, color: 0x4b3a78 });
       if (sk.mp > p.mp) b.setEnabled(false);
@@ -267,8 +273,9 @@ export class BattleScene extends Phaser.Scene {
     }
     // Locked skill hints so kids know what's coming.
     const nextLocked = cls.skills.find((s) => s.unlock > p.level);
-    if (nextLocked && !this.isBoss) {
-      c.add(txt(this, 30, H - 40, `New skill at level ${nextLocked.unlock}: ${nextLocked.name}`, 14, C.dim));
+    if (nextLocked && !this.isBoss && skills.length < 4) {
+      const n = skills.length;
+      c.add(txt(this, 34 + (n % 2) * (bw + 10), H - 116 + Math.floor(n / 2) * (bh + 8), `New spell at level ${nextLocked.unlock}: ${nextLocked.name}`, 14, C.dim, { wordWrap: { width: bw - 8 } }));
     }
     if (!this.isBoss) {
       const pots = POTIONS.reduce((n, d) => n + (p.potions[d.id] ?? 0), 0);
@@ -590,9 +597,15 @@ export class BattleScene extends Phaser.Scene {
       case 'summon': {
         const cls = classOf(p);
         this.castPose(() => {
-          this.summon(cls.summon!.sprite, correct ? 4 : 2, sk.power);
+          const had = !!p.pet;
+          // Pets have about a third of the hero's health (more at higher ranks).
+          const rank = sk.id.endsWith('3') ? 3 : sk.id.endsWith('2') ? 2 : 1;
+          const maxHp = Math.round(derive(p).maxHp * (0.28 + rank * 0.04));
+          p.pet = { name: cls.summon!.name, sprite: cls.summon!.sprite, maxHp, hp: correct ? maxHp : Math.round(maxHp * 0.6), power: sk.power };
+          this.showPet(true);
           sfx('summon');
-          this.say(`${cls.summon!.name} joins the fight for ${correct ? 4 : 2} turns!`);
+          this.say(had ? `Your ${cls.summon!.name} is healed and powered up!` : `Your ${cls.summon!.name} will follow you into every fight!`);
+          saveProfile(p);
           after();
         });
         return;
@@ -600,7 +613,15 @@ export class BattleScene extends Phaser.Scene {
       case 'aoe': {
         const targets = this.alive();
         this.attackAnim(sk, null, () => {
-          targets.forEach((f, i) => this.time.delayedCall(i * 120, () => this.hit(f, this.calcDamage(sk, f, correct), correct, sk.fx)));
+          targets.forEach((f, i) =>
+            this.time.delayedCall(i * 120, () => {
+              this.hit(f, this.calcDamage(sk, f, correct), correct, sk.fx);
+              if (correct && sk.stunChance && f.e.hp > 0 && chance(sk.stunChance)) {
+                f.e.stunned = true;
+                this.floatText(f.sprite.x, f.sprite.y - 90, 'FROZEN!', '#8fd8ff', 20);
+              }
+            }),
+          );
           this.time.delayedCall(targets.length * 120 + 200, after);
         });
         return;
@@ -628,29 +649,22 @@ export class BattleScene extends Phaser.Scene {
 
   private afterPlayerAction() {
     if (this.checkWin()) return;
-    // Summoned helper attacks a random living foe.
-    if (this.minion && this.minion.turns > 0) {
-      const m = this.minion;
+    // The pet attacks a random living foe (pets just cheer during boss fights).
+    const pet = current().pet;
+    if (pet && this.petSprite && !this.isBoss) {
+      const sp = this.petSprite;
       const t = Phaser.Utils.Array.GetRandom(this.alive());
-      m.turns--;
-      const home = { x: m.sprite.x, y: m.sprite.y };
+      const home = { x: sp.x, y: sp.y };
       this.tweens.add({
-        targets: m.sprite,
+        targets: sp,
         x: t.sprite.x + 70,
         y: t.sprite.y,
         duration: 220,
         ease: 'Quad.In',
         onComplete: () => {
-          const dmg = Math.max(1, Math.round(derive(current()).power * m.power * rf(0.9, 1.1) - t.e.armor * 0.4));
+          const dmg = Math.max(1, Math.round(derive(current()).power * pet.power * rf(0.9, 1.1) - t.e.armor * 0.4));
           this.hit(t, { dmg, crit: false }, true, 'slash');
-          this.tweens.add({ targets: m.sprite, x: home.x, y: home.y, duration: 260, delay: 120 });
-          if (m.turns <= 0) {
-            this.time.delayedCall(500, () => {
-              this.puff(m.sprite.x, m.sprite.y, 0x9a4aff);
-              m.sprite.destroy();
-              this.minion = undefined;
-            });
-          }
+          this.tweens.add({ targets: sp, x: home.x, y: home.y, duration: 260, delay: 120 });
           this.time.delayedCall(600, () => (this.checkWin() ? undefined : this.enemyTurn()));
         },
       });
@@ -666,9 +680,9 @@ export class BattleScene extends Phaser.Scene {
     const next = () => {
       if (p.hp <= 0) return this.lose();
       if (i >= foes.length) {
-        // Small mana regen each round.
+        // Mana comes back slowly (5% a round), so big spells need planning or potions.
         const s = derive(p);
-        p.mp = Math.min(s.maxMp, p.mp + 2);
+        p.mp = Math.min(s.maxMp, p.mp + Math.max(2, Math.round(s.maxMp * 0.05)));
         this.heroMp.set(p.mp, s.maxMp);
         saveProfile(p);
         if (this.isBoss && this.bossAsked >= BOSS_QUESTIONS) return this.bossFail();
@@ -680,9 +694,44 @@ export class BattleScene extends Phaser.Scene {
         this.say(`${f.e.def.name} is stunned and can't attack!`);
         return this.time.delayedCall(700, next);
       }
-      this.enemyAttack(f, next);
+      // Monsters sometimes go after the pet instead of the hero.
+      if (p.pet && this.petSprite && !this.isBoss && chance(0.35)) this.enemyAttackPet(f, next);
+      else this.enemyAttack(f, next);
     };
     next();
+  }
+
+  private enemyAttackPet(f: Foe, done: () => void) {
+    const p = current();
+    const pet = p.pet!;
+    const sp = this.petSprite!;
+    const dmg = Math.max(1, Math.round(f.e.atk * rf(0.85, 1.15) * 0.8));
+    this.say(`${f.e.def.name} ${f.e.def.verb} your ${pet.name}!`);
+    this.tweens.add({
+      targets: f.sprite,
+      x: sp.x - 90,
+      y: sp.y,
+      duration: 220,
+      ease: 'Quad.In',
+      onComplete: () => {
+        pet.hp = Math.max(0, pet.hp - dmg);
+        this.petBar?.set(pet.hp, pet.maxHp);
+        this.flash(sp, 0xff4040);
+        sfx('hurt');
+        this.floatText(sp.x, sp.y - 50, `-${dmg}`, '#ff6b6b', 24);
+        if (pet.hp <= 0) {
+          this.say(`Your ${pet.name} was defeated! Cast the summon spell to bring it back.`);
+          this.puff(sp.x, sp.y, 0x9a4aff);
+          sp.destroy();
+          this.petBar?.destroy();
+          this.petSprite = undefined;
+          this.petBar = undefined;
+          p.pet = undefined;
+        }
+        saveProfile(p);
+        this.tweens.add({ targets: f.sprite, x: f.home.x, y: f.home.y, duration: 300, delay: 100, onComplete: () => this.time.delayedCall(200, done) });
+      },
+    });
   }
 
   private enemyAttack(f: Foe, done: () => void) {
@@ -785,6 +834,14 @@ export class BattleScene extends Phaser.Scene {
     const before = derive(p);
     const fromLevel = p.level;
     const levels = gainXp(p, this.earnedXp);
+    // New spells drop straight into an empty battle slot.
+    if (levels > 0) {
+      const cur = chosenSpells(cls.skills, p.level - levels, p.spells).map((x) => x.id);
+      for (const sp of cls.skills.filter((x) => x.unlock > p.level - levels && x.unlock <= p.level && x.unlock > 1)) {
+        if (cur.length < MAX_CHOSEN) cur.push(sp.id);
+      }
+      p.spells = cur;
+    }
     saveProfile(p);
     const showVictory = () => this.victoryPanel(kept, loot.length - kept.length, levels, perfect);
     if (levels > 0) this.time.delayedCall(600, () => this.levelUpCelebration(fromLevel, before, showVictory));
@@ -879,7 +936,7 @@ export class BattleScene extends Phaser.Scene {
     const unlocked = cls.skills.find((sk) => sk.unlock > fromLevel && sk.unlock <= p.level);
     const after1 = 700 + shown.length * 220 + 200;
     if (unlocked) {
-      const t = txt(this, W / 2 + 40, 478, `NEW SKILL: ${unlocked.name}!`, 28, '#ff9af0').setOrigin(0.5).setAlpha(0);
+      const t = txt(this, W / 2 + 40, 478, `NEW SPELL: ${unlocked.name}!`, 28, '#ff9af0').setOrigin(0.5).setAlpha(0);
       c.add(t);
       this.tweens.add({ targets: t, alpha: 1, scale: { from: 2, to: 1 }, duration: 400, delay: after1, ease: 'Back.Out' });
     }
@@ -926,7 +983,7 @@ export class BattleScene extends Phaser.Scene {
       const unlocked = classOf(p).skills.find((s) => s.unlock === p.level);
       if (unlocked) {
         y += 34;
-        c.add(txt(this, W / 2, y, `New skill: ${unlocked.name} - ${unlocked.desc}`, 18, '#ffe9a0').setOrigin(0.5));
+        c.add(txt(this, W / 2, y, `New spell: ${unlocked.name}! Open your Spellbook to use it.`, 18, '#ffe9a0').setOrigin(0.5));
       }
       y += 40;
     }
@@ -1047,7 +1104,9 @@ export class BattleScene extends Phaser.Scene {
           this.time.delayedCall(i * 90, () =>
             sk.fx === 'arrow'
               ? this.arrow(this.hero, f.sprite, () => ++landed === list.length && onHit())
-              : this.projectile(this.hero, f.sprite, color, () => ++landed === list.length && onHit()),
+              : sk.fx === 'lightning'
+                ? this.lightning(this.hero, f.sprite, () => ++landed === list.length && onHit())
+                : this.projectile(this.hero, f.sprite, color, () => ++landed === list.length && onHit()),
           ),
         );
         if (sk.fx === 'frost' || sk.fx === 'nature' || sk.fx === 'fel') this.cameras.main.flash(120, (color >> 16) & 255, (color >> 8) & 255, color & 255, false);
@@ -1090,18 +1149,24 @@ export class BattleScene extends Phaser.Scene {
     f.bar.destroy();
   }
 
-  private summon(key: string, turns: number, power: number) {
-    if (this.minion) {
-      this.minion.turns = turns;
+  /** Show the hero's pet (with its own health bar) beside the hero. */
+  private showPet(pop: boolean) {
+    const pet = current().pet;
+    if (!pet) return;
+    const x = this.heroHome.x - 150;
+    const y = this.heroHome.y + 45;
+    if (this.petSprite) {
+      this.petBar?.set(pet.hp, pet.maxHp);
+      this.sparkle(this.petSprite, 0x9a4aff, 12);
       return;
     }
-    const x = this.heroHome.x - 110;
-    const y = this.heroHome.y + 80;
-    this.puff(x, y, 0x9a4aff);
-    const sp = this.add.image(x, y, key).setScale(0).setFlipX(true).setDepth(11);
-    this.tweens.add({ targets: sp, scale: 4.5, duration: 350, ease: 'Back.Out' });
+    if (pop) this.puff(x, y, 0x9a4aff);
+    const sp = this.add.image(x, y, pet.sprite).setScale(pop ? 0 : 4.5).setFlipX(true).setDepth(11);
+    if (pop) this.tweens.add({ targets: sp, scale: 4.5, duration: 350, ease: 'Back.Out' });
     this.tweens.add({ targets: sp, y: y - 6, duration: 600, yoyo: true, repeat: -1, delay: 400 });
-    this.minion = { sprite: sp, turns, power };
+    this.petSprite = sp;
+    this.petBar = new Bar(this, x - 40, y - 50, 80, 9, C.hp, false).setDepth(20);
+    this.petBar.set(pet.hp, pet.maxHp, false);
   }
 
   private flash(obj: Phaser.GameObjects.Image, color: number) {
@@ -1181,6 +1246,33 @@ export class BattleScene extends Phaser.Scene {
         this.time.delayedCall(320, () => trail.destroy());
         onHit();
       },
+    });
+  }
+
+  /** A crackling zig-zag lightning bolt. */
+  private lightning(from: Phaser.GameObjects.Image, to: Phaser.GameObjects.Image, onHit: () => void) {
+    const g = this.add.graphics().setDepth(160).setBlendMode('ADD');
+    const draw = () => {
+      g.clear();
+      for (const [w, col, a] of [[8, 0x6ab8ff, 0.5], [3, 0xffffff, 1]] as const) {
+        g.lineStyle(w, col, a);
+        g.beginPath();
+        g.moveTo(from.x - 30, from.y - 10);
+        const n = 7;
+        for (let i = 1; i < n; i++) {
+          const t = i / n;
+          g.lineTo(from.x - 30 + (to.x - from.x + 30) * t + Phaser.Math.Between(-10, 10), from.y - 10 + (to.y - from.y + 10) * t + Phaser.Math.Between(-22, 22));
+        }
+        g.lineTo(to.x, to.y);
+        g.strokePath();
+      }
+    };
+    draw();
+    this.cameras.main.flash(80, 180, 220, 255, false);
+    this.time.addEvent({ delay: 50, repeat: 3, callback: draw });
+    this.time.delayedCall(220, () => {
+      g.destroy();
+      onHit();
     });
   }
 

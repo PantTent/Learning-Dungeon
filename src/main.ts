@@ -6,6 +6,7 @@ import { DungeonScene } from './scenes/DungeonScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { ParentScene } from './scenes/ParentScene';
 import { PracticeScene } from './scenes/PracticeScene';
+import { SpellbookScene } from './scenes/SpellbookScene';
 import { ShopScene, TravelScene } from './scenes/ShopScene';
 import { TitleScene } from './scenes/TitleScene';
 import { H, W } from './ui/widgets';
@@ -20,7 +21,7 @@ const game = new Phaser.Game({
   pixelArt: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 2 },
-  scene: [BootScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene],
+  scene: [BootScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene],
 });
 
 // Browsers only allow sound after the player taps or presses a key.

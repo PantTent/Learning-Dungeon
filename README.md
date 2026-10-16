@@ -32,8 +32,17 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 ## What's in v0.1
 
 - **7 classes**: Warrior, Mage, Ranger, Paladin, Necromancer (summons
-  skeletons), Druid, and Demonologist (summons an imp). Each has 3 skills,
-  unlocked at levels 1, 3 and 6.
+  skeletons), Druid, and Demonologist (summons an imp).
+- **Spellbook**: each class has 10 spells. A new spell or a stronger rank
+  (I/II/III) unlocks every 2 levels. Pick **3** to bring into battle, plus a
+  free basic attack. Mages get fire, ice, arcane and lightning, including
+  spells that hit every enemy. Stronger spells cost a lot more mana.
+- **Summons** (Necromancer skeleton, Demonologist imp): cast once and the pet
+  follows you on the map and into every fight. It has about 1/3 of your
+  health, and monsters can attack it and defeat it. Casting again heals or
+  upgrades it, and the camp fountain heals it too.
+- **Lighting**: caves are dark, with flickering torches and glowing campfires,
+  portals and chests. Places outside the rooms and paths are just empty black.
 - **Gear slots**: head, necklace, chest, gloves, pants, boots, 2 rings, main
   hand and off hand. Two-handed weapons (greatsword, greataxe, staff, bow) take
   both hands. One-handed weapons can be paired with a shield or spellbook.

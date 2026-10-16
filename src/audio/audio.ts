@@ -168,7 +168,7 @@ export type Sfx =
   | 'click' | 'correct' | 'wrong' | 'slash' | 'arrow' | 'fire' | 'frost' | 'arcane' | 'holy'
   | 'shadow' | 'nature' | 'fel' | 'hit' | 'crit' | 'hurt' | 'die' | 'heal' | 'summon'
   | 'levelup' | 'victory' | 'defeat' | 'coin' | 'chest' | 'equip' | 'encounter' | 'stairs'
-  | 'roar' | 'potion' | 'teacher' | 'power' | 'boom' | 'ready';
+  | 'roar' | 'potion' | 'teacher' | 'power' | 'boom' | 'ready' | 'lightning';
 
 export function sfx(name: Sfx) {
   const c = ensure();
@@ -311,6 +311,11 @@ export function sfx(name: Sfx) {
     case 'ready':
       arp(['G5', 'C6', 'E6', 'G6', 'C7'], t, 0.05, { type: 'square', vol: 0.07 });
       tone(freq('C7'), t + 0.25, 0.3, { type: 'sine', vol: 0.12, vibrato: 8 });
+      break;
+    case 'lightning':
+      // Crackle and zap.
+      for (let i = 0; i < 5; i++) noise(t + i * 0.035, 0.05, { filter: 3000 + i * 800, type: 'highpass', vol: 0.35 });
+      tone(1800, t, 0.25, { type: 'sawtooth', vol: 0.06, slideTo: 200 });
       break;
     case 'teacher':
       arp(['E5', 'G5', 'C6'], t, 0.08, { type: 'sine', vol: 0.14 });

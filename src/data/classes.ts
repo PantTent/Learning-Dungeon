@@ -1,3 +1,4 @@
+import { SPELL_LISTS } from './spells';
 export type PrimaryStat = 'str' | 'int' | 'agi';
 export type StatKey = 'str' | 'int' | 'agi' | 'sta' | 'armor' | 'crit';
 
@@ -9,7 +10,7 @@ export type OffhandType = 'shield' | 'tome';
 /** Visual effect used when an ability lands. */
 export type Fx =
   | 'slash' | 'fire' | 'frost' | 'arcane' | 'arrow' | 'holy'
-  | 'shadow' | 'nature' | 'fel' | 'heal';
+  | 'shadow' | 'nature' | 'fel' | 'heal' | 'lightning';
 
 export interface SkillDef {
   id: string;
@@ -23,6 +24,8 @@ export interface SkillDef {
   fx: Fx;
   /** True if the hero runs up to the target (melee) instead of casting from place. */
   melee?: boolean;
+  /** Area spells: chance to freeze/stun each enemy hit (on a right answer). */
+  stunChance?: number;
 }
 
 export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal';
@@ -204,3 +207,6 @@ export function growthPerLevel(cls: ClassDef): Record<'str' | 'int' | 'agi' | 's
 export function getClass(id: string): ClassDef {
   return CLASSES.find((c) => c.id === id) ?? CLASSES[0];
 }
+
+// Full spell lists live in spells.ts (10 per class, unlocking every 2 levels).
+for (const c of CLASSES) c.skills = SPELL_LISTS[c.id];
