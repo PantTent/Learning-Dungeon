@@ -30,7 +30,10 @@ REQUIRED = ('hero_warrior hero_mage hero_ranger hero_paladin hero_necromancer he
             'farm_coin farm_portal farm_soil farm_soil_wet farm_path farm_hay_floor farm_fence farm_fence_v '
             'crop_seeds crop_sprout crop_growing crop_carrot crop_tomato crop_corn crop_pumpkin crop_strawberry '
             'item_carrot item_tomato item_corn item_pumpkin item_strawberry '
-            'animal_horse animal_pig animal_chicken animal_goat').split()
+            'animal_horse animal_pig animal_chicken animal_goat '
+            'hat_straw hat_bow hat_crown hat_cap hat_flowers hat_party '
+            'gear_can gear_hat gear_brush gear_basket gear_bell '
+            'farm_board npc_moose npc_beaver npc_owl npc_raccoon').split()
 errs = []
 for n, s in sprites.items():
     if len(s['rows']) != s['h']: errs.append(f'{n}: h mismatch')

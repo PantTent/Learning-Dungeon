@@ -872,3 +872,293 @@ SPRITES['animal_goat'] = grid([
     "..n.n...n.n.....",
     "................",
 ])
+
+
+# ================================================================ animal hats (worn facing right; bottom row sits on the head)
+
+SPRITES['hat_straw'] = {'w': 12, 'rows': grid([
+    "............",
+    "....uYYY....",
+    "...uYYyYy...",
+    "...YYYYYy...",
+    "...RqRRRr...",
+    ".uYYYYYYYyy.",
+    "..yyyyyyyU..",
+    "............",
+], 12)}
+
+SPRITES['hat_bow'] = {'w': 10, 'rows': grid([
+    "..........",
+    ".ii....ii.",
+    ".$ii..iiI.",
+    ".$iiIIiiI.",
+    ".iiiIIiII.",
+    "..I.II.I..",
+    "..........",
+], 10)}
+
+SPRITES['hat_crown'] = {'w': 10, 'rows': grid([
+    "..........",
+    ".u..uu..u.",
+    ".Yu.YY.Yy.",
+    ".YYYYYYYy.",
+    ".YRYaaYRy.",
+    ".uYYYYYYy.",
+    ".yyyyyyyU.",
+    "..........",
+], 10)}
+
+SPRITES['hat_cap'] = {'w': 12, 'rows': grid([
+    "............",
+    "...cBBb.....",
+    "..cBBBBb....",
+    ".cBHHBBBb...",
+    ".BBBBBBBbb..",
+    ".bbbbbbCccc.",
+    "............",
+], 12)}
+
+SPRITES['hat_flowers'] = {'w': 12, 'rows': grid([
+    "............",
+    "..H..i..H...",
+    ".HYHiYiHYHf.",
+    ".EHeEiEeHEe.",
+    ".eEEeEEeEEe.",
+    "............",
+], 12)}
+
+SPRITES['hat_party'] = {'w': 8, 'rows': grid([
+    "........",
+    "...$i...",
+    "...iI...",
+    "...cB...",
+    "...Yy...",
+    "..ccBb..",
+    "..uYYy..",
+    ".cBBBBb.",
+    ".uYYYYy.",
+    "........",
+], 8)}
+
+
+# ================================================================ farmer gear (16x16 shop icons)
+
+SPRITES['gear_can'] = grid([
+    "................",
+    "................",
+    "................",
+    "....eeeee.......",
+    "...e.....e......",
+    "...e.....e..fEe.",
+    "..fEEEEEEEe.fEe.",
+    "..fEfEEEEEeEEe..",
+    "..fEEEEEEEEEe.a.",
+    "..fEEEEEEEEe....",
+    "..fEEEEEEEee.A..",
+    "..EEEEEEEEee.a..",
+    "..eEEEEEEEee..a.",
+    "..eeeeeeeeee....",
+    "................",
+    "................",
+])
+
+SPRITES['gear_hat'] = grid([
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....uYYYY......",
+    "....uYYfYYy.....",
+    "....YYfEfYy.....",
+    "....YYYfFYy.....",
+    "....eEEEFEe.....",
+    ".uuYYYYYYYYYy...",
+    "uYYYYYYYYYYYYy..",
+    ".yyyyyyyyyyyU...",
+    "................",
+    "................",
+    "................",
+    "................",
+])
+
+SPRITES['gear_brush'] = grid([
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....pOOOp......",
+    "....O.....o.....",
+    "....O.....o.....",
+    "..ppppppppppp...",
+    "..pOOOOOOOOOo...",
+    "..pOpOOOOpOOo...",
+    "..ooooooooooo...",
+    "..NmNmNmNmNmN...",
+    "..NmNmNmNmNmN...",
+    "..mMmMmMmMmMm...",
+    "................",
+    "................",
+])
+
+SPRITES['gear_basket'] = grid([
+    "................",
+    "................",
+    ".....pOOOOOp....",
+    "....O.......O...",
+    "...O.f.^.....O..",
+    "...O.E7^RRuY.O..",
+    "...OfE77RqRYYO..",
+    "..pppppppppppp..",
+    "..OpOpOpOpOpOo..",
+    "..pOpOpOpOpOpo..",
+    "..OpOpOpOpOpOo..",
+    "...OpOpOpOpOo...",
+    "...pOpOpOpOpo...",
+    "....oooooooo....",
+    "................",
+    "................",
+])
+
+SPRITES['gear_bell'] = grid([
+    "................",
+    "................",
+    "......RRRR......",
+    ".....R....r.....",
+    ".....R....r.....",
+    ".....uYYYYy.....",
+    ".....uYYYYy.....",
+    "....uuYYYYyy....",
+    "....uYYYYYYy....",
+    "....HYYYYYYy....",
+    "...uuYYYYYYyy...",
+    "...uYYYYYYYYy...",
+    "...yyyyyyyyyU...",
+    "......UUU.......",
+    "................",
+    "................",
+])
+
+
+# ================================================================ orders board (28x24)
+
+def board():
+    c = Canvas(28, 24)
+    # two posts
+    for px in (4, 21):
+        c.rect(px, 3, px + 2, 22, 'O')
+        for y in range(3, 23):
+            c.put(px, y, 'p'); c.put(px + 2, y, 'o')
+    # little roof plank on top
+    c.rect(1, 1, 26, 2, 'R')
+    for x in range(1, 27):
+        c.put(x, 1, 'q'); c.put(x, 2, 'r' if x % 4 == 0 else 'R')
+    # board planks
+    c.rect(2, 4, 25, 16, 'p')
+    for y in range(4, 17):
+        for x in range(2, 26):
+            if y in (8, 12):
+                c.put(x, y, 'O')
+        c.put(2, y, '<'); c.put(25, y, 'o')
+    for x in range(2, 26):
+        c.put(x, 16, 'o'); c.put(x, 4, '<')
+    for (x, y) in ((6, 6), (19, 10), (11, 14), (23, 6)):
+        c.put(x, y, 'O')
+    # three paper notes with pins
+    notes = ((4, 5, 'R', 'W'), (11, 6, 'B', 'u'), (18, 5, 'E', '$'))
+    for (nx, ny, pin, paper) in notes:
+        c.rect(nx, ny, nx + 5, ny + 7, paper)
+        for y in range(ny, ny + 8):
+            c.put(nx + 5, y, 'G' if paper == 'W' else 'm')
+        for x in range(nx, nx + 6):
+            c.put(x, ny + 7, 'G' if paper == 'W' else 'm')
+        for ly in (ny + 3, ny + 5):
+            for x in range(nx + 1, nx + 4):
+                c.put(x, ly, 'g')
+        c.put(nx + 2, ny + 1, pin); c.put(nx + 3, ny + 1, pin)
+        c.put(nx + 2, ny, {'R': 'q', 'B': 'c', 'E': 'f'}[pin])
+    # grass tufts at the post feet
+    for (x, y, ch) in ((3, 22, 'E'), (7, 22, 'E'), (20, 22, 'E'), (24, 22, 'E'), (3, 21, 'f'), (24, 21, 'f')):
+        c.put(x, y, ch)
+    return c.rows()
+
+
+SPRITES['farm_board'] = {'w': 28, 'rows': board()}
+
+
+# ================================================================ neighbour busts (16x16, order cards)
+
+SPRITES['npc_moose'] = grid([
+    "................",
+    ".<.<........<.<.",
+    ".<<<.<....<.<<<.",
+    "..p<<p....p<<p..",
+    "....pp.oo.pp....",
+    "...ooOOOOOOoo...",
+    "....OOOOOOOO....",
+    "....OHkOOHkO....",
+    "....OkkOOkkO....",
+    "....OOOOOOOO....",
+    "...pppppppppp...",
+    "...ppPppppPpp...",
+    "...ppppiipppp...",
+    "....pppppppp....",
+    "..oOOOOOOOOOOo..",
+    "................",
+])
+
+SPRITES['npc_beaver'] = grid([
+    "................",
+    "................",
+    "...oo......oo...",
+    "...oOOOOOOOOo...",
+    "..oOOOOOOOOOOo..",
+    "..OOOOOOOOOOOO..",
+    "..OOHkOOOOHkOO..",
+    "..OOkkOOOOkkOO..",
+    "..OOOppppppOOO..",
+    "..OOppPPPPppOO..",
+    "..OOpppPPpppOO..",
+    "...OppWWWWppO...",
+    "...oOOWHWWOOoPP.",
+    "..oOOOOOOOOOPoP.",
+    "..oOOOOOOOOOPPo.",
+    "................",
+])
+
+SPRITES['npc_owl'] = grid([
+    "................",
+    "..o.........o...",
+    "..oO.......Oo...",
+    "..OOOOOOOOOOO...",
+    "..OggggOggggO...",
+    "..gNNNNgNNNNg...",
+    "..gNHkNgNHkNg...",
+    "..gNkkNgNkkNg...",
+    "..OggggYggggO...",
+    "..OOpppYyppOO...",
+    "..OpNNNNNNNpO...",
+    ".OOpNmNNmNNpOO..",
+    ".OOpNNNNNNNpOO..",
+    ".oOOpNmNNmNpOo..",
+    ".ooOOpppppOOoo..",
+    "................",
+])
+
+SPRITES['npc_raccoon'] = grid([
+    "................",
+    "..gg........gg..",
+    "..gngG....Gngg..",
+    "..gGGGGGGGGGGg..",
+    "..GWWWGGGGWWWG..",
+    "..KKKKKGGKKKKK..",
+    ".GKHkKKGGKHkKKG.",
+    ".GKkkKKGGKkkKKG.",
+    "..GKKKWWWWKKKG..",
+    "..GGWWWkkWWWGG..",
+    "...GWWWWWWWWG...",
+    "....GgWWWWgG....",
+    "...gGGGGGGGGg...",
+    "..gGnGGGGGGnGg..",
+    "..gGGnGGGGnGGg..",
+    "................",
+])

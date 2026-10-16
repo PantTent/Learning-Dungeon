@@ -71,3 +71,65 @@ export function crop(id: string): CropDef {
 export function animal(id: string): AnimalDef {
   return ANIMALS.find((a) => a.id === id) ?? ANIMALS[0];
 }
+
+// ------------------------------------------------------------- part 2
+
+/** Farmer gear: bought once, helps forever. */
+export interface GearDef {
+  id: 'can' | 'hat' | 'brush' | 'basket' | 'bell';
+  name: string;
+  desc: string;
+  cost: number;
+  icon: string;
+}
+
+export const GEAR: GearDef[] = [
+  { id: 'can', name: 'Watering Can', desc: 'Crops grow 30% faster.', cost: 120, icon: 'gear_can' },
+  { id: 'hat', name: 'Lucky Straw Hat', desc: 'Crops sell for 25% more.', cost: 150, icon: 'gear_hat' },
+  { id: 'brush', name: 'Comfy Brush', desc: 'Animals stay happy 50% longer.', cost: 140, icon: 'gear_brush' },
+  { id: 'basket', name: 'Big Basket', desc: '1 in 4 harvests gives 2 crops.', cost: 200, icon: 'gear_basket' },
+  { id: 'bell', name: 'Golden Bell', desc: 'Happy animals earn 50% more.', cost: 250, icon: 'gear_bell' },
+];
+
+export const GEAR_EFFECT = { growSpeed: 1 / 0.7, sellBonus: 1.25, happyLonger: 1.5, doubleChance: 0.25, incomeBonus: 1.5 };
+
+/** Hats for the animals (just for fun). */
+export interface HatDef {
+  id: string;
+  name: string;
+  cost: number;
+  sprite: string;
+}
+
+export const HATS: HatDef[] = [
+  { id: 'straw', name: 'Straw Hat', cost: 30, sprite: 'hat_straw' },
+  { id: 'bow', name: 'Pink Bow', cost: 30, sprite: 'hat_bow' },
+  { id: 'cap', name: 'Baseball Cap', cost: 40, sprite: 'hat_cap' },
+  { id: 'flowers', name: 'Flower Crown', cost: 40, sprite: 'hat_flowers' },
+  { id: 'party', name: 'Party Hat', cost: 50, sprite: 'hat_party' },
+  { id: 'crown', name: 'Royal Crown', cost: 100, sprite: 'hat_crown' },
+];
+
+/** Neighbours who post orders on the board. */
+export const NEIGHBOURS: { id: string; name: string; sprite: string }[] = [
+  { id: 'moose', name: 'Mrs. Moose', sprite: 'npc_moose' },
+  { id: 'beaver', name: 'Mr. Beaver', sprite: 'npc_beaver' },
+  { id: 'owl', name: 'Granny Owl', sprite: 'npc_owl' },
+  { id: 'raccoon', name: 'Rocky Raccoon', sprite: 'npc_raccoon' },
+];
+
+/** A rare shiny harvest worth much more. */
+export const GOLDEN_CHANCE = 0.08;
+export const GOLDEN_MULT = 5;
+/** Orders pay this much more than the market. */
+export const ORDER_BONUS = 1.6;
+export const MAX_ORDERS = 3;
+export const ORDER_EVERY_MS = 45 * S;
+
+export function gear(id: string): GearDef | undefined {
+  return GEAR.find((g) => g.id === id);
+}
+
+export function hat(id: string): HatDef | undefined {
+  return HATS.find((h) => h.id === id);
+}

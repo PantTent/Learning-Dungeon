@@ -83,6 +83,10 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   hungry (a red ! appears); answer a question to feed them (1 right, or 3
   tries, makes them happy). Happy animals earn a little income. Spend coins on
   a bigger garden, more stalls, and pigs, chickens, goats and horses.
+  Neighbours post orders on the order board (bonus coins), harvests are
+  sometimes golden (worth 5x), farmer gear gives bonuses (Watering Can, Lucky
+  Straw Hat, Comfy Brush, Big Basket, Golden Bell), and animals can be renamed
+  and dressed up in hats.
 - **English and French**: pick the language on the title screen, the hero
   screen or the parent dashboard (each hero keeps its own language). French
   heroes get questions from the Quebec curriculum for 1re, 2e and 3e annee:

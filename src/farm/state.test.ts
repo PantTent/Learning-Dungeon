@@ -1,5 +1,8 @@
-import { ANIMALS, CROPS, FEED_TRIES, LAND_TIERS, STALL_TIERS } from './data';
-import { accrue, buyAnimal, buyLand, buyStalls, clock, collect, feed, harvest, isHungry, newFarm, plant, plotState, saleValue, sell } from './state';
+import { ANIMALS, CROPS, FEED_TRIES, GOLDEN_MULT, LAND_TIERS, ORDER_EVERY_MS, STALL_TIERS } from './data';
+import {
+  accrue, buyAnimal, buyGear, buyHat, buyLand, buyStalls, canFill, clock, collect, feed, fillOrder, goldKey, harvest, isHungry, newFarm, newOrder, plant,
+  plotState, refreshOrders, renameAnimal, saleValue, sell, wearHat,
+} from './state';
 
 const T0 = 1_000_000;
 
@@ -21,7 +24,7 @@ describe('Learning Farm rules', () => {
     expect(plotState(f.plots[0], T0 + carrot.growMs - 1)).toBe('growing');
     expect(harvest(f, 0, T0 + 1000)).toBeUndefined();
     expect(plotState(f.plots[0], T0 + carrot.growMs)).toBe('ready');
-    expect(harvest(f, 0, T0 + carrot.growMs)).toBe('carrot');
+    expect(harvest(f, 0, T0 + carrot.growMs, () => 0.99)?.crop).toBe('carrot');
     expect(f.basket.carrot).toBe(1);
     expect(plotState(f.plots[0], T0 + carrot.growMs)).toBe('empty');
   });
@@ -86,5 +89,88 @@ describe('Learning Farm rules', () => {
   it('formats countdowns', () => {
     expect(clock(65_000)).toBe('1:05');
     expect(clock(400)).toBe('0:01');
+  });
+});
+
+describe('Learning Farm part 2', () => {
+  const always = () => 0; // rand() -> 0: golden + double every time
+  const never = () => 0.99;
+
+  it('golden crops sell for 5x, and the Lucky Straw Hat adds 25%', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    plant(f, 0, 'carrot', T0);
+    const h = harvest(f, 0, T0 + 60_000, always)!;
+    expect(h.golden).toBe(true);
+    expect(f.basket[goldKey('carrot')]).toBe(1);
+    expect(saleValue(goldKey('carrot'), 1, true, f)).toBe(CROPS[0].price * GOLDEN_MULT);
+    f.gear.push('hat');
+    expect(saleValue('carrot', 4, true, f)).toBe(Math.round(CROPS[0].price * 4 * 1.25));
+  });
+
+  it('the Big Basket sometimes doubles a harvest; the Watering Can speeds growth', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    f.coins = 1000;
+    expect(buyGear(f, 'basket')).toBe(true);
+    expect(buyGear(f, 'basket')).toBe(false);
+    plant(f, 0, 'carrot', T0);
+    expect(harvest(f, 0, T0 + 60_000, () => 0.1)!.count).toBe(2);
+    expect(buyGear(f, 'can')).toBe(true);
+    plant(f, 1, 'carrot', T0);
+    expect(plotState(f.plots[1], T0 + CROPS[0].growMs * 0.75, f)).toBe('ready');
+    expect(plotState(f.plots[1], T0 + CROPS[0].growMs * 0.6, f)).toBe('growing');
+    expect(harvest(f, 1, T0 + 60_000, never)!.count).toBe(1);
+  });
+
+  it('the Comfy Brush keeps animals happy longer; the Golden Bell earns more', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    const a = f.animals[0];
+    feed(a, true, T0, f);
+    const normal = ANIMALS[0].hungryAfterMs;
+    expect(isHungry(a, T0 + normal, f)).toBe(true);
+    f.gear.push('brush', 'bell');
+    expect(isHungry(a, T0 + normal, f)).toBe(false);
+    expect(collect(f, a, T0 + 60_000)).toBe(ANIMALS[0].incomePerMin * 1.5);
+  });
+
+  it('hats: buy, wear, move to another animal; rename', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    f.coins = 1000;
+    f.stallTier = 1;
+    const pig = buyAnimal(f, 'pig', T0)!;
+    expect(wearHat(f, f.animals[0], 'crown')).toBe(false);
+    expect(buyHat(f, 'crown')).toBe(true);
+    expect(wearHat(f, f.animals[0], 'crown')).toBe(true);
+    expect(wearHat(f, pig, 'crown')).toBe(true);
+    expect(f.animals[0].hat).toBeUndefined();
+    expect(pig.hat).toBe('crown');
+    renameAnimal(pig, '  Sir Oinks a Lot  ');
+    expect(pig.name).toBe('Sir Oinks a');
+  });
+
+  it('orders: start with two, fill from the basket, a new one arrives later', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    expect(f.orders).toHaveLength(2);
+    const o = f.orders[0];
+    expect(canFill(f, o)).toBe(false);
+    expect(fillOrder(f, o.id, true, T0)).toBe(0);
+    for (const x of o.items) f.basket[x.crop] = x.n;
+    const before = f.coins;
+    expect(fillOrder(f, o.id, false, T0)).toBe(Math.round(o.reward / 2));
+    expect(f.coins).toBe(before + Math.round(o.reward / 2));
+    expect(f.orders).toHaveLength(1);
+    expect(refreshOrders(f, T0 + 1000)).toBe(false);
+    expect(refreshOrders(f, T0 + ORDER_EVERY_MS)).toBe(true);
+    expect(f.orders).toHaveLength(2);
+  });
+
+  it('orders always pay more than the market', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    for (let i = 0; i < 300; i++) {
+      const o = newOrder(f);
+      const market = o.items.reduce((s, x) => s + CROPS.find((c) => c.id === x.crop)!.price * x.n, 0);
+      expect(o.reward).toBeGreaterThan(market);
+      expect(o.items.length).toBeGreaterThanOrEqual(1);
+      expect(new Set(o.items.map((x) => x.crop)).size).toBe(o.items.length);
+    }
   });
 });
