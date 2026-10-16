@@ -8,7 +8,8 @@ import {
   type LearningSettings,
   type LearningStats,
 } from '../questions/engine';
-import type { Grade } from '../questions/curriculum';
+import { defaultGrade, fitGrade, type Grade } from '../questions/curriculum';
+import { getLang, type Lang } from '../i18n';
 import { upgradePotions, type PotionBag } from '../data/potions';
 import { uid } from '../util/rng';
 
@@ -74,7 +75,7 @@ export function xpToNext(level: number): number {
   return Math.round(40 + 20 * level ** 1.6);
 }
 
-export function newProfile(name: string, classId: string, grade: Grade = 4): Profile {
+export function newProfile(name: string, classId: string, grade?: Grade, lang: Lang = getLang()): Profile {
   const cls = getClass(classId);
   const p: Profile = {
     version: 1,
@@ -93,7 +94,7 @@ export function newProfile(name: string, classId: string, grade: Grade = 4): Pro
     bossKills: 0,
     streak: 0,
     learning: newLearningStats(),
-    settings: { ...defaultLearningSettings(), grade },
+    settings: { ...defaultLearningSettings(lang), grade: fitGrade(grade ?? defaultGrade(lang), lang), readAloud: lang === 'fr' && (grade ?? 2) <= 2 },
     createdAt: Date.now(),
     lastPlayed: Date.now(),
   };

@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import type { Question } from '../questions/types';
 import { isCorrect, teacherHelp } from '../questions/engine';
 import { sfx } from '../audio/audio';
-import { MATH_TOPICS } from '../questions/math';
-import { READING_TOPICS } from '../questions/readingBank';
+import { topicLabel } from '../questions/labels';
+import { fmtNum, getLang, speechLang, tr } from '../i18n';
 import { C, H, W, button, panel, txt } from './widgets';
 
 const debugHook: { q?: Question; choicePos: { x: number; y: number }[] } = { choicePos: [] };
@@ -14,14 +14,35 @@ export function speak(text: string) {
     const synth = window.speechSynthesis;
     if (!synth) return;
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(
-      text.replace(/ x /g, ' times ').replace(/ \/ /g, ' divided by ').replace(/(\d)\/(\d)/g, '$1 over $2').replace(/_+/g, ' blank ').replace(/\?/g, '?'),
-    );
+    const u = new SpeechSynthesisUtterance(speechText(text));
+    u.lang = speechLang();
     u.rate = 0.92;
     synth.speak(u);
   } catch {
     /* Speech not available on this device. */
   }
+}
+
+/** Spell out math symbols so the speech voice reads them in the current language. */
+export function speechText(text: string): string {
+  if (getLang() === 'fr') {
+    return text
+      .replace(/ x /g, ' fois ')
+      .replace(/×/g, ' fois ')
+      .replace(/÷/g, ' divisé par ')
+      .replace(/ \/ /g, ' divisé par ')
+      .replace(/(\d)\/(\d)/g, '$1 sur $2')
+      .replace(/_+/g, ' blanc ')
+      .replace(/¢/g, ' cents')
+      .replace(/\$/g, ' dollars');
+  }
+  return text
+    .replace(/ x /g, ' times ')
+    .replace(/×/g, ' times ')
+    .replace(/÷/g, ' divided by ')
+    .replace(/ \/ /g, ' divided by ')
+    .replace(/(\d)\/(\d)/g, '$1 over $2')
+    .replace(/_+/g, ' blank ');
 }
 
 /**
@@ -52,12 +73,12 @@ export class QuestionPanel {
     root.add(shade);
     root.add(panel(scene, 40, 18, W - 80, H - 36, 0x1d1730, 0xffd24a));
 
-    const topicName = (q.subject === 'math' ? MATH_TOPICS : READING_TOPICS)[q.topic] ?? q.topic;
+    const topicName = topicLabel(q.topic);
     const tagColor = q.subject === 'math' ? '#7fd3ff' : '#ffb36b';
-    root.add(txt(scene, 64, 32, `${q.subject === 'math' ? 'MATH' : 'READING'}  -  ${topicName}`, 16, tagColor));
+    root.add(txt(scene, 64, 32, `${q.subject === 'math' ? tr('MATH') : tr('READING')}  -  ${topicName}`, 16, tagColor));
     if (this.opts.header) root.add(txt(scene, W - 64, 32, this.opts.header, 16, '#ffd24a').setOrigin(1, 0));
     // Missed questions come back on purpose; say so, so it doesn't feel like a glitch.
-    if (q.isRetry) root.add(txt(scene, W / 2 + 60, 32, "Let's try this one again!", 16, '#ffb36b').setOrigin(0.5, 0));
+    if (q.isRetry) root.add(txt(scene, W / 2 + 60, 32, tr("Let's try this one again!"), 16, '#ffb36b').setOrigin(0.5, 0));
 
     const isNumber = q.input === 'number';
     const promptW = isNumber ? 470 : W - 270;
@@ -71,11 +92,11 @@ export class QuestionPanel {
     // Read-aloud and teacher help: right column for choices, under the question for the number pad.
     if (isNumber) {
       const y = Math.min(345, Math.max(prompt.y + prompt.height + 34, 320));
-      root.add(button(scene, 120, y, 100, 46, 'Say', () => speak(q.prompt), { size: 18, color: 0x2e5a7a }));
-      root.add(button(scene, 310, y, 250, 46, 'I need a teacher!', () => this.showTeacher(), { size: 19, color: 0x7a4ab0 }));
+      root.add(button(scene, 120, y, 100, 46, tr('Say'), () => speak(q.prompt), { size: 18, color: 0x2e5a7a }));
+      root.add(button(scene, 310, y, 250, 46, tr('I need a teacher!'), () => this.showTeacher(), { size: 19, color: 0x7a4ab0 }));
     } else {
-      root.add(button(scene, W - 130, 84, 130, 40, 'Say', () => speak(q.prompt), { size: 17, color: 0x2e5a7a }));
-      root.add(button(scene, W - 130, 142, 130, 58, 'I need a\nteacher!', () => this.showTeacher(), { size: 17, color: 0x7a4ab0 }));
+      root.add(button(scene, W - 130, 84, 130, 40, tr('Say'), () => speak(q.prompt), { size: 17, color: 0x2e5a7a }));
+      root.add(button(scene, W - 130, 142, 130, 58, tr('I need a\nteacher!'), () => this.showTeacher(), { size: 17, color: 0x7a4ab0 }));
     }
     if (this.opts.readAloud) speak(q.prompt);
 
@@ -95,12 +116,12 @@ export class QuestionPanel {
     const teacher = scene.add.image(160, 150, 'hero_mage').setScale(6).setFlipX(true);
     t.add(teacher);
     scene.tweens.add({ targets: teacher, y: 142, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    t.add(txt(scene, 220, 96, 'Teacher says:', 26, '#d7b8ff'));
+    t.add(txt(scene, 220, 96, tr('Teacher says:'), 26, '#d7b8ff'));
     t.add(
       txt(scene, 220, 140, help, 21, '#ffffff', { wordWrap: { width: W - 340, useAdvancedWrap: true }, lineSpacing: 6 }),
     );
-    t.add(button(scene, W / 2 - 110, H - 112, 170, 54, 'Read it to me', () => speak(help), { size: 18, color: 0x2e5a7a }));
-    t.add(button(scene, W / 2 + 110, H - 112, 200, 54, "Got it! Let me try", () => t.destroy(), { size: 18, color: 0x2f9a4a }));
+    t.add(button(scene, W / 2 - 110, H - 112, 170, 54, tr('Read it to me'), () => speak(help), { size: 18, color: 0x2e5a7a }));
+    t.add(button(scene, W / 2 + 110, H - 112, 200, 54, tr('Got it! Let me try'), () => t.destroy(), { size: 18, color: 0x2f9a4a }));
     this.root.once('destroy', () => t.destroy());
     if (this.opts.readAloud) speak(help);
   }
@@ -121,9 +142,10 @@ export class QuestionPanel {
       const col = i % 3;
       const row = Math.floor(i / 3);
       const color = k === 'GO' ? 0x2f9a4a : k === 'DEL' ? 0x8a3a3a : 0x4b3a78;
-      const b = button(scene, kx + col * (kw + 10) + kw / 2, ky + row * (kh + 10) + kh / 2, kw, kh, k, () => this.key(k), {
+      const label = k === 'DEL' ? tr('DEL') : k === 'GO' ? tr('GO') : k;
+      const b = button(scene, kx + col * (kw + 10) + kw / 2, ky + row * (kh + 10) + kh / 2, kw, kh, label, () => this.key(k), {
         color,
-        size: k.length > 1 ? 22 : 34,
+        size: label.length > 4 ? 20 : label.length > 1 ? 22 : 34,
       });
       root.add(b);
     });
@@ -146,7 +168,7 @@ export class QuestionPanel {
       if (this.typed.length) this.submit(this.typed);
       return;
     } else if (this.typed.length < 9) this.typed += k;
-    this.display?.setText(this.typed.length ? Number(this.typed).toLocaleString('en-US') : '?');
+    this.display?.setText(this.typed.length ? fmtNum(Number(this.typed)) : '?');
   }
 
   private buildChoices(top: number) {
@@ -192,14 +214,14 @@ export class QuestionPanel {
     res.add(scene.add.rectangle(0, 0, W, H, 0x000000, 0.5).setOrigin(0).setInteractive());
     res.add(panel(scene, 110, 90, W - 220, H - 180, correct ? 0x123a22 : 0x3a1a22, correct ? 0x5ef07a : 0xff8a6b));
 
-    const title = correct ? pickOne(['Correct!', 'Awesome!', 'You got it!', 'Great job!', 'Nailed it!']) : 'Not quite!';
+    const title = correct ? pickOne([tr('Correct!'), tr('Awesome!'), tr('You got it!'), tr('Great job!'), tr('Nailed it!')]) : tr('Not quite!');
     const head = txt(scene, W / 2, 130, title, 44, correct ? C.good : '#ffb36b').setOrigin(0.5);
     res.add(head);
     scene.tweens.add({ targets: head, scale: { from: 0.6, to: 1 }, duration: 260, ease: 'Back.Out' });
 
     const answerLine = correct
-      ? `Answer: ${display(q.answer, q)}\nFULL damage!`
-      : `You said: ${display(given, q)}\nRight answer: ${display(q.answer, q)}\n(Half damage this time)`;
+      ? tr('Answer: {answer}\nFULL damage!', { answer: display(q.answer, q) })
+      : tr('You said: {given}\nRight answer: {answer}\n(Half damage this time)', { given: display(given, q), answer: display(q.answer, q) });
     const ans = txt(scene, W / 2, 190, answerLine, 23, '#ffffff', {
       align: 'center',
       wordWrap: { width: W - 280, useAdvancedWrap: true },
@@ -213,9 +235,9 @@ export class QuestionPanel {
         lineSpacing: 4,
       }).setOrigin(0.5, 0),
     );
-    if (!correct) speakIfOn(this.opts.readAloud, `The answer is ${q.answer}. ${q.explanation}`);
+    if (!correct) speakIfOn(this.opts.readAloud, tr('The answer is {answer}. {explanation}', { answer: q.answer, explanation: q.explanation }));
 
-    const go = button(scene, W / 2, H - 135, 260, 64, correct ? 'Attack!' : 'Got it', () => {
+    const go = button(scene, W / 2, H - 135, 260, 64, correct ? tr('Attack!') : tr('Got it'), () => {
       res.destroy();
       this.root.destroy();
       this.opts.done(correct);
@@ -231,7 +253,7 @@ export class QuestionPanel {
 }
 
 function display(ans: string, q: Question): string {
-  if (q.input === 'number' && /^\d+$/.test(ans)) return Number(ans).toLocaleString('en-US');
+  if (q.input === 'number' && /^\d+$/.test(ans)) return fmtNum(Number(ans));
   return ans;
 }
 

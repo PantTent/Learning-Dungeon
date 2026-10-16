@@ -2,8 +2,11 @@
 // and bringing missed questions back a few turns later for another try.
 import type { Difficulty, Question, Subject } from './types';
 import { makeMathQuestion, mathTopicLevels } from './math';
-import { ALL_GROUP_IDS, TOPIC_GROUPS, enabledTopics, GRADE_BAND, mathTopicsForGrade, TOPIC_LESSONS, type Grade } from './curriculum';
+import { allGroupIds, defaultGrade, enabledTopics, fitGrade, gradeBand, mathTopicsForGrade, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
+import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
+import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
+import { getLang, type Lang as LangT } from '../i18n';
 import { clamp, pick, shuffle } from '../util/rng';
 
 export interface TopicStat {
@@ -34,6 +37,8 @@ export interface LearningSettings {
   groups: string[];
   /** Focus practice: only these times tables / divisors (empty = everything for the grade). */
   focus: { multiply: number[]; divide: number[] };
+  /** Language of the questions (and the whole game for this hero). */
+  lang: Lang;
 }
 
 export function newLearningStats(): LearningStats {
@@ -48,25 +53,38 @@ export function newLearningStats(): LearningStats {
   };
 }
 
-export function defaultLearningSettings(): LearningSettings {
-  return { mathPercent: 60, readAloud: false, grade: 4, groups: [...ALL_GROUP_IDS], focus: { multiply: [], divide: [] } };
+export function defaultLearningSettings(lang: Lang = 'en'): LearningSettings {
+  return { mathPercent: 60, readAloud: false, grade: defaultGrade(lang), groups: [...allGroupIds(lang)], focus: { multiply: [], divide: [] }, lang };
 }
 
 /** Fill in settings added after a save was created. */
 export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings {
-  const d = defaultLearningSettings();
+  const lang: Lang = s.lang === 'fr' ? 'fr' : 'en';
+  const d = defaultLearningSettings(lang);
+  const valid = new Set(allGroupIds(lang));
+  const groups = (s.groups ?? []).filter((g) => valid.has(g));
   return {
     mathPercent: s.mathPercent ?? d.mathPercent,
     readAloud: s.readAloud ?? d.readAloud,
-    grade: s.grade ?? d.grade,
-    groups: s.groups && s.groups.length ? s.groups : d.groups,
+    grade: fitGrade(s.grade ?? d.grade, lang),
+    groups: groups.length ? groups : d.groups,
     focus: { multiply: s.focus?.multiply ?? [], divide: s.focus?.divide ?? [] },
+    lang,
   };
 }
 
 /** The "I need a teacher!" text for a question. */
 export function teacherHelp(q: Question): string {
-  return q.teach ?? TOPIC_LESSONS[q.topic] ?? 'Read the question again slowly. What is it asking you to find? Cross out choices that cannot be right, then pick the best one left.';
+  if (q.teach) return q.teach;
+  if (getLang() === 'fr') {
+    return READING_LESSONS_FR[q.topic] ?? 'Relis la question lentement. Que dois-tu trouver? Élimine les choix qui ne peuvent pas être bons, puis choisis le meilleur.';
+  }
+  return TOPIC_LESSONS[q.topic] ?? 'Read the question again slowly. What is it asking you to find? Cross out choices that cannot be right, then pick the best one left.';
+}
+
+/** The reading bank for a language (and the prefix for its question ids). */
+function readingBank(lang: LangT) {
+  return lang === 'fr' ? { bank: READING_BANK_FR, prefix: 'rf' } : { bank: READING_BANK, prefix: 'r' };
 }
 
 function today(): string {
@@ -99,15 +117,16 @@ export class QuestionEngine {
 
   /** Math topics allowed right now: in the child's grade AND in a chosen group. */
   private mathTopics(): string[] {
-    const on = enabledTopics(this.settings.groups);
+    const on = enabledTopics(this.settings.groups, this.settings.lang);
     const { multiply, divide } = this.settings.focus;
     const groups = this.settings.groups;
     // A focus (e.g. "only the 5s") replaces the whole group with focused questions.
     const focusMult = multiply.length > 0 && groups.includes('multiply');
     const focusDiv = divide.length > 0 && groups.includes('divide');
-    const multTopics = new Set(TOPIC_GROUPS.find((g) => g.id === 'multiply')!.topics);
-    const divTopics = new Set(TOPIC_GROUPS.find((g) => g.id === 'divide')!.topics);
-    const topics = mathTopicsForGrade(this.settings.grade).filter(
+    const lang = this.settings.lang;
+    const multTopics = new Set(topicGroups(lang).find((g) => g.id === 'multiply')?.topics ?? []);
+    const divTopics = new Set(topicGroups(lang).find((g) => g.id === 'divide')?.topics ?? []);
+    const topics = mathTopicsForGrade(this.settings.grade, lang).filter(
       (t) => on.has(t) && !(focusMult && multTopics.has(t)) && !(focusDiv && divTopics.has(t)),
     );
     if (focusMult) topics.push('times-table');
@@ -116,8 +135,8 @@ export class QuestionEngine {
   }
 
   private readingTopics(): Set<string> {
-    const on = enabledTopics(this.settings.groups);
-    return new Set(READING_BANK.map((b) => b.topic).filter((t) => on.has(t)));
+    const on = enabledTopics(this.settings.groups, this.settings.lang);
+    return new Set(readingBank(this.settings.lang).bank.map((b) => b.topic).filter((t) => on.has(t)));
   }
 
   next(): Question {
@@ -138,7 +157,7 @@ export class QuestionEngine {
     if (subject === 'reading' && readingTopics.size === 0) subject = 'math';
     if (subject === 'math' && mathTopics.length === 0) subject = 'reading'; // nothing chosen at all: fall back to reading
 
-    const band = GRADE_BAND[this.settings.grade];
+    const band = gradeBand(this.settings.grade, this.settings.lang);
     this.stats.level[subject] = clamp(this.stats.level[subject], band[0], band[1] + 0.49);
     const d = pickDifficulty(this.stats.level[subject], band);
     const q = subject === 'math' ? this.mathQuestion(d, mathTopics) : this.readingQuestion(d, readingTopics);
@@ -149,7 +168,7 @@ export class QuestionEngine {
   }
 
   private mathQuestion(d: Difficulty, allowed: string[]): Question {
-    const [lo, hi] = GRADE_BAND[this.settings.grade];
+    const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
     // Prefer topics that have questions at this difficulty; otherwise any allowed topic.
     let topics = allowed.filter((t) => mathTopicLevels(t).includes(d));
     if (!topics.length) topics = allowed.filter((t) => mathTopicLevels(t).some((l) => l >= lo && l <= hi));
@@ -179,15 +198,21 @@ export class QuestionEngine {
 
   private readingQuestion(d: Difficulty, topics: Set<string>): Question {
     const recent = new Set(this.stats.recent);
-    const all = READING_BANK.map((item, i) => ({ item, i })).filter((x) => topics.size === 0 || topics.has(x.item.topic));
-    const [lo, hi] = GRADE_BAND[this.settings.grade];
-    let pool = all.filter((x) => x.item.difficulty === d && !recent.has(`r:${x.i}`));
-    if (pool.length === 0) pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !recent.has(`r:${x.i}`));
-    if (pool.length === 0) pool = all.filter((x) => !recent.has(`r:${x.i}`));
-    if (pool.length === 0) pool = all.length ? all : READING_BANK.map((item, i) => ({ item, i }));
+    const { bank, prefix } = readingBank(this.settings.lang);
+    const all = bank.map((item, i) => ({ item, i })).filter((x) => topics.size === 0 || topics.has(x.item.topic));
+    const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
+    let pool = all.filter((x) => x.item.difficulty === d && !recent.has(`${prefix}:${x.i}`));
+    if (pool.length === 0) pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !recent.has(`${prefix}:${x.i}`));
+    // Out of new ones at this level: repeat ones from the grade, skipping the latest few.
+    if (pool.length === 0) {
+      const latest = new Set(this.stats.recent.slice(-20));
+      pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !latest.has(`${prefix}:${x.i}`));
+    }
+    if (pool.length === 0) pool = all.filter((x) => !recent.has(`${prefix}:${x.i}`));
+    if (pool.length === 0) pool = all.length ? all : bank.map((item, i) => ({ item, i }));
     const { item, i } = pick(pool);
     return {
-      id: `r:${i}`,
+      id: `${prefix}:${i}`,
       subject: 'reading',
       topic: item.topic,
       difficulty: item.difficulty,
@@ -210,7 +235,7 @@ export class QuestionEngine {
     day.asked++;
     if (correct) day.correct++;
 
-    const [lo, hi] = GRADE_BAND[this.settings.grade];
+    const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
     s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), lo, hi + 0.49);
 
     if (!correct && !s.retry.some((r) => r.q.id === q.id)) {

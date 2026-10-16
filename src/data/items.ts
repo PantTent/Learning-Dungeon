@@ -48,7 +48,7 @@ export interface Item {
   value: number;
 }
 
-const BASE_NAME: Record<BaseType, string> = {
+export const BASE_NAME: Record<BaseType, string> = {
   head: 'Helm', chest: 'Chestguard', legs: 'Pants', hands: 'Gloves', feet: 'Boots',
   ring: 'Ring', neck: 'Amulet',
   sword: 'Sword', axe: 'Axe', mace: 'Mace', dagger: 'Dagger', wand: 'Wand',
@@ -72,7 +72,7 @@ export const STAT_LABEL: Record<StatKey, string> = {
   str: 'Strength', int: 'Intellect', agi: 'Dexterity', sta: 'Stamina', armor: 'Armor', crit: 'Crit %',
 };
 
-const PREFIX: Record<StatKey, string[]> = {
+export const PREFIX: Record<StatKey, string[]> = {
   str: ['Mighty', 'Brutal', 'Strong'],
   int: ['Wise', 'Arcane', 'Clever'],
   agi: ['Swift', 'Nimble', 'Quick'],
@@ -80,12 +80,17 @@ const PREFIX: Record<StatKey, string[]> = {
   armor: ['Reinforced', 'Guarding', 'Plated'],
   crit: ['Keen', 'Lucky', 'Sharp'],
 };
-const SUFFIX: Record<StatKey, string> = {
+export const SUFFIX: Record<StatKey, string> = {
   str: 'of the Bear', int: 'of the Owl', agi: 'of the Fox', sta: 'of the Turtle', armor: 'of the Wall', crit: 'of the Tiger',
 };
 
+/** Material tier (0-6) for an item level. */
+export function materialTier(ilvl: number): number {
+  return ilvl <= 3 ? 0 : ilvl <= 6 ? 1 : ilvl <= 9 ? 2 : ilvl <= 12 ? 3 : ilvl <= 15 ? 4 : ilvl <= 18 ? 5 : 6;
+}
+
 function material(base: BaseType, ilvl: number): string {
-  const tier = ilvl <= 3 ? 0 : ilvl <= 6 ? 1 : ilvl <= 9 ? 2 : ilvl <= 12 ? 3 : ilvl <= 15 ? 4 : ilvl <= 18 ? 5 : 6;
+  const tier = materialTier(ilvl);
   if (base === 'ring' || base === 'neck') return ['Copper', 'Silver', 'Gold', 'Moonstone', 'Emerald', 'Sapphire', 'Starstone'][tier];
   if (base === 'staff' || base === 'wand' || base === 'bow') return ['Oak', 'Ash', 'Yew', 'Elderwood', 'Whisperwood', 'Heartwood', 'Starwood'][tier];
   if (base === 'tome') return ['Dusty', 'Glowing', 'Runed', 'Ancient', 'Leafbound', 'Arcane', 'Celestial'][tier];

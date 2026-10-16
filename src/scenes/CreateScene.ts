@@ -3,8 +3,9 @@ import { playMusic } from '../audio/audio';
 import { CLASSES, type ClassDef } from '../data/classes';
 import { WEAPON_NAMES } from './shared';
 import { isDevCode, makeDeveloper, newProfile, saveProfile, session } from '../state/profile';
-import { C, W, button, panel, sprite, toast, txt, type Button } from '../ui/widgets';
-import { GRADES, type Grade } from '../questions/curriculum';
+import { C, W, button, langButton, panel, sprite, toast, txt, type Button } from '../ui/widgets';
+import { defaultGrade, gradeLabel, gradesFor, type Grade } from '../questions/curriculum';
+import { getLang, tr } from '../i18n';
 import { menuBackground } from './TitleScene';
 
 const NAMES = ['Max', 'Nova', 'Rex', 'Luna', 'Finn', 'Zara', 'Leo', 'Ivy', 'Kai', 'Milo', 'Ash', 'Sky'];
@@ -24,11 +25,15 @@ export class CreateScene extends Phaser.Scene {
     super('Create');
   }
 
-  create() {
+  create(data: { keep?: boolean } = {}) {
     playMusic('title');
     this.cards = [];
+    this.gradeButtons = [];
+    // A new language means new grades (Quebec 1re-3e vs. Massachusetts 3-5).
+    this.grade = defaultGrade();
     menuBackground(this);
-    txt(this, W / 2, 30, 'Choose your hero!', 34, '#ffd24a').setOrigin(0.5);
+    txt(this, W / 2, 30, tr('Choose your hero!'), 34, '#ffd24a').setOrigin(0.5);
+    langButton(this, 96, 30, 172, 38, () => this.scene.restart({ keep: true }));
 
     const cw = 124;
     const ch = 150;
@@ -41,48 +46,50 @@ export class CreateScene extends Phaser.Scene {
       this.cards.push(g);
       const s = sprite(this, x + cw / 2, y + 62, cls.sprite, 5);
       this.tweens.add({ targets: s, y: s.y - 4, duration: 700 + i * 60, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-      txt(this, x + cw / 2, y + 120, cls.name, cls.name.length > 9 ? 15 : 18).setOrigin(0.5);
+      const nm = tr(cls.name);
+      txt(this, x + cw / 2, y + 120, nm, nm.length > 11 ? 14 : nm.length > 9 ? 15 : 18).setOrigin(0.5);
       const zone = this.add.zone(x, y, cw, ch).setOrigin(0).setInteractive({ useHandCursor: true });
       zone.on('pointerup', () => this.select(cls));
     });
 
     // Name entry: our own on-screen keyboard, so it works on every device.
-    txt(this, 40, 450, 'Hero name:', 22);
-    this.heroName = NAMES[Math.floor(Math.random() * NAMES.length)];
+    txt(this, 40, 450, tr('Hero name:'), 22);
+    if (!data.keep || !this.heroName) this.heroName = NAMES[Math.floor(Math.random() * NAMES.length)];
     const box = this.add.graphics();
     box.fillStyle(0x0f0b1a, 1).fillRoundedRect(210, 440, 236, 50, 10);
     box.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(210, 440, 236, 50, 10);
     this.nameText = txt(this, 224, 465, this.heroName, 24).setOrigin(0, 0.5);
-    txt(this, 432, 465, 'Edit', 15, '#7fd3ff').setOrigin(1, 0.5);
+    txt(this, 432, 465, tr('Edit'), 15, '#7fd3ff').setOrigin(1, 0.5);
     this.add.zone(210, 440, 236, 50).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () =>
-      this.openKeyboard("What's your hero's name?", this.heroName, true, (name) => {
+      this.openKeyboard(tr("What's your hero's name?"), this.heroName, true, (name) => {
         this.heroName = name.trim() || this.heroName;
         this.nameText?.setText(this.heroName);
       }),
     );
 
     // Secret code box (for the game's developer).
-    this.devMode = false;
-    this.codeButton = button(this, W - 60, 30, 96, 36, 'Code', () =>
-      this.openKeyboard('Type a secret code', '', false, (code) => {
+    if (!data.keep) this.devMode = false;
+    const codeLabel = () => (this.devMode ? tr('DEV ON') : tr('Code'));
+    this.codeButton = button(this, W - 60, 30, 96, 36, codeLabel(), () =>
+      this.openKeyboard(tr('Type a secret code'), '', false, (code) => {
         if (!code.trim()) return;
         this.devMode = isDevCode(code);
-        this.codeButton?.label.setText(this.devMode ? 'DEV ON' : 'Code');
-        toast(this, this.devMode ? 'Developer mode ON! Everything is unlocked.' : 'That code does not work.', this.devMode ? C.good : C.bad);
+        this.codeButton?.label.setText(codeLabel());
+        toast(this, this.devMode ? tr('Developer mode ON! Everything is unlocked.') : tr('That code does not work.'), this.devMode ? C.good : C.bad);
       }),
     { size: 16, color: 0x3a3450 });
 
     // School grade picks how hard the questions are.
-    txt(this, 470, 438, 'Grade:', 20);
-    this.gradeButtons = GRADES.map((g, i) =>
-      button(this, 494 + i * 62, 486, 54, 46, `${g}`, () => this.setGrade(g), { size: 22 }),
+    txt(this, 470, 438, tr('Grade:'), 20);
+    this.gradeButtons = gradesFor().map((g, i) =>
+      button(this, 494 + i * 62, 486, 54, 46, gradeLabel(g), () => this.setGrade(g), { size: 22 }),
     );
     this.setGrade(this.grade);
 
-    button(this, 120, 510, 160, 46, 'Back', () => this.scene.start('Title'), { size: 20, color: 0x3a3450 });
-    button(this, W - 170, 490, 280, 70, 'Start Adventure!', () => this.start(), { color: 0x2f9a4a, size: 26 });
+    button(this, 120, 510, 160, 46, tr('Back'), () => this.scene.start('Title'), { size: 20, color: 0x3a3450 });
+    button(this, W - 170, 490, 280, 70, tr('Start Adventure!'), () => this.start(), { color: 0x2f9a4a, size: 26 });
 
-    this.select(CLASSES[0]);
+    this.select(data.keep ? this.selected : CLASSES[0]);
   }
 
   private select(cls: ClassDef) {
@@ -104,37 +111,43 @@ export class CreateScene extends Phaser.Scene {
     const d = this.add.container(0, 0);
     this.detail = d;
     d.add(panel(this, 40, 228, W - 80, 196, C.panel, cls.color));
-    d.add(txt(this, 64, 242, `${cls.name}  -  ${cls.role}`, 26, '#ffd24a'));
-    d.add(txt(this, 64, 280, cls.blurb, 19, C.text, { wordWrap: { width: 520 } }));
-    const primaryName = { str: 'Strength', int: 'Intellect', agi: 'Dexterity' }[cls.primary];
-    d.add(txt(this, 64, 320, `Main stat: ${primaryName}`, 17, C.dim));
-    d.add(
-      txt(this, 64, 344, `Weapons: ${cls.weapons.map((w) => WEAPON_NAMES[w]).join(', ')}${cls.offhands.length ? `  |  Off-hand: ${cls.offhands.map((o) => WEAPON_NAMES[o]).join(', ')}` : ''}`, 16, C.dim, {
-        wordWrap: { width: 560 },
-      }),
-    );
+    d.add(txt(this, 64, 242, `${tr(cls.name)}  -  ${tr(cls.role)}`, 26, '#ffd24a'));
+    // Lines flow down so longer (French) blurbs never overlap.
+    let ty = 280;
+    const line = (t: Phaser.GameObjects.Text, gap = 6) => {
+      d.add(t);
+      ty += t.height + gap;
+    };
+    line(txt(this, 64, ty, tr(cls.blurb), 18, C.text, { wordWrap: { width: 540 } }), 8);
+    const primaryName = { str: tr('Strength'), int: tr('Intellect'), agi: tr('Dexterity') }[cls.primary];
+    line(txt(this, 64, ty, tr('Main stat: {stat}', { stat: primaryName }), 16, C.dim), 4);
+    const weapons = tr('Weapons: {list}', { list: cls.weapons.map((w) => tr(WEAPON_NAMES[w])).join(', ') });
+    const off = cls.offhands.length ? `  |  ${tr('Off-hand: {list}', { list: cls.offhands.map((o) => tr(WEAPON_NAMES[o])).join(', ') })}` : '';
+    line(txt(this, 64, ty, weapons + off, 15, C.dim, { wordWrap: { width: 560 } }));
     // Stat bars
     const stats: [string, number][] = [
-      ['Health', cls.base.sta / 12],
-      ['Melee', cls.base.str / 12],
-      ['Magic', cls.base.int / 12],
-      ['Dexterity', cls.base.agi / 12],
+      [tr('Health'), cls.base.sta / 12],
+      [tr('Melee'), cls.base.str / 12],
+      [tr('Magic'), cls.base.int / 12],
+      [tr('Dexterity'), cls.base.agi / 12],
     ];
     stats.forEach(([n, v], i) => {
-      const y = 250 + i * 28;
+      const y = 246 + i * 26;
       d.add(txt(this, 640, y, n, 16, C.dim));
       const g = this.add.graphics();
       g.fillStyle(0x0b0812, 1).fillRoundedRect(732, y + 3, 170, 14, 4);
       g.fillStyle(cls.color, 1).fillRoundedRect(732, y + 3, 170 * Math.min(1, v), 14, 4);
       d.add(g);
     });
-    d.add(txt(this, 640, 368, `${cls.skills.length} spells, a new one every 2 levels:`, 15, C.dim));
-    d.add(txt(this, 640, 390, `${cls.skills.slice(0, 2).map((s) => s.name).join(', ')}, and more!`, 15, C.text, { wordWrap: { width: 270 } }));
+    const sp = txt(this, 640, 352, tr('{n} spells, a new one every 2 levels:', { n: cls.skills.length }), 15, C.dim, { wordWrap: { width: 280 } });
+    d.add(sp);
+    const first = cls.skills.slice(0, 2).map((s) => tr(s.name)).join(', ');
+    d.add(txt(this, 640, 352 + sp.height + 2, tr('{spells}, and more!', { spells: first }), 15, C.text, { wordWrap: { width: 280 } }));
   }
 
   private setGrade(g: Grade) {
     this.grade = g;
-    GRADES.forEach((x, i) => {
+    gradesFor().forEach((x, i) => {
       const b = this.gradeButtons[i];
       const label = b.label.text;
       b.destroy();
@@ -165,22 +178,24 @@ export class CreateScene extends Phaser.Scene {
       refresh();
     };
     const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+    // French names often have accents (Léa, Zoé, François).
+    if (nameCase && getLang() === 'fr') rows.push('ÉÈÊËÀÂÇÏÎÔ');
     const kw = 70;
     const kh = 60;
     rows.forEach((row, r) => {
       const x0 = W / 2 - (row.length * (kw + 8)) / 2 + kw / 2;
       [...row].forEach((ch, i) => c.add(button(this, x0 + i * (kw + 8), 182 + r * (kh + 10), kw, kh, ch, () => type(ch), { size: 26 })));
     });
-    c.add(button(this, W / 2 + 4 * 78 + 30, 182 + 2 * 70, 116, kh, 'Delete', () => type('DEL'), { size: 20, color: 0x8a3a3a }));
-    c.add(button(this, W / 2 - 4 * 78 - 30, 182 + 2 * 70, 116, kh, 'Space', () => type('SPACE'), { size: 20, color: 0x3a3450 }));
+    c.add(button(this, W / 2 + 4 * 78 + 30, 182 + 2 * 70, 116, kh, tr('Delete'), () => type('DEL'), { size: 20, color: 0x8a3a3a }));
+    c.add(button(this, W / 2 - 4 * 78 - 30, 182 + 2 * 70, 116, kh, tr('Space'), () => type('SPACE'), { size: 20, color: 0x3a3450 }));
     if (nameCase) {
-      c.add(button(this, W / 2 - 180, 460, 200, 60, 'Random name', () => {
+      c.add(button(this, W / 2 - 180, 460, 200, 60, tr('Random name'), () => {
         name = NAMES[Math.floor(Math.random() * NAMES.length)];
         refresh();
       }, { size: 20, color: 0x2e5a7a }));
     }
     const onKey = (e: KeyboardEvent) => {
-      if (/^[a-zA-Z]$/.test(e.key)) type(e.key);
+      if (/^\p{L}$/u.test(e.key)) type(e.key);
       else if (e.key === 'Backspace') type('DEL');
       else if (e.key === ' ') type('SPACE');
       else if (e.key === 'Enter') done();
@@ -191,11 +206,11 @@ export class CreateScene extends Phaser.Scene {
       onDone(name);
     };
     this.input.keyboard?.on('keydown', onKey);
-    c.add(button(this, W / 2 + 140, 460, 220, 60, 'Done', done, { size: 24, color: 0x2f9a4a }));
+    c.add(button(this, W / 2 + 140, 460, 220, 60, tr('Done'), done, { size: 24, color: 0x2f9a4a }));
   }
 
   private start() {
-    const name = this.heroName.trim().slice(0, 12) || 'Hero';
+    const name = this.heroName.trim().slice(0, 12) || tr('Hero');
     const p = newProfile(name, this.selected.id, this.grade);
     if (this.devMode) makeDeveloper(p);
     saveProfile(p);

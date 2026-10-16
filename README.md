@@ -69,6 +69,14 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 - **Potions** in four strengths (Minor, Medium, Major, Superior) for health
   and mana. They drop from monsters and chests, scaled by monster level, and
   stronger ones unlock in the shop as you level up.
+- **English and French**: pick the language on the title screen, the hero
+  screen or the parent dashboard (each hero keeps its own language). French
+  heroes get questions from the Quebec curriculum for 1re, 2e and 3e annee:
+  early math (counting, adding and subtracting, money in Canadian coins, time,
+  shapes, first multiplication and fractions) and a French reading bank
+  (sounds and syllables, vocabulary, spelling, homophones, grammar, short
+  stories). Read-aloud uses a French voice. All game text is translated
+  (`src/i18n`).
 - **Parent dashboard** (hold the button on the title screen): accuracy by
   topic, weakest first. You can also set the math/reading mix and turn on
   read-aloud.

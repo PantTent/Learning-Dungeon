@@ -2,9 +2,32 @@
 // "What do you want to practice?" screen, and the teacher lessons used for
 // reading questions (math questions carry their own step-by-step hints).
 import type { Difficulty, Subject } from './types';
+import { getLang, type Lang } from '../i18n';
 
-export type Grade = 3 | 4 | 5;
+export type Grade = 1 | 2 | 3 | 4 | 5;
+/** English questions follow Massachusetts grades 3-5. */
 export const GRADES: Grade[] = [3, 4, 5];
+/** French questions follow the Quebec curriculum, 1re to 3e annee. */
+export const GRADES_FR: Grade[] = [1, 2, 3];
+
+export function gradesFor(lang: Lang = getLang()): Grade[] {
+  return lang === 'fr' ? GRADES_FR : GRADES;
+}
+
+export function defaultGrade(lang: Lang = getLang()): Grade {
+  return lang === 'fr' ? 2 : 4;
+}
+
+/** "4" in English, "1re" / "2e" / "3e" (annee) in French. */
+export function gradeLabel(g: Grade, lang: Lang = getLang()): string {
+  if (lang === 'fr') return g === 1 ? '1re' : `${g}e`;
+  return `${g}`;
+}
+
+/** Keep a saved grade valid for the language (e.g. after switching language). */
+export function fitGrade(g: Grade, lang: Lang = getLang()): Grade {
+  return gradesFor(lang).includes(g) ? g : defaultGrade(lang);
+}
 
 export interface TopicGroup {
   id: string;
@@ -30,10 +53,34 @@ export const TOPIC_GROUPS: TopicGroup[] = [
   { id: 'comprehension', subject: 'reading', label: 'Reading Passages', topics: ['comprehension'] },
 ];
 
+/** Topic groups for the French (Quebec) questions. */
+export const TOPIC_GROUPS_FR: TopicGroup[] = [
+  { id: 'fr-nombres', subject: 'math', label: 'Les nombres', topics: ['e-count', 'e-compare', 'e-place', 'e-skip', 'e-even-odd'] },
+  { id: 'fr-add-sub', subject: 'math', label: 'Additions et soustractions', topics: ['e-add', 'e-sub', 'e-missing', 'e-doubles'] },
+  { id: 'fr-mult', subject: 'math', label: 'Multiplier et partager', topics: ['e-mult', 'e-div'] },
+  { id: 'fr-mesure', subject: 'math', label: "L'argent, l'heure et la mesure", topics: ['e-money', 'e-time', 'e-measure'] },
+  { id: 'fr-formes', subject: 'math', label: 'Formes et fractions', topics: ['e-shapes', 'e-fractions'] },
+  { id: 'fr-problemes', subject: 'math', label: 'Problèmes', topics: ['e-word'] },
+  { id: 'fr-vocab', subject: 'reading', label: 'Vocabulaire', topics: ['fr-vocabulaire', 'fr-synonymes', 'fr-contraires'] },
+  { id: 'fr-sons', subject: 'reading', label: 'Sons et syllabes', topics: ['fr-sons'] },
+  { id: 'fr-ortho', subject: 'reading', label: 'Orthographe et homophones', topics: ['fr-orthographe', 'fr-homophones'] },
+  { id: 'fr-grammaire', subject: 'reading', label: 'Grammaire', topics: ['fr-grammaire'] },
+  { id: 'fr-lecture', subject: 'reading', label: 'Lecture', topics: ['fr-lecture'] },
+];
+
+export function topicGroups(lang: Lang = getLang()): TopicGroup[] {
+  return lang === 'fr' ? TOPIC_GROUPS_FR : TOPIC_GROUPS;
+}
+
 export const ALL_GROUP_IDS = TOPIC_GROUPS.map((g) => g.id);
+export const ALL_GROUP_IDS_FR = TOPIC_GROUPS_FR.map((g) => g.id);
+
+export function allGroupIds(lang: Lang = getLang()): string[] {
+  return lang === 'fr' ? ALL_GROUP_IDS_FR : ALL_GROUP_IDS;
+}
 
 /** Math topics taught in each grade (Massachusetts frameworks). */
-const MATH_BY_GRADE: Record<Grade, string[]> = {
+const MATH_BY_GRADE: Partial<Record<Grade, string[]>> = {
   3: ['mult-facts', 'mult-2x1', 'div-facts', 'add-sub', 'place-value', 'rounding', 'compare', 'patterns', 'fractions-equiv', 'measurement', 'area-perimeter', 'word-problems'],
   4: [
     'mult-facts', 'mult-2x1', 'mult-big', 'mult-2x2', 'div-facts', 'div-remainder', 'div-long', 'add-sub', 'place-value', 'rounding',
@@ -47,28 +94,53 @@ const MATH_BY_GRADE: Record<Grade, string[]> = {
   ],
 };
 
+/** French math topics by Quebec school year (difficulty 1 = 1re, 2 = 2e, 3 = 3e). */
+const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
+  1: ['e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-shapes', 'e-word'],
+  2: [
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-even-odd', 'e-money', 'e-time',
+    'e-shapes', 'e-fractions', 'e-measure', 'e-word',
+  ],
+  3: [
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-even-odd', 'e-money', 'e-time', 'e-shapes',
+    'e-mult', 'e-div', 'e-fractions', 'e-measure', 'e-word',
+  ],
+};
+
 /** Difficulty range for each grade (1 = warm-up, 3 = stretch). */
-export const GRADE_BAND: Record<Grade, [Difficulty, Difficulty]> = {
+export const GRADE_BAND: Partial<Record<Grade, [Difficulty, Difficulty]>> = {
   3: [1, 2],
   4: [1, 3],
   5: [2, 3],
 };
+/** In French, difficulty is the school year itself. */
+const GRADE_BAND_FR: Partial<Record<Grade, [Difficulty, Difficulty]>> = {
+  1: [1, 1],
+  2: [1, 2],
+  3: [2, 3],
+};
 
-export function mathTopicsForGrade(grade: Grade): string[] {
-  return MATH_BY_GRADE[grade];
+export function gradeBand(grade: Grade, lang: Lang = getLang()): [Difficulty, Difficulty] {
+  const g = fitGrade(grade, lang);
+  return (lang === 'fr' ? GRADE_BAND_FR : GRADE_BAND)[g]!;
+}
+
+export function mathTopicsForGrade(grade: Grade, lang: Lang = getLang()): string[] {
+  const g = fitGrade(grade, lang);
+  return (lang === 'fr' ? MATH_BY_GRADE_FR : MATH_BY_GRADE)[g]!;
 }
 
 /** Topics turned on by the chosen groups. */
-export function enabledTopics(groupIds: string[]): Set<string> {
+export function enabledTopics(groupIds: string[], lang: Lang = getLang()): Set<string> {
   const on = new Set<string>();
-  for (const g of TOPIC_GROUPS) if (groupIds.includes(g.id)) g.topics.forEach((t) => on.add(t));
+  for (const g of topicGroups(lang)) if (groupIds.includes(g.id)) g.topics.forEach((t) => on.add(t));
   return on;
 }
 
 /** Groups worth showing for a grade (hides math groups with nothing for that grade). */
-export function groupsForGrade(grade: Grade): TopicGroup[] {
-  const math = new Set(MATH_BY_GRADE[grade]);
-  return TOPIC_GROUPS.filter((g) => g.subject === 'reading' || g.topics.some((t) => math.has(t)));
+export function groupsForGrade(grade: Grade, lang: Lang = getLang()): TopicGroup[] {
+  const math = new Set(mathTopicsForGrade(grade, lang));
+  return topicGroups(lang).filter((g) => g.subject === 'reading' || g.topics.some((t) => math.has(t)));
 }
 
 /** "I need a teacher!" lessons for reading topics, and a fallback for any math topic. */

@@ -4,6 +4,7 @@ import { MAX_CHOSEN, activePower, chosenSpells } from '../data/spells';
 import type { Fx } from '../data/classes';
 import { classOf, current, saveProfile } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
+import { tr } from '../i18n';
 
 const FX_NAME: Record<Fx, string> = {
   slash: 'Melee', fire: 'Fire', frost: 'Ice', arcane: 'Arcane', arrow: 'Arrow', holy: 'Holy',
@@ -39,9 +40,9 @@ export class SpellbookScene extends Phaser.Scene {
     const c = this.add.container(0, 0);
     this.layer = c;
     c.add(panel(this, 16, 12, W - 32, H - 24, 0x1d1730, cls.color));
-    c.add(txt(this, 36, 22, `${cls.name} Spellbook`, 26, '#ffd24a'));
-    c.add(txt(this, 36, 56, `Pick ${MAX_CHOSEN} spells to bring into battle. ${list[0].name} is always ready (free).`, 16, C.dim));
-    c.add(button(this, W - 90, 40, 130, 46, 'Done', () => {
+    c.add(txt(this, 36, 22, tr('{cls} Spellbook', { cls: tr(cls.name) }), 26, '#ffd24a'));
+    c.add(txt(this, 36, 56, tr('Pick {n} spells to bring into battle. {spell} is always ready (free).', { n: MAX_CHOSEN, spell: tr(list[0].name) }), 16, C.dim));
+    c.add(button(this, W - 90, 40, 130, 46, tr('Done'), () => {
       saveProfile(p);
       this.scene.stop();
       this.onClose?.();
@@ -55,9 +56,9 @@ export class SpellbookScene extends Phaser.Scene {
       g.fillStyle(sp ? FX_COLOR[sp.fx] : 0x0f0b1a, 1).fillRoundedRect(x, 84, 284, 52, 8);
       g.lineStyle(3, 0xffd24a, sp ? 1 : 0.4).strokeRoundedRect(x, 84, 284, 52, 8);
       c.add(g);
-      c.add(txt(this, x + 12, 90, sp ? sp.name : `Empty slot ${i + 1}`, 18, sp ? '#ffffff' : C.dim));
+      c.add(txt(this, x + 12, 90, sp ? tr(sp.name) : tr('Empty slot {n}', { n: i + 1 }), 18, sp ? '#ffffff' : C.dim));
       if (sp) {
-        c.add(txt(this, x + 12, 113, `${sp.mp} MP  -  tap to remove`, 13, '#ffe9a0'));
+        c.add(txt(this, x + 12, 113, tr('{mp} MP  -  tap to remove', { mp: sp.mp }), 13, '#ffe9a0'));
         c.add(this.add.zone(x, 84, 284, 52).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () => {
           p.spells = p.spells!.filter((id) => id !== sp.id);
           sfx('click');
@@ -69,9 +70,11 @@ export class SpellbookScene extends Phaser.Scene {
     // The ultimate follows the school most chosen spells use.
     const pw = activePower(cls, p.level, p.spells);
     const same = chosenSpells(list, p.level, p.spells).filter((x) => x.fx === pw.fx).length;
-    const why = same >= 2 ? `most of your spells are ${FX_NAME[pw.fx ?? 'slash']}` : `the ${cls.name} ultimate`;
-    c.add(txt(this, W / 2, 448, `\u2605 Ultimate: ${pw.name} \u2605`, 22, pw.css).setOrigin(0.5));
-    c.add(txt(this, W / 2, 478, `(${why}. Pick spells of one kind to change it!)`, 14, C.dim).setOrigin(0.5));
+    const why = same >= 2
+      ? tr('(most of your spells are {school}. Pick spells of one kind to change it!)', { school: tr(FX_NAME[pw.fx ?? 'slash']) })
+      : tr('(the {cls} ultimate. Pick spells of one kind to change it!)', { cls: tr(cls.name) });
+    c.add(txt(this, W / 2, 448, `\u2605 ${tr('Ultimate: {name}', { name: tr(pw.name) })} \u2605`, 22, pw.css).setOrigin(0.5));
+    c.add(txt(this, W / 2, 478, why, 14, C.dim).setOrigin(0.5));
 
     // All spells: unlocked ones can be added, locked ones show their level
     list.slice(1).forEach((sp, i) => {
@@ -85,13 +88,13 @@ export class SpellbookScene extends Phaser.Scene {
       g.fillStyle(unlocked ? FX_COLOR[sp.fx] : 0x241e30, unlocked ? 0.85 : 1).fillRoundedRect(x, y, 284, 84, 8);
       g.lineStyle(picked ? 4 : 2, picked ? 0xffd24a : 0x5b4a82, 1).strokeRoundedRect(x, y, 284, 84, 8);
       c.add(g);
-      c.add(txt(this, x + 10, y + 6, `${picked ? '✔ ' : ''}${sp.name}`, 17, unlocked ? '#ffffff' : C.dim));
-      c.add(txt(this, x + 274, y + 8, unlocked ? `${sp.mp} MP` : `Level ${sp.unlock}`, 14, unlocked ? '#ffe9a0' : '#ff9a9a').setOrigin(1, 0));
-      c.add(txt(this, x + 10, y + 30, `${FX_NAME[sp.fx]}  -  ${sp.desc}`, 13, unlocked ? '#e8e0ff' : '#6a6080', { wordWrap: { width: 264 } }));
+      c.add(txt(this, x + 10, y + 6, `${picked ? '✔ ' : ''}${tr(sp.name)}`, 17, unlocked ? '#ffffff' : C.dim));
+      c.add(txt(this, x + 274, y + 8, unlocked ? tr('{mp} MP', { mp: sp.mp }) : tr('Level {n}', { n: sp.unlock }), 14, unlocked ? '#ffe9a0' : '#ff9a9a').setOrigin(1, 0));
+      c.add(txt(this, x + 10, y + 30, `${tr(FX_NAME[sp.fx])}  -  ${tr(sp.desc)}`, 13, unlocked ? '#e8e0ff' : '#6a6080', { wordWrap: { width: 264 } }));
       if (!unlocked) return;
       c.add(this.add.zone(x, y, 284, 84).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () => {
         if (picked) p.spells = p.spells!.filter((id) => id !== sp.id);
-        else if (p.spells!.length >= MAX_CHOSEN) return toast(this, 'All 3 slots are full. Tap a slot at the top to remove one.', C.bad);
+        else if (p.spells!.length >= MAX_CHOSEN) return toast(this, tr('All 3 slots are full. Tap a slot at the top to remove one.'), C.bad);
         else p.spells = [...p.spells!, sp.id];
         sfx('equip');
         this.draw();

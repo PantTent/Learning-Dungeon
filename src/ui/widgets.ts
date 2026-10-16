@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { cycleSoundMode, sfx, soundModeLabel } from '../audio/audio';
+import { LANGS, fmtNum, getLang, setLang, tr } from '../i18n';
 
 export const W = 960;
 export const H = 540;
@@ -122,7 +123,7 @@ export class Bar {
 
   set(value: number, max: number, animate = true) {
     const target = max > 0 ? Phaser.Math.Clamp(value / max, 0, 1) : 0;
-    this.label?.setText(`${Math.max(0, Math.round(value))} / ${Math.round(max)}`);
+    this.label?.setText(`${fmtNum(Math.max(0, Math.round(value)))} / ${fmtNum(Math.round(max))}`);
     if (!animate) {
       this.shown = target;
       this.draw();
@@ -183,4 +184,13 @@ export function sprite(scene: Phaser.Scene, x: number, y: number, key: string, s
 export function soundButton(scene: Phaser.Scene, x: number, y: number, w = 120, h = 50): Button {
   const b = button(scene, x, y, w, h, soundModeLabel(), () => b.label.setText(soundModeLabel(cycleSoundMode())), { size: 15, color: 0x2e4a5a });
   return b;
+}
+
+/** "Language: English" / "Langue : Français" toggle. `onChange` re-renders the screen. */
+export function langButton(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onChange: () => void): Button {
+  const label = tr('Language: {lang}', { lang: LANGS.find((l) => l.id === getLang())!.label });
+  return button(scene, x, y, w, h, label, () => {
+    setLang(getLang() === 'fr' ? 'en' : 'fr');
+    onChange();
+  }, { size: 15, color: 0x2e5a7a });
 }

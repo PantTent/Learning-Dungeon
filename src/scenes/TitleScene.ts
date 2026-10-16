@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { playMusic } from '../audio/audio';
+import { AREAS } from '../data/areas';
 import { getClass } from '../data/classes';
+import { setLang, tr } from '../i18n';
 import { deleteProfile, loadProfiles, session, type Profile } from '../state/profile';
-import { C, H, W, button, panel, soundButton, sprite, txt } from '../ui/widgets';
+import { C, H, W, button, langButton, panel, soundButton, sprite, txt } from '../ui/widgets';
 
 export const MAX_PROFILES = 3;
 
@@ -37,10 +39,11 @@ export class TitleScene extends Phaser.Scene {
     playMusic('title');
     menuBackground(this);
     soundButton(this, W - 76, 30, 130, 40);
+    langButton(this, 96, 30, 172, 40, () => this.scene.restart());
     const title = txt(this, W / 2, 62, 'LEARNING DUNGEON', 56, '#ffd24a').setOrigin(0.5);
     title.setStroke('#5a2a00', 10);
     this.tweens.add({ targets: title, y: 70, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    txt(this, W / 2, 118, 'Answer questions. Defeat monsters. Grab loot!', 20, C.dim).setOrigin(0.5);
+    txt(this, W / 2, 118, tr('Answer questions. Defeat monsters. Grab loot!'), 20, C.dim).setOrigin(0.5);
 
     const profiles = loadProfiles().sort((a, b) => b.lastPlayed - a.lastPlayed);
     const slotW = 260;
@@ -54,7 +57,7 @@ export class TitleScene extends Phaser.Scene {
     }
 
     // Parents: press and hold so kids don't wander in by accident.
-    const parent = button(this, W - 110, H - 40, 190, 50, 'Parents (hold)', () => {}, { size: 18, color: 0x3a3450 });
+    const parent = button(this, W - 110, H - 40, 190, 50, tr('Parents (hold)'), () => {}, { size: 18, color: 0x3a3450 });
     let holdTimer: Phaser.Time.TimerEvent | null = null;
     parent.on('pointerdown', () => {
       holdTimer = this.time.delayedCall(1200, () => this.scene.start('Parent'));
@@ -62,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
     parent.on('pointerup', () => holdTimer?.remove());
     parent.on('pointerout', () => holdTimer?.remove());
 
-    txt(this, 20, H - 30, 'v0.1 - Area 1: Mossfang Caverns', 14, C.dim);
+    txt(this, 20, H - 30, tr('v0.1 - Area 1: {area}', { area: tr(AREAS[0].name) }), 14, C.dim);
   }
 
   private profileCard(x: number, y: number, w: number, p: Profile) {
@@ -71,29 +74,35 @@ export class TitleScene extends Phaser.Scene {
     const s = sprite(this, x + w / 2, y + 90, cls.sprite, 6);
     this.tweens.add({ targets: s, y: s.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     txt(this, x + w / 2, y + 160, p.name, 28).setOrigin(0.5);
-    txt(this, x + w / 2, y + 194, `Level ${p.level} ${cls.name}`, 18, C.dim).setOrigin(0.5);
-    button(this, x + w / 2, y + 250, w - 40, 56, 'Play', () => {
+    txt(this, x + w / 2, y + 194, tr('Level {n} {cls}', { n: p.level, cls: tr(cls.name) }), 18, C.dim).setOrigin(0.5);
+    const tag = this.add.graphics();
+    tag.fillStyle(0x0b0812, 0.9).fillRoundedRect(x + 10, y + 10, 44, 28, 8);
+    tag.lineStyle(2, 0x7fd3ff, 1).strokeRoundedRect(x + 10, y + 10, 44, 28, 8);
+    txt(this, x + 32, y + 24, p.settings.lang === 'fr' ? 'FR' : 'EN', 15, '#7fd3ff').setOrigin(0.5);
+    button(this, x + w / 2, y + 250, w - 40, 56, tr('Play'), () => {
+      // Each hero plays in their own language.
+      setLang(p.settings.lang);
       session.profile = p;
       this.scene.start('Practice');
     }, { color: 0x2f9a4a, size: 26 });
-    button(this, x + w - 46, y + 24, 76, 32, 'Delete', () => this.confirmDelete(p), { size: 14, color: 0x8a3a3a });
+    button(this, x + w - 46, y + 24, 76, 32, tr('Delete'), () => this.confirmDelete(p), { size: 14, color: 0x8a3a3a });
   }
 
   private emptyCard(x: number, y: number, w: number) {
     panel(this, x, y, w, 300, 0x1a1526, 0x3a3054);
     txt(this, x + w / 2, y + 110, '+', 72, C.dim).setOrigin(0.5);
-    button(this, x + w / 2, y + 250, w - 40, 56, 'New Hero', () => this.scene.start('Create'), { size: 24 });
+    button(this, x + w / 2, y + 250, w - 40, 56, tr('New Hero'), () => this.scene.start('Create'), { size: 24 });
   }
 
   private confirmDelete(p: Profile) {
     const c = this.add.container(0, 0).setDepth(100);
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.7).setOrigin(0).setInteractive());
     c.add(panel(this, W / 2 - 260, H / 2 - 110, 520, 220, C.panel, 0xff6b6b));
-    c.add(txt(this, W / 2, H / 2 - 60, `Delete ${p.name} forever?`, 28).setOrigin(0.5));
-    c.add(button(this, W / 2 - 110, H / 2 + 40, 180, 60, 'Delete', () => {
+    c.add(txt(this, W / 2, H / 2 - 60, tr('Delete {name} forever?', { name: p.name }), 28).setOrigin(0.5));
+    c.add(button(this, W / 2 - 110, H / 2 + 40, 180, 60, tr('Delete'), () => {
       deleteProfile(p.id);
       this.scene.restart();
     }, { color: 0xa83a3a }));
-    c.add(button(this, W / 2 + 110, H / 2 + 40, 180, 60, 'Keep', () => c.destroy()));
+    c.add(button(this, W / 2 + 110, H / 2 + 40, 180, 60, tr('Keep'), () => c.destroy()));
   }
 }

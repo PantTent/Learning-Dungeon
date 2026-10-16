@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { playMusic } from '../audio/audio';
-import { GRADES, groupsForGrade, TOPIC_GROUPS, type TopicGroup } from '../questions/curriculum';
+import { defaultGrade, gradeLabel, gradesFor, groupsForGrade, topicGroups, type TopicGroup } from '../questions/curriculum';
+import { tr } from '../i18n';
 import { current, saveProfile } from '../state/profile';
 import { C, W, H, button, panel, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
@@ -29,43 +30,47 @@ export class PracticeScene extends Phaser.Scene {
     const c = this.add.container(0, 0);
     this.layer = c;
 
-    c.add(txt(this, W / 2, 26, `What do you want to practice today, ${p.name}?`, 28, '#ffd24a').setOrigin(0.5));
+    c.add(txt(this, W / 2, 26, tr('What do you want to practice today, {name}?', { name: p.name }), 28, '#ffd24a').setOrigin(0.5));
 
-    c.add(txt(this, W / 2 - 170, 76, 'Grade:', 22).setOrigin(1, 0.5));
-    GRADES.forEach((g, i) => {
-      c.add(button(this, W / 2 - 110 + i * 82, 76, 72, 42, `${g}`, () => {
+    c.add(txt(this, W / 2 - 170, 76, tr('Grade:'), 22).setOrigin(1, 0.5));
+    const grades = gradesFor(s.lang);
+    grades.forEach((g, i) => {
+      c.add(button(this, W / 2 - 110 + i * 82, 76, 72, 42, gradeLabel(g, s.lang), () => {
         s.grade = g;
         this.draw();
       }, { size: 22, color: s.grade === g ? 0x2f9a4a : 0x4b3a78 }));
     });
-    c.add(txt(this, W / 2 + 140, 76, s.grade === 4 ? '(the full grade 4 set)' : s.grade === 3 ? '(easier)' : '(harder)', 15, C.dim).setOrigin(0, 0.5));
+    const mid = defaultGrade(s.lang);
+    const hint = s.grade === mid ? tr('(the full grade {g} set)', { g: gradeLabel(s.grade, s.lang) }) : s.grade < mid ? tr('(easier)') : tr('(harder)');
+    c.add(txt(this, W / 2 + 140, 76, hint, 15, C.dim).setOrigin(0, 0.5));
 
-    const groups = groupsForGrade(s.grade);
-    this.column(c, 24, 'Math', groups.filter((g) => g.subject === 'math'));
-    this.column(c, W / 2 + 6, 'Reading', groups.filter((g) => g.subject === 'reading'));
+    const groups = groupsForGrade(s.grade, s.lang);
+    this.column(c, 24, 'math', groups.filter((g) => g.subject === 'math'));
+    this.column(c, W / 2 + 6, 'reading', groups.filter((g) => g.subject === 'reading'));
 
     const visible = new Set(groups.map((g) => g.id));
     const chosen = s.groups.filter((id) => visible.has(id)).length;
-    c.add(txt(this, 40, H - 52, chosen ? `${chosen} topic group${chosen === 1 ? '' : 's'} picked` : 'Pick at least one topic!', 18, chosen ? C.dim : C.bad).setOrigin(0, 0.5));
-    const go = button(this, W - 150, H - 50, 250, 64, "Let's go!", () => {
+    c.add(txt(this, 40, H - 52, chosen === 1 ? tr('1 topic group picked') : chosen ? tr('{n} topic groups picked', { n: chosen }) : tr('Pick at least one topic!'), 18, chosen ? C.dim : C.bad).setOrigin(0, 0.5));
+    const go = button(this, W - 150, H - 50, 250, 64, tr("Let's go!"), () => {
       saveProfile(p);
       this.scene.start('Dungeon');
     }, { color: 0x2f9a4a, size: 28 });
     go.setEnabled(chosen > 0);
     c.add(go);
-    c.add(button(this, W / 2 - 40, H - 50, 150, 48, 'Back', () => {
+    c.add(button(this, W / 2 - 40, H - 50, 150, 48, tr('Back'), () => {
       saveProfile(p);
       this.scene.start('Title');
     }, { size: 20, color: 0x3a3450 }));
   }
 
-  private column(c: Phaser.GameObjects.Container, x: number, title: string, groups: TopicGroup[]) {
+  private column(c: Phaser.GameObjects.Container, x: number, subject: 'math' | 'reading', groups: TopicGroup[]) {
     const s = current().settings;
     const colW = W / 2 - 30;
-    c.add(panel(this, x, 106, colW, 360, 0x1d1730, title === 'Math' ? 0x4a7ad0 : 0xd07a3a));
-    c.add(txt(this, x + 16, 118, title, 24, title === 'Math' ? '#7fd3ff' : '#ffb36b'));
+    const isMath = subject === 'math';
+    c.add(panel(this, x, 106, colW, 360, 0x1d1730, isMath ? 0x4a7ad0 : 0xd07a3a));
+    c.add(txt(this, x + 16, 118, isMath ? tr('Math') : tr('Reading'), 24, isMath ? '#7fd3ff' : '#ffb36b'));
     const all = groups.every((g) => s.groups.includes(g.id));
-    c.add(button(this, x + colW - 70, 134, 110, 34, all ? 'None' : 'All', () => {
+    c.add(button(this, x + colW - 70, 134, 110, 34, all ? tr('None') : tr('All'), () => {
       const ids = groups.map((g) => g.id);
       s.groups = all ? s.groups.filter((id) => !ids.includes(id)) : [...new Set([...s.groups, ...ids])];
       this.draw();
@@ -85,12 +90,13 @@ export class PracticeScene extends Phaser.Scene {
     });
 
     // Focus practice: drill specific times tables (e.g. only the 5s).
-    if (title === 'Math') {
+    // Only the English groups have 'multiply' / 'divide'.
+    if (isMath && s.lang === 'en') {
       const bw = (colW - 48) / 2;
       const m = s.focus.multiply;
       const d = s.focus.divide;
-      c.add(button(this, x + 16 + bw / 2, 434, bw, 40, m.length ? `x tables: ${m.join(', ')}` : 'x tables: all', () => this.focusPicker('multiply'), { size: 15, color: 0x5a3a8a }));
-      c.add(button(this, x + 32 + bw * 1.5, 434, bw, 40, d.length ? `/ facts: ${d.join(', ')}` : '/ facts: all', () => this.focusPicker('divide'), { size: 15, color: 0x5a3a8a }));
+      c.add(button(this, x + 16 + bw / 2, 434, bw, 40, m.length ? tr('x tables: {list}', { list: m.join(', ') }) : tr('x tables: all'), () => this.focusPicker('multiply'), { size: 15, color: 0x5a3a8a }));
+      c.add(button(this, x + 32 + bw * 1.5, 434, bw, 40, d.length ? tr('/ facts: {list}', { list: d.join(', ') }) : tr('/ facts: all'), () => this.focusPicker('divide'), { size: 15, color: 0x5a3a8a }));
     }
   }
 
@@ -103,12 +109,12 @@ export class PracticeScene extends Phaser.Scene {
       const chosen = s.focus[kind];
       c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.75).setOrigin(0).setInteractive());
       c.add(panel(this, 90, 40, W - 180, H - 80, 0x1d1730, 0xb98aff));
-      c.add(txt(this, W / 2, 70, kind === 'multiply' ? 'Multiplying: what should we practice?' : 'Dividing: what should we practice?', 24, '#ffd24a').setOrigin(0.5));
-      c.add(button(this, W / 2, 128, 420, 52, `Everything for grade ${s.grade}`, () => {
+      c.add(txt(this, W / 2, 70, kind === 'multiply' ? tr('Multiplying: what should we practice?') : tr('Dividing: what should we practice?'), 24, '#ffd24a').setOrigin(0.5));
+      c.add(button(this, W / 2, 128, 420, 52, tr('Everything for grade {g}', { g: gradeLabel(s.grade, s.lang) }), () => {
         s.focus[kind] = [];
         redraw();
       }, { size: 20, color: chosen.length ? 0x2a2340 : 0x2f7a3a }));
-      c.add(txt(this, W / 2, 178, kind === 'multiply' ? 'Or only these times tables:' : 'Or only dividing by:', 19, C.dim).setOrigin(0.5));
+      c.add(txt(this, W / 2, 178, kind === 'multiply' ? tr('Or only these times tables:') : tr('Or only dividing by:'), 19, C.dim).setOrigin(0.5));
       for (let n = 1; n <= 12; n++) {
         const on = chosen.includes(n);
         const col = (n - 1) % 6;
@@ -119,13 +125,17 @@ export class PracticeScene extends Phaser.Scene {
           redraw();
         }, { size: 24, color: on ? 0x2f7a3a : 0x3d3266 }));
       }
-      c.add(txt(this, W / 2, 396, chosen.length ? `Every ${kind === 'multiply' ? 'multiplying' : 'dividing'} question will use: ${chosen.join(', ')}` : 'All the multiplying and dividing for the grade.', 17, '#ffe9a0').setOrigin(0.5));
+      c.add(txt(this, W / 2, 396, chosen.length
+            ? kind === 'multiply'
+              ? tr('Every multiplying question will use: {list}', { list: chosen.join(', ') })
+              : tr('Every dividing question will use: {list}', { list: chosen.join(', ') })
+            : tr('All the multiplying and dividing for the grade.'), 17, '#ffe9a0').setOrigin(0.5));
       const only = s.groups.length === 1 && s.groups[0] === kind;
-      c.add(button(this, W / 2 - 150, 452, 330, 52, only ? '\u2714 Only practicing this' : 'Practice ONLY this', () => {
-        s.groups = only ? s.groups.concat(TOPIC_GROUPS.map((g) => g.id).filter((id) => id !== kind)) : [kind];
+      c.add(button(this, W / 2 - 150, 452, 330, 52, only ? tr('\u2714 Only practicing this') : tr('Practice ONLY this'), () => {
+        s.groups = only ? s.groups.concat(topicGroups(s.lang).map((g) => g.id).filter((id) => id !== kind)) : [kind];
         redraw();
       }, { size: 19, color: only ? 0x2f7a3a : 0x7a4ab0 }));
-      c.add(button(this, W / 2 + 160, 452, 200, 52, 'Done', () => {
+      c.add(button(this, W / 2 + 160, 452, 200, 52, tr('Done'), () => {
         c.destroy();
         this.draw();
       }, { size: 24, color: 0x2f9a4a }));

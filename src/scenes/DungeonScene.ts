@@ -9,6 +9,8 @@ import { playMusic, sfx } from '../audio/audio';
 import { POTIONS, countPotions, tierForLevel } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
 import { ri } from '../util/rng';
+import { fmtNum, getLang, tr } from '../i18n';
+import { itemName } from '../i18n/itemNames';
 
 const T = 16;
 const S = 3;
@@ -116,8 +118,8 @@ export class DungeonScene extends Phaser.Scene {
     } });
 
     if (data.floor !== undefined || !data.fromBattle) this.showFloorBanner();
-    if (data.fromBattle?.result === 'defeat') this.dialog(['You were knocked out!', 'You wake up safe at camp, fully healed. Keep trying - every question makes you smarter!']);
-    if (data.fromBattle?.result === 'bossFail') this.dialog([`${this.area().boss.shortName} escaped!`, 'You need 4 out of 5 right to beat him. Rest up and try again - you can do it!']);
+    if (data.fromBattle?.result === 'defeat') this.dialog([tr('You were knocked out!'), tr('You wake up safe at camp, fully healed. Keep trying - every question makes you smarter!')]);
+    if (data.fromBattle?.result === 'bossFail') this.dialog([tr('{boss} escaped!', { boss: tr(this.area().boss.shortName) }), tr('You need 4 out of 5 right to beat him. Rest up and try again - you can do it!')]);
   }
 
   private glowSpots: { x: number; y: number; r: number; flicker: number }[] = [];
@@ -238,7 +240,7 @@ export class DungeonScene extends Phaser.Scene {
         this.tweens.add({ targets: portal, angle: 360, duration: 4000, repeat: -1 });
         const g = this.add.image(portal.x, portal.y, 'glow').setScale(10).setTint(0x9a6aff).setAlpha(0.4).setBlendMode('ADD').setDepth(4);
         this.tweens.add({ targets: g, alpha: 0.7, scale: 11, duration: 700, yoyo: true, repeat: -1 });
-        this.label({ x: map.portal.x, y: map.portal.y - 1 }, `To ${next.name}`);
+        this.label({ x: map.portal.x, y: map.portal.y - 1 }, tr('To {place}', { place: tr(next.name) }));
       }
     }
 
@@ -256,16 +258,16 @@ export class DungeonScene extends Phaser.Scene {
       const m = at(map.camp.merchant, 'npc_merchant', 10);
       m.setFlipX(true);
       this.tweens.add({ targets: m, y: m.y - 3, duration: 900, yoyo: true, repeat: -1 });
-      this.label(map.camp.fountain, 'Heal');
-      this.label(map.camp.merchant, 'Shop');
-      this.label(map.camp.fire, 'Travel');
+      this.label(map.camp.fountain, tr('Heal'));
+      this.label(map.camp.merchant, tr('Shop'));
+      this.label(map.camp.fire, tr('Travel'));
     }
 
     if (map.boss) {
       const boss = this.area().boss;
       const b = this.add.image(map.boss.x * TS + TS / 2, map.boss.y * TS + TS / 2, boss.sprite).setScale(S).setDepth(15).setFlipX(true);
       this.tweens.add({ targets: b, scaleY: S * 1.05, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-      this.label({ x: map.boss.x, y: map.boss.y - 1 }, boss.name);
+      this.label({ x: map.boss.x, y: map.boss.y - 1 }, tr(boss.name));
     }
     this.drawMonsters();
   }
@@ -329,20 +331,20 @@ export class DungeonScene extends Phaser.Scene {
 
     this.hud = { hp, mp, xp, xpBig, xpLeft, xpRight, info, gold, pots, today };
 
-    const floorName = this.place().name;
+    const floorName = tr(this.place().name);
     txt(this, W / 2, 14, floorName, 18, '#ffe9a0').setOrigin(0.5, 0).setScrollFactor(0).setDepth(1000);
 
     const bx = W - 70;
     const mk = (y: number, label: string, fn: () => void, color = 0x4b3a78) => button(this, bx, y, 120, 50, label, fn, { size: 19, color }).setScrollFactor(0).setDepth(1000);
-    mk(36, 'Bag', () => this.openOverlay('Inventory'));
-    mk(94, 'Spells', () => this.openOverlay('Spells'), 0x5a3a8a);
-    mk(152, 'Potion', () => this.drinkPotion(), 0x8a2a3a);
-    mk(210, 'Camp', () => this.goCamp(), 0x2e5a7a);
-    mk(268, 'Save & Quit', () => {
+    mk(36, tr('Bag'), () => this.openOverlay('Inventory'));
+    mk(94, tr('Spells'), () => this.openOverlay('Spells'), 0x5a3a8a);
+    mk(152, tr('Potion'), () => this.drinkPotion(), 0x8a2a3a);
+    mk(210, tr('Camp'), () => this.goCamp(), 0x2e5a7a);
+    mk(268, tr('Save & Quit'), () => {
       saveProfile(current());
       worldState.world = null;
       this.scene.start('Title');
-    }, 0x3a3450).label.setFontSize(15);
+    }, 0x3a3450).label.setFontSize(getLang() === 'fr' ? 13 : 15);
     soundButton(this, bx, 326).setScrollFactor(0).setDepth(1000);
     this.refreshHud(false);
   }
@@ -350,20 +352,21 @@ export class DungeonScene extends Phaser.Scene {
   refreshHud(animate = true) {
     const p = current();
     const s = derive(p);
-    this.hud.info.setText(`${p.name}  Lv ${p.level}${p.level >= LEVEL_CAP ? ' (MAX)' : ''}`);
+    this.hud.info.setText(p.level >= LEVEL_CAP ? tr('{name}  Lv {n} (MAX)', { name: p.name, n: p.level }) : tr('{name}  Lv {n}', { name: p.name, n: p.level }));
     this.hud.hp.set(p.hp, s.maxHp, animate);
     this.hud.mp.set(p.mp, s.maxMp, animate);
     const maxed = p.level >= LEVEL_CAP;
     this.hud.xp.set(maxed ? 1 : p.xp, maxed ? 1 : xpToNext(p.level), animate);
     this.hud.xpBig.set(maxed ? 1 : p.xp, maxed ? 1 : xpToNext(p.level), animate);
-    this.hud.xpLeft.setText(`Level ${p.level}`);
-    this.hud.xpRight.setText(maxed ? 'MAX LEVEL!' : `XP to level ${p.level + 1}`);
-    this.hud.gold.setText(`${p.gold}g`);
-    this.hud.pots.setText(`Potions: ${countPotions(p.potions, 'hp')} health, ${countPotions(p.potions, 'mp')} mana`);
+    this.hud.xpLeft.setText(tr('Level {n}', { n: p.level }));
+    this.hud.xpRight.setText(maxed ? tr('MAX LEVEL!') : tr('XP to level {n}', { n: p.level + 1 }));
+    this.hud.gold.setText(tr('{n}g', { n: fmtNum(p.gold) }));
+    this.hud.pots.setX(Math.max(84, this.hud.gold.x + this.hud.gold.width + 10));
+    this.hud.pots.setText(tr('Potions: {hp} health, {mp} mana', { hp: countPotions(p.potions, 'hp'), mp: countPotions(p.potions, 'mp') }));
     const d = new Date();
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const day = p.learning.days[key];
-    this.hud.today.setText(day ? `Today: ${day.correct} of ${day.asked} questions right!` : 'Find a monster to start learning!');
+    this.hud.today.setText(day ? tr('Today: {right} of {asked} questions right!', { right: day.correct, asked: day.asked }) : tr('Find a monster to start learning!'));
   }
 
   private drinkPotion() {
@@ -375,7 +378,7 @@ export class DungeonScene extends Phaser.Scene {
       (d, gained) => {
         this.busy = false;
         this.healFx(this.player);
-        toast(this, `+${gained} ${d.kind === 'hp' ? 'health' : 'mana'}`, C.good);
+        toast(this, d.kind === 'hp' ? tr('+{n} health', { n: gained }) : tr('+{n} mana', { n: gained }), C.good);
         this.refreshHud();
       },
       () => (this.busy = false),
@@ -416,8 +419,8 @@ export class DungeonScene extends Phaser.Scene {
 
   private showFloorBanner() {
     const pl = this.place();
-    const name = pl.name;
-    const sub = pl.floor ? `Monsters here: level ${pl.floor.levels.join(' - ')}` : this.area().boss.lairSub;
+    const name = tr(pl.name);
+    const sub = pl.floor ? tr('Monsters here: level {from} - {to}', { from: pl.floor.levels[0], to: pl.floor.levels[1] }) : tr(this.area().boss.lairSub);
     const c = this.add.container(W / 2, H / 2 - 60).setScrollFactor(0).setDepth(2000);
     c.add(txt(this, 0, 0, name, 36, '#ffd24a').setOrigin(0.5));
     c.add(txt(this, 0, 44, sub, 20, C.dim).setOrigin(0.5));
@@ -588,7 +591,7 @@ export class DungeonScene extends Phaser.Scene {
       p.mp = s.maxMp;
       if (p.pet) p.pet.hp = p.pet.maxHp;
       this.healFx(this.player);
-      toast(this, p.pet ? `The water heals you and your ${p.pet.name}!` : 'The water heals you completely!', C.good);
+      toast(this, p.pet ? tr('The water heals you and your {pet}!', { pet: tr(p.pet.name) }) : tr('The water heals you completely!'), C.good);
       sfx('heal');
       this.refreshHud();
       saveProfile(p);
@@ -607,7 +610,7 @@ export class DungeonScene extends Phaser.Scene {
   private openChest(key: string) {
     const p = current();
     if (p.bag.length >= BAG_SIZE) {
-      toast(this, 'Your bag is full! Sell something first.', C.bad);
+      toast(this, tr('Your bag is full! Sell something first.'), C.bad);
       return;
     }
     this.world.openedChests.add(key);
@@ -621,13 +624,13 @@ export class DungeonScene extends Phaser.Scene {
     if (Math.random() < 0.5) {
       const d = POTIONS.find((x) => x.kind === (Math.random() < 0.7 ? 'hp' : 'mp') && x.tier === tierForLevel(ilvl))!;
       p.potions[d.id] = (p.potions[d.id] ?? 0) + 1;
-      this.time.delayedCall(1300, () => toast(this, `+1 ${d.name}`, '#ff8a8a'));
+      this.time.delayedCall(1300, () => toast(this, tr('+1 {potion}', { potion: tr(d.name) }), '#ff8a8a'));
     }
     p.bag.push(item);
     p.gold += gold;
     saveProfile(p);
     this.refreshHud();
-    toast(this, `Treasure! ${item.name} and ${gold} gold`, RARITY[item.rarity].css);
+    toast(this, tr('Treasure! {item} and {gold} gold', { item: itemName(item), gold }), RARITY[item.rarity].css);
   }
 
   private useExit() {
@@ -645,8 +648,8 @@ export class DungeonScene extends Phaser.Scene {
     }
     if (nextIsLair && p.level < boss.minLevel) {
       this.dialog([
-        this.area().theme.outdoor ? 'A huge gate made of twisted roots, glowing green...' : 'A heavy door with a crown carved on it...',
-        `A deep voice rumbles: "Come back when you're stronger, little hero!" (Reach level ${boss.minLevel} to enter. You are level ${p.level}.)`,
+        this.area().theme.outdoor ? tr('A huge gate made of twisted roots, glowing green...') : tr('A heavy door with a crown carved on it...'),
+        tr('A deep voice rumbles: "Come back when you\'re stronger, little hero!" (Reach level {need} to enter. You are level {level}.)', { need: boss.minLevel, level: p.level }),
       ]);
       return;
     }
@@ -705,7 +708,7 @@ export class DungeonScene extends Phaser.Scene {
 
   private startBoss() {
     this.busy = true;
-    this.dialog(this.area().boss.intro, () => {
+    this.dialog(this.area().boss.intro.map((l) => tr(l)), () => {
       this.cameras.main.shake(400, 0.02);
       this.time.delayedCall(400, () => this.scene.start('Battle', { boss: true, bossArea: this.place().area, lair: this.world.floor }));
     });
@@ -721,7 +724,7 @@ export class DungeonScene extends Phaser.Scene {
     c.add(panel(this, 60, H - 190, W - 120, 160, 0x1d1730, 0xffd24a));
     const t = txt(this, 90, H - 170, '', 24, C.text, { wordWrap: { width: W - 180 }, lineSpacing: 6 });
     c.add(t);
-    const hint = txt(this, W - 90, H - 50, 'tap to continue', 15, C.dim).setOrigin(1, 1);
+    const hint = txt(this, W - 90, H - 50, tr('tap to continue'), 15, C.dim).setOrigin(1, 1);
     c.add(hint);
     const show = () => t.setText(lines[i]);
     show();

@@ -2,6 +2,7 @@
 // Curriculum Framework (grades 3-5: OA, NBT, NF, MD, G).
 // Every question carries a `teach` hint: how to think about THIS problem,
 // without giving away the answer.
+import { EARLY_GENERATORS, makeEarlyQuestion } from './mathEarly';
 import type { Difficulty, Question } from './types';
 import { pick, ri, shuffle } from '../util/rng';
 
@@ -957,10 +958,12 @@ export function mathTopicsFor(d: Difficulty): string[] {
 }
 
 export function mathTopicLevels(topic: string): Difficulty[] {
-  return GENERATORS[topic]?.levels ?? [];
+  return GENERATORS[topic]?.levels ?? EARLY_GENERATORS[topic]?.levels ?? [];
 }
 
 export function makeMathQuestion(topic: string, d: Difficulty, factors?: number[]): Question {
+  // Early-grade topics (1re-3e annee / grades 1-3) are bilingual and live in mathEarly.ts.
+  if (EARLY_GENERATORS[topic]) return makeEarlyQuestion(topic, d);
   const g = GENERATORS[topic];
   const level = g.levels.includes(d) ? d : g.levels.reduce((best, l) => (Math.abs(l - d) < Math.abs(best - d) ? l : best), g.levels[0]);
   const q = g.gen(level, factors && factors.length ? factors : undefined);

@@ -8,6 +8,8 @@ import {
 } from '../data/items';
 import { BAG_SIZE, classOf, current, derive, equip, saveProfile, unequip } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
+import { fmtNum, tr } from '../i18n';
+import { itemName } from '../i18n/itemNames';
 
 const BOX = 58;
 
@@ -49,8 +51,8 @@ export class InventoryScene extends Phaser.Scene {
     this.layer = c;
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.75).setOrigin(0).setInteractive());
     c.add(panel(this, 12, 12, W - 24, H - 24, 0x1d1730, cls.color));
-    c.add(txt(this, 32, 22, `${p.name}'s Gear`, 24, '#ffd24a'));
-    c.add(button(this, W - 80, 42, 110, 44, 'Close', () => this.close(), { size: 20, color: 0x8a3a3a }));
+    c.add(txt(this, 32, 22, tr("{name}'s Gear", { name: p.name }), 24, '#ffd24a'));
+    c.add(button(this, W - 80, 42, 110, 44, tr('Close'), () => this.close(), { size: 20, color: 0x8a3a3a }));
 
     // Paper doll
     const hero = this.add.image(185, 270, cls.sprite).setScale(8);
@@ -61,32 +63,32 @@ export class InventoryScene extends Phaser.Scene {
 
     // Stats
     const sx = 350;
-    c.add(txt(this, sx, 66, 'Stats', 20, '#ffd24a'));
-    const rows: [string, string][] = [
-      ['Health', `${p.hp}/${s.maxHp}`],
-      ['Mana', `${p.mp}/${s.maxMp}`],
-      ['Power', `${Math.round(s.power)}`],
-      ['Weapon', `${s.weaponDmg[0]}-${s.weaponDmg[1]}`],
-      ['Strength', `${s.str}`],
-      ['Intellect', `${s.int}`],
-      ['Dexterity', `${s.agi}`],
-      ['Stamina', `${s.sta}`],
-      ['Armor', `${s.armor}`],
-      ['Crit', `${s.crit}%`],
+    c.add(txt(this, sx, 66, tr('Stats'), 20, '#ffd24a'));
+    const rows: [string, string, StatKey?][] = [
+      [tr('Health'), `${p.hp}/${s.maxHp}`],
+      [tr('Mana'), `${p.mp}/${s.maxMp}`],
+      [tr('Power'), `${Math.round(s.power)}`],
+      [tr('Weapon'), `${s.weaponDmg[0]}-${s.weaponDmg[1]}`],
+      [tr(STAT_LABEL.str), `${s.str}`, 'str'],
+      [tr(STAT_LABEL.int), `${s.int}`, 'int'],
+      [tr(STAT_LABEL.agi), `${s.agi}`, 'agi'],
+      [tr(STAT_LABEL.sta), `${s.sta}`, 'sta'],
+      [tr(STAT_LABEL.armor), `${s.armor}`],
+      [tr('Crit'), `${s.crit}%`],
     ];
-    rows.forEach(([k, v], i) => {
-      const main = (k === 'Strength' && cls.primary === 'str') || (k === 'Intellect' && cls.primary === 'int') || (k === 'Dexterity' && cls.primary === 'agi');
+    rows.forEach(([k, v, stat], i) => {
+      const main = stat !== undefined && stat === cls.primary;
       c.add(txt(this, sx, 96 + i * 30, k, 17, main ? '#ffd24a' : C.dim));
       c.add(txt(this, sx + 170, 96 + i * 30, v, 17, main ? '#ffd24a' : C.text).setOrigin(1, 0));
     });
-    c.add(txt(this, sx, 404, `Gold: ${p.gold}`, 18, '#ffd24a'));
-    c.add(txt(this, sx, 430, `Gold color = your main stat`, 13, C.dim));
+    c.add(txt(this, sx, 404, tr('Gold: {n}', { n: fmtNum(p.gold) }), 18, '#ffd24a'));
+    c.add(txt(this, sx, 430, tr('Gold color = your main stat'), 13, C.dim));
 
     // Bag
     const bx = 556;
     const cols = 6;
     const cell = 62;
-    c.add(txt(this, bx, 66, `Bag ${p.bag.length}/${BAG_SIZE}`, 20, '#ffd24a'));
+    c.add(txt(this, bx, 66, tr('Bag {n}/{max}', { n: p.bag.length, max: BAG_SIZE }), 20, '#ffd24a'));
     for (let i = 0; i < BAG_SIZE; i++) {
       const x = bx + (i % cols) * cell;
       const y = 96 + Math.floor(i / cols) * cell;
@@ -111,7 +113,7 @@ export class InventoryScene extends Phaser.Scene {
       z.on('pointerup', () => this.showItem(it, null));
       c.add(z);
     }
-    c.add(button(this, bx + 180, H - 50, 230, 44, 'Sell items...', () => openSellMenu(this, () => this.draw()), { size: 18, color: 0x6a5a2a }));
+    c.add(button(this, bx + 180, H - 50, 230, 44, tr('Sell items...'), () => openSellMenu(this, () => this.draw()), { size: 18, color: 0x6a5a2a }));
   }
 
   private bestEquippedScore(it: Item): number {
@@ -131,7 +133,7 @@ export class InventoryScene extends Phaser.Scene {
     c.add(g);
     if (it) c.add(this.add.image(x + BOX / 2, y + BOX / 2, ICON[it.base]).setScale(3));
     else c.add(this.add.image(x + BOX / 2, y + BOX / 2, SLOT_ICON[slot]).setScale(3).setAlpha(blocked ? 0.35 : 0.18));
-    c.add(txt(this, x + BOX / 2, y + BOX + 2, blocked ? '2-Hand' : SLOT_LABEL[slot], 12, C.dim).setOrigin(0.5, 0));
+    c.add(txt(this, x + BOX / 2, y + BOX + 2, blocked ? tr('2-Hand') : tr(SLOT_LABEL[slot]), 12, C.dim).setOrigin(0.5, 0));
     if (it) {
       const z = this.add.zone(x, y, BOX, BOX).setOrigin(0).setInteractive({ useHandCursor: true });
       z.on('pointerup', () => this.showItem(it, slot));
@@ -164,18 +166,18 @@ export class InventoryScene extends Phaser.Scene {
     // Lay out the content first, then size the window around it.
     const body = this.add.container(0, 0);
     const main = cls.primary;
-    const mainLabel = STAT_LABEL[main];
+    const mainLabel = tr(STAT_LABEL[main]);
     /**
      * One column of item info. When `against` is given, each line gets a
      * green up arrow (better) or red down arrow (worse) compared to it.
      */
     const col = (x: number, item: Item, title: string, against: Item | null): number => {
       body.add(txt(this, x, 0, title, 15, C.dim));
-      const name = txt(this, x + 60, 24, item.name, 21, RARITY[item.rarity].css, { wordWrap: { width: colW - 60 } });
+      const name = txt(this, x + 60, 24, itemName(item), 21, RARITY[item.rarity].css, { wordWrap: { width: colW - 60 } });
       body.add(name);
       body.add(this.add.image(x + 24, 24 + Math.max(name.height, 44) / 2, ICON[item.base]).setScale(3));
       let y = 24 + Math.max(name.height, 44) + 14;
-      body.add(txt(this, x, y, `${RARITY[item.rarity].name} ${weaponLabel(item.base)}   (item level ${item.ilvl})`, 17, C.dim));
+      body.add(txt(this, x, y, tr('{rarity} {type}   (item level {n})', { rarity: tr(RARITY[item.rarity].name), type: tr(weaponLabel(item.base)), n: item.ilvl }), 17, C.dim));
       y += 28;
 
       const mine = this.values(item);
@@ -187,13 +189,13 @@ export class InventoryScene extends Phaser.Scene {
         const v = mine[k] ?? 0;
         const isMain = k === `stat:${main}`;
         let label: string;
-        if (k === 'dmg') label = item.dmg ? `Damage: ${item.dmg[0]} - ${item.dmg[1]}` : 'Damage: none';
-        else if (k === 'armor') label = `Armor: ${v || 'none'}`;
+        if (k === 'dmg') label = item.dmg ? tr('Damage: {from} - {to}', { from: item.dmg[0], to: item.dmg[1] }) : tr('Damage: none');
+        else if (k === 'armor') label = v ? tr('Armor: {n}', { n: v }) : tr('Armor: none');
         else {
           const sk = k.slice(5) as StatKey;
-          label = v ? `+${v} ${STAT_LABEL[sk]}` : `${STAT_LABEL[sk]}: none`;
+          label = v ? `+${v} ${tr(STAT_LABEL[sk])}` : tr('{stat}: none', { stat: tr(STAT_LABEL[sk]) });
         }
-        if (isMain) label += '  (main)';
+        if (isMain) label += tr('  (main)');
         body.add(txt(this, x, y, label, 18, isMain ? '#ffd24a' : v ? C.text : C.dim));
         if (against) {
           const d = Math.round((v - (theirs[k] ?? 0)) * 10) / 10;
@@ -206,8 +208,8 @@ export class InventoryScene extends Phaser.Scene {
       }
       return y;
     };
-    let bottom = col(px + 24, it, equippedSlot ? 'Equipped' : 'In your bag', compare);
-    if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, 'Currently wearing', null));
+    let bottom = col(px + 24, it, equippedSlot ? tr('Equipped') : tr('In your bag'), compare);
+    if (compare) bottom = Math.max(bottom, col(px + pw / 2 + 12, compare, tr('Currently wearing'), null));
     bottom += 8;
     // What actually happens to your hero's totals if you put this on.
     if (!equippedSlot && canUse(cls, it)) {
@@ -217,26 +219,28 @@ export class InventoryScene extends Phaser.Scene {
         const before = derive(p);
         const after = derive(sim);
         const rows: [string, number, string][] = [
-          ['Damage', Math.round(after.power) - Math.round(before.power), ''],
-          ['Armor', after.armor - before.armor, ''],
-          ['Health', after.maxHp - before.maxHp, ''],
-          ['Mana', after.maxMp - before.maxMp, ''],
-          [STAT_LABEL.str, after.str - before.str, ''],
-          [STAT_LABEL.int, after.int - before.int, ''],
-          [STAT_LABEL.agi, after.agi - before.agi, ''],
-          [STAT_LABEL.sta, after.sta - before.sta, ''],
-          ['Crit', after.crit - before.crit, '%'],
+          [tr('Damage'), Math.round(after.power) - Math.round(before.power), ''],
+          [tr('Armor'), after.armor - before.armor, ''],
+          [tr('Health'), after.maxHp - before.maxHp, ''],
+          [tr('Mana'), after.maxMp - before.maxMp, ''],
+          [tr(STAT_LABEL.str), after.str - before.str, ''],
+          [tr(STAT_LABEL.int), after.int - before.int, ''],
+          [tr(STAT_LABEL.agi), after.agi - before.agi, ''],
+          [tr(STAT_LABEL.sta), after.sta - before.sta, ''],
+          [tr('Crit'), after.crit - before.crit, '%'],
         ];
         const changed = rows.filter(([, d]) => d !== 0);
-        body.add(txt(this, px + 24, bottom, 'If you equip this:', 17, '#d7b8ff'));
-        let cx = px + 24 + 160;
+        const head = txt(this, px + 24, bottom, tr('If you equip this:'), 17, '#d7b8ff');
+        body.add(head);
+        const indent = Math.max(160, head.width + 14);
+        let cx = px + 24 + indent;
         let cy = bottom;
-        if (!changed.length) body.add(txt(this, cx, cy, 'no change', 17, C.dim));
+        if (!changed.length) body.add(txt(this, cx, cy, tr('no change'), 17, C.dim));
         for (const [label, d, unit] of changed) {
           const up = d > 0;
           const t = txt(this, cx, cy, `${label} ${up ? '\u25B2' : '\u25BC'}${Math.abs(d)}${unit}`, 17, up ? C.good : C.bad);
           if (cx + t.width > px + pw - 24) {
-            cx = px + 24 + 160;
+            cx = px + 24 + indent;
             cy += 24;
             t.setPosition(cx, cy);
           }
@@ -249,12 +253,12 @@ export class InventoryScene extends Phaser.Scene {
     if (compare && canUse(cls, it)) {
       const diff = itemScore(it, cls) - itemScore(compare, cls);
       body.add(
-        txt(this, W / 2, bottom, diff > 0 ? `UPGRADE for a ${cls.name}! (${mainLabel} is your main stat)` : diff < 0 ? `Your current item is better for a ${cls.name}.` : 'About the same.', 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),
+        txt(this, W / 2, bottom, diff > 0 ? tr('UPGRADE for a {cls}! ({stat} is your main stat)', { cls: tr(cls.name), stat: mainLabel }) : diff < 0 ? tr('Your current item is better for a {cls}.', { cls: tr(cls.name) }) : tr('About the same.'), 18, diff > 0 ? C.good : diff < 0 ? '#ffb36b' : C.dim).setOrigin(0.5, 0),
       );
       bottom += 30;
     }
     if (!canUse(cls, it)) {
-      body.add(txt(this, px + 24, bottom, `A ${cls.name} can't use this.`, 17, C.bad));
+      body.add(txt(this, px + 24, bottom, tr("A {cls} can't use this.", { cls: tr(cls.name) }), 17, C.bad));
       bottom += 28;
     }
 
@@ -270,33 +274,35 @@ export class InventoryScene extends Phaser.Scene {
     const by = py + ph - 18 - bh / 2;
     const actions: { label: string; color: number; fn: () => void; enabled?: boolean }[] = equippedSlot
       ? [
-          { label: 'Unequip', color: 0x4b3a78, fn: () => {
-            if (!unequip(p, equippedSlot)) toast(this, 'Bag is full!', C.bad);
+          { label: tr('Unequip'), color: 0x4b3a78, fn: () => {
+            if (!unequip(p, equippedSlot)) toast(this, tr('Bag is full!'), C.bad);
             this.draw();
           } },
-          { label: 'Close', color: 0x3a3450, fn: () => c.destroy() },
+          { label: tr('Close'), color: 0x3a3450, fn: () => c.destroy() },
         ]
       : [
-          { label: 'Equip', color: 0x2f9a4a, enabled: canUse(cls, it), fn: () => {
-            if (!equip(p, it)) toast(this, 'Bag is full!', C.bad);
+          { label: tr('Equip'), color: 0x2f9a4a, enabled: canUse(cls, it), fn: () => {
+            if (!equip(p, it)) toast(this, tr('Bag is full!'), C.bad);
             else sfx('equip');
             saveProfile(p);
             this.draw();
           } },
-          { label: `Sell ${it.value}g`, color: 0x6a5a2a, fn: () => {
+          { label: tr('Sell {n}g', { n: fmtNum(it.value) }), color: 0x6a5a2a, fn: () => {
             p.bag = p.bag.filter((x) => x.id !== it.id);
             p.gold += it.value;
             sfx('coin');
             saveProfile(p);
             this.draw();
           } },
-          { label: 'Close', color: 0x3a3450, fn: () => c.destroy() },
+          { label: tr('Close'), color: 0x3a3450, fn: () => c.destroy() },
         ];
     const gap = 12;
     const bw = Math.min(160, (pw - 48 - gap * (actions.length - 1)) / actions.length);
     const total = actions.length * bw + (actions.length - 1) * gap;
     actions.forEach((a, i) => {
       const b = button(this, W / 2 - total / 2 + bw / 2 + i * (bw + gap), by, bw, bh, a.label, a.fn, { color: a.color, size: 20 });
+      // Longer (French) labels shrink to stay on one line.
+      for (let size = 19; size >= 14 && b.label.getWrappedText().length > 1; size--) b.label.setFontSize(size);
       if (a.enabled === false) b.setEnabled(false);
       c.add(b);
     });

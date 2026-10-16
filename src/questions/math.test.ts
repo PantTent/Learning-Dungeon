@@ -174,7 +174,7 @@ describe('teacher hints and grades', () => {
       for (let i = 0; i < 300; i++) {
         const q = e.next();
         expect(allowed.has(q.topic), `grade ${grade}: ${q.topic}`).toBe(true);
-        const [lo, hi] = GRADE_BAND[grade];
+        const [lo, hi] = GRADE_BAND[grade]!;
         expect(q.difficulty >= lo && q.difficulty <= hi || !mathTopicLevelsIn(q.topic, lo, hi), `${q.topic} d${q.difficulty}`).toBe(true);
       }
     }

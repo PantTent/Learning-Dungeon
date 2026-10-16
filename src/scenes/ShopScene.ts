@@ -5,6 +5,7 @@ import { AREAS, PLACES } from '../data/areas';
 import { POTIONS, countPotions, type PotionDef } from '../data/potions';
 import { current, saveProfile } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
+import { fmtNum, tr } from '../i18n';
 
 export class ShopScene extends Phaser.Scene {
   private onClose?: () => void;
@@ -19,8 +20,8 @@ export class ShopScene extends Phaser.Scene {
     this.add.rectangle(0, 0, W, H, 0, 0.7).setOrigin(0).setInteractive();
     panel(this, 120, 30, W - 240, H - 60, 0x1d1730, 0xffd24a);
     this.add.image(190, 100, 'npc_merchant').setScale(6);
-    txt(this, 250, 54, 'Pip the Merchant', 26, '#ffd24a');
-    txt(this, 250, 88, '"Potions! Fresh potions! Sell me your old junk!"', 17, C.dim, { wordWrap: { width: 460 } });
+    txt(this, 250, 54, tr('Pip the Merchant'), 26, '#ffd24a');
+    txt(this, 250, 88, tr('"Potions! Fresh potions! Sell me your old junk!"'), 17, C.dim, { wordWrap: { width: 460 } });
     this.draw();
   }
 
@@ -29,13 +30,13 @@ export class ShopScene extends Phaser.Scene {
     const p = current();
     const c = this.add.container(0, 0);
     this.layer = c;
-    c.add(txt(this, 250, 120, `Your gold: ${p.gold}     Potions: ${countPotions(p.potions, 'hp')} health, ${countPotions(p.potions, 'mp')} mana`, 17, '#ffd24a'));
+    c.add(txt(this, 250, 120, tr('Your gold: {gold}     Potions: {hp} health, {mp} mana', { gold: fmtNum(p.gold), hp: countPotions(p.potions, 'hp'), mp: countPotions(p.potions, 'mp') }), 17, '#ffd24a'));
     // Stronger potions appear in the shop as the hero levels up.
     const forSale = POTIONS.filter((d) => d.shopLevel <= p.level);
     forSale.forEach((d, i) => {
       const col = d.kind === 'hp' ? 0 : 1;
       const row = d.tier - 1;
-      const b = button(this, W / 2 - 165 + col * 330, 180 + row * 62, 310, 54, `${d.name}\n+${d.amount}  -  ${d.price} gold`, () => this.buy(d), {
+      const b = button(this, W / 2 - 165 + col * 330, 180 + row * 62, 310, 54, tr('{potion}\n+{amount}  -  {price} gold', { potion: tr(d.name), amount: d.amount, price: fmtNum(d.price) }), () => this.buy(d), {
         size: 15,
         color: d.kind === 'hp' ? 0x8a2a3a : 0x2a4a8a,
       });
@@ -44,9 +45,9 @@ export class ShopScene extends Phaser.Scene {
       c.add(b);
     });
     const next = POTIONS.find((d) => d.shopLevel > p.level);
-    if (next) c.add(txt(this, W / 2, 180 + 4 * 62 - 22, `Stronger potions unlock at level ${next.shopLevel}!`, 15, C.dim).setOrigin(0.5));
-    c.add(button(this, W / 2 - 110, H - 72, 200, 50, 'Sell items...', () => openSellMenu(this, () => this.draw()), { size: 18, color: 0x6a5a2a }));
-    c.add(button(this, W / 2 + 110, H - 72, 180, 50, 'Bye!', () => {
+    if (next) c.add(txt(this, W / 2, 180 + 4 * 62 - 22, tr('Stronger potions unlock at level {n}!', { n: next.shopLevel }), 15, C.dim).setOrigin(0.5));
+    c.add(button(this, W / 2 - 110, H - 72, 200, 50, tr('Sell items...'), () => openSellMenu(this, () => this.draw()), { size: 18, color: 0x6a5a2a }));
+    c.add(button(this, W / 2 + 110, H - 72, 180, 50, tr('Bye!'), () => {
       this.scene.stop();
       this.onClose?.();
     }, { color: 0x3a3450 }));
@@ -54,7 +55,7 @@ export class ShopScene extends Phaser.Scene {
 
   private buy(d: PotionDef) {
     const p = current();
-    if (p.gold < d.price) return toast(this, 'Not enough gold!', C.bad);
+    if (p.gold < d.price) return toast(this, tr('Not enough gold!'), C.bad);
     p.gold -= d.price;
     p.potions[d.id] = (p.potions[d.id] ?? 0) + 1;
     sfx('coin');
@@ -73,15 +74,17 @@ export class TravelScene extends Phaser.Scene {
     const p = current();
     this.add.rectangle(0, 0, W, H, 0, 0.7).setOrigin(0).setInteractive();
     panel(this, 60, 30, W - 120, H - 60, 0x1d1730, 0xff9a40);
-    txt(this, W / 2, 58, 'Campfire Travel', 28, '#ffd24a').setOrigin(0.5);
-    txt(this, W / 2, 92, 'Jump to any place you have already reached.', 16, C.dim).setOrigin(0.5);
+    txt(this, W / 2, 58, tr('Campfire Travel'), 28, '#ffd24a').setOrigin(0.5);
+    txt(this, W / 2, 92, tr('Jump to any place you have already reached.'), 16, C.dim).setOrigin(0.5);
     AREAS.forEach((area, ai) => {
       const x = W / 2 - 205 + ai * 410;
-      txt(this, x, 128, area.name, 20, area.theme.outdoor ? '#8aff6a' : '#c8b8ff').setOrigin(0.5);
+      txt(this, x, 128, tr(area.name), 20, area.theme.outdoor ? '#8aff6a' : '#c8b8ff').setOrigin(0.5);
       PLACES.filter((pl) => pl.area === ai).forEach((pl, i) => {
         const unlocked = pl.index <= p.maxFloor;
-        const label = pl.kind === 'lair' ? pl.name : pl.name.replace(`${area.name} - `, '');
-        const b = button(this, x, 172 + i * 62, 360, 52, unlocked ? label : `${label} (locked)`, () => {
+        const full = tr(pl.name);
+        const prefix = `${tr(area.name)} - `;
+        const label = pl.kind !== 'lair' && full.startsWith(prefix) ? full.slice(prefix.length) : full;
+        const b = button(this, x, 172 + i * 62, 360, 52, unlocked ? label : tr('{place} (locked)', { place: label }), () => {
           this.scene.stop();
           this.scene.stop('Dungeon');
           this.scene.start('Dungeon', { floor: pl.index });
@@ -89,7 +92,7 @@ export class TravelScene extends Phaser.Scene {
         b.setEnabled(unlocked);
       });
     });
-    button(this, W / 2, H - 72, 180, 48, 'Stay here', () => {
+    button(this, W / 2, H - 72, 180, 48, tr('Stay here'), () => {
       this.scene.stop();
       data.onClose?.();
     }, { color: 0x3a3450 });

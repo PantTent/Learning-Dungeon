@@ -1,6 +1,8 @@
 // All game audio is synthesized with the Web Audio API: retro sound effects
 // and little chiptune songs. No audio files to download or license.
 
+import { tr } from '../i18n';
+
 type Wave = OscillatorType;
 
 let ctx: AudioContext | null = null;
@@ -82,7 +84,7 @@ export function cycleSoundMode(): SoundMode {
 }
 
 export function soundModeLabel(m: SoundMode = mode): string {
-  return m === 'all' ? 'Sound: ON' : m === 'sfx' ? 'Music: OFF' : 'Sound: OFF';
+  return m === 'all' ? tr('Sound: ON') : m === 'sfx' ? tr('Music: OFF') : tr('Sound: OFF');
 }
 
 // ------------------------------------------------------------------ synth helpers
