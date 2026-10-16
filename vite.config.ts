@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         preview3d: resolve(__dirname, 'preview3d.html'),
+        preview2d: resolve(__dirname, 'preview2d.html'),
       },
     },
   },
