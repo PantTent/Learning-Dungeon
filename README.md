@@ -43,6 +43,9 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 - **Ultimates change with your spells**: the power attack matches the school
   most of your 3 chosen spells use, e.g. Meteor (fire), Glacier Crash (ice),
   Arcane Nova (arcane), Thunderstorm (lightning), Starfall (druid moon magic).
+  Every class has two schools: Warrior (melee + lightning), Ranger (arrows +
+  nature), Paladin (holy + fire), Necromancer (shadow + ice), Druid (nature +
+  moon), Demonologist (fel fire + shadow), Mage (fire, ice, arcane, lightning).
   The Spellbook shows which one you'll get.
 - **Summons** (Necromancer skeleton, Demonologist imp): cast once and the pet
   follows you on the map and into every fight. It has about 1/3 of your

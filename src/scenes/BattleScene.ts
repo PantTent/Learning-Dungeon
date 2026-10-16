@@ -717,7 +717,7 @@ export class BattleScene extends Phaser.Scene {
               this.hit(f, this.calcDamage(sk, f, correct), correct, sk.fx);
               if (correct && sk.stunChance && f.e.hp > 0 && chance(sk.stunChance)) {
                 f.e.stunned = true;
-                this.floatText(f.sprite.x, f.sprite.y - 90, 'FROZEN!', '#8fd8ff', 20);
+                this.floatText(f.sprite.x, f.sprite.y - 90, sk.fx === 'frost' ? 'FROZEN!' : 'STUNNED!', sk.fx === 'frost' ? '#8fd8ff' : '#ffe066', 20);
               }
             }),
           );

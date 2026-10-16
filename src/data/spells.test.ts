@@ -61,3 +61,16 @@ describe('ultimate follows the chosen spells', () => {
     expect(activePower(druid, 20, ['moonfire1', 'moonfire2', 'rejuv1']).name).toBe('Starfall');
   });
 });
+
+describe('every class can pick between at least 2 ultimates', () => {
+  for (const c of CLASSES) {
+    it(c.id, () => {
+      const ids = c.skills.slice(1).map((s) => s.id);
+      const names = new Set<string>();
+      for (let a = 0; a < ids.length; a++)
+        for (let b = a + 1; b < ids.length; b++)
+          for (let d = b + 1; d < ids.length; d++) names.add(activePower(c, 20, [ids[a], ids[b], ids[d]]).name);
+      expect(names.size).toBeGreaterThanOrEqual(2);
+    });
+  }
+});
