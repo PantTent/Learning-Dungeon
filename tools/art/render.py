@@ -7,7 +7,7 @@ ts = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '
 
 # --- parse TS independently of the generator ---
 sprites = {}
-for m in re.finditer(r"\n  (\w+): \{\n    w: (\d+), h: (\d+),\n    palette: \{([^}]*)\},\n    rows: \[\n(.*?)\n    \],", ts, re.S):
+for m in re.finditer(r"\n  (\w+): \{\n    w: (\d+), h: (\d+),\n    palette: \{(.*?)\},\n    rows: \[\n(.*?)\n    \],", ts, re.S):
     name, w, h, pal, rows = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5)
     palette = dict(re.findall(r"'(.)': '([^']*)'", pal))
     rows = re.findall(r"'([^']*)'", rows)
@@ -33,7 +33,14 @@ REQUIRED = ('hero_warrior hero_mage hero_ranger hero_paladin hero_necromancer he
             'animal_horse animal_pig animal_chicken animal_goat '
             'hat_straw hat_bow hat_crown hat_cap hat_flowers hat_party '
             'gear_can gear_hat gear_brush gear_basket gear_bell '
-            'farm_board npc_moose npc_beaver npc_owl npc_raccoon').split()
+            'farm_board npc_moose npc_beaver npc_owl npc_raccoon '
+            # Magic World
+            'tile_magic_grass magic_soil magic_path magic_floor magic_fence magic_fence_v '
+            'magic_house magic_barn magic_market magic_tree magic_board magic_sprout '
+            'crop_starfruit crop_moonmelon crop_rainbowcarrot crop_crystalberry crop_dragonpepper '
+            'item_starfruit item_moonmelon item_rainbowcarrot item_crystalberry item_dragonpepper '
+            'animal_unicorn animal_dragon animal_fairy animal_griffin '
+            'npc_gnome npc_mermaid npc_wizard npc_pixie').split()
 errs = []
 for n, s in sprites.items():
     if len(s['rows']) != s['h']: errs.append(f'{n}: h mismatch')

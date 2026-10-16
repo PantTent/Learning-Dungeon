@@ -1,6 +1,6 @@
-import { ANIMALS, CROPS, FEED_TRIES, GOLDEN_MULT, LAND_TIERS, ORDER_EVERY_MS, STALL_TIERS } from './data';
+import { ANIMALS, CROPS, FEED_TRIES, GOLDEN_MULT, LAND_TIERS, MAGIC_CROPS, ORDER_EVERY_MS, PORTAL_COST, STALL_TIERS } from './data';
 import {
-  accrue, buyAnimal, buyGear, buyHat, buyLand, buyStalls, canFill, clock, collect, feed, fillOrder, goldKey, harvest, isHungry, newFarm, newOrder, plant,
+  accrue, buyAnimal, buyGear, buyPortal, enterWorld, rootOf, buyHat, buyLand, buyStalls, canFill, clock, collect, feed, fillOrder, goldKey, harvest, isHungry, newFarm, newOrder, plant,
   plotState, refreshOrders, renameAnimal, saleValue, sell, wearHat,
 } from './state';
 
@@ -172,5 +172,43 @@ describe('Learning Farm part 2', () => {
       expect(o.items.length).toBeGreaterThanOrEqual(1);
       expect(new Set(o.items.map((x) => x.crop)).size).toBe(o.items.length);
     }
+  });
+});
+
+describe('the magic world', () => {
+  it('needs 1000 coins; starts with 4 plots and a hungry unicorn', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    expect(buyPortal(f, T0)).toBe(false);
+    f.coins = PORTAL_COST + 50;
+    expect(buyPortal(f, T0)).toBe(true);
+    expect(buyPortal(f, T0)).toBe(false);
+    expect(f.coins).toBe(50);
+    const m = enterWorld(f, 'magic');
+    expect(m.plots).toHaveLength(4);
+    expect(m.animals.map((a) => a.kind)).toEqual(['unicorn']);
+    expect(isHungry(m.animals[0], T0)).toBe(true);
+    expect(m.orders).toHaveLength(2);
+    for (const o of m.orders) for (const x of o.items) expect(MAGIC_CROPS.some((c) => c.id === x.crop)).toBe(true);
+  });
+
+  it('shares coins and gear with home but keeps its own land and animals', () => {
+    const f = newFarm('Sam', undefined, 'en', T0);
+    f.coins = 5000;
+    buyPortal(f, T0);
+    const m = enterWorld(f, 'magic');
+    expect(plant(m, 0, 'starfruit', T0)).toBe(true);
+    expect(f.coins).toBe(5000 - PORTAL_COST - 45);
+    expect(f.plots[0].crop).toBeUndefined();
+    expect(m.plots[0].crop).toBe('starfruit');
+    f.gear.push('can');
+    expect(plotState(m.plots[0], T0 + 120_000 * 0.75, m)).toBe('ready');
+    expect(buyLand(m)).toBe(true);
+    expect(m.plots).toHaveLength(6);
+    expect(f.plots).toHaveLength(4);
+    expect(m.landTier).toBe(1);
+    expect(f.landTier).toBe(0);
+    // Saving through the view saves the whole farm.
+    expect(rootOf(m)).toBe(f);
+    expect(JSON.parse(JSON.stringify(f)).magic.plots).toHaveLength(6);
   });
 });

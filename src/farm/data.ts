@@ -65,11 +65,11 @@ export const FEED_TRIES = 3;
 export const START_COINS = 20;
 
 export function crop(id: string): CropDef {
-  return CROPS.find((c) => c.id === id) ?? CROPS[0];
+  return CROPS.find((c) => c.id === id) ?? MAGIC_CROPS.find((c) => c.id === id) ?? CROPS[0];
 }
 
 export function animal(id: string): AnimalDef {
-  return ANIMALS.find((a) => a.id === id) ?? ANIMALS[0];
+  return ANIMALS.find((a) => a.id === id) ?? MAGIC_ANIMALS.find((a) => a.id === id) ?? ANIMALS[0];
 }
 
 // ------------------------------------------------------------- part 2
@@ -132,4 +132,95 @@ export function gear(id: string): GearDef | undefined {
 
 export function hat(id: string): HatDef | undefined {
   return HATS.find((h) => h.id === id);
+}
+
+// ------------------------------------------------------- the magic world
+
+export type WorldId = 'home' | 'magic';
+
+export const MAGIC_CROPS: CropDef[] = [
+  { id: 'rainbowcarrot', name: 'Rainbow Carrot', seedCost: 30, growMs: 90 * S, price: 75, sprite: 'crop_rainbowcarrot', item: 'item_rainbowcarrot' },
+  { id: 'starfruit', name: 'Star Fruit', seedCost: 45, growMs: 120 * S, price: 110, sprite: 'crop_starfruit', item: 'item_starfruit' },
+  { id: 'moonmelon', name: 'Moon Melon', seedCost: 70, growMs: 180 * S, price: 170, sprite: 'crop_moonmelon', item: 'item_moonmelon' },
+  { id: 'crystalberry', name: 'Crystal Berry', seedCost: 100, growMs: 240 * S, price: 250, sprite: 'crop_crystalberry', item: 'item_crystalberry' },
+  { id: 'dragonpepper', name: 'Dragon Pepper', seedCost: 150, growMs: 300 * S, price: 380, sprite: 'crop_dragonpepper', item: 'item_dragonpepper' },
+];
+
+export const MAGIC_ANIMALS: AnimalDef[] = [
+  { id: 'fairy', name: 'Fairy', cost: 300, hungryAfterMs: 240 * S, incomePerMin: 6, sprite: 'animal_fairy', names: ['Twinkle', 'Bluebell', 'Pip', 'Glimmer', 'Dewdrop'] },
+  { id: 'unicorn', name: 'Unicorn', cost: 600, hungryAfterMs: 300 * S, incomePerMin: 12, sprite: 'animal_unicorn', names: ['Sparkle', 'Rainbow', 'Stardust', 'Moonbeam', 'Glitter'] },
+  { id: 'griffin', name: 'Griffin', cost: 800, hungryAfterMs: 330 * S, incomePerMin: 15, sprite: 'animal_griffin', names: ['Talon', 'Goldwing', 'Sky', 'Breeze', 'Comet'] },
+  { id: 'dragon', name: 'Baby Dragon', cost: 1000, hungryAfterMs: 360 * S, incomePerMin: 18, sprite: 'animal_dragon', names: ['Ember', 'Puff', 'Scorch', 'Ziggy', 'Blaze'] },
+];
+
+export const MAGIC_NEIGHBOURS: { id: string; name: string; sprite: string }[] = [
+  { id: 'gnome', name: 'Gus the Gnome', sprite: 'npc_gnome' },
+  { id: 'mermaid', name: 'Marina the Mermaid', sprite: 'npc_mermaid' },
+  { id: 'wizard', name: 'Wally the Wizard', sprite: 'npc_wizard' },
+  { id: 'pixie', name: 'Pip the Pixie', sprite: 'npc_pixie' },
+];
+
+export const MAGIC_LAND_TIERS: { plots: number; cost: number }[] = [
+  { plots: 4, cost: 0 },
+  { plots: 6, cost: 600 },
+  { plots: 9, cost: 1500 },
+  { plots: 12, cost: 3000 },
+];
+
+export const MAGIC_STALL_TIERS: { stalls: number; cost: number }[] = [
+  { stalls: 1, cost: 0 },
+  { stalls: 2, cost: 500 },
+  { stalls: 3, cost: 1200 },
+  { stalls: 4, cost: 2500 },
+  { stalls: 6, cost: 5000 },
+];
+
+/** Building the portal to the magic world (full game). */
+export const PORTAL_COST = 1000;
+
+export interface WorldDef {
+  crops: CropDef[];
+  animals: AnimalDef[];
+  neighbours: { id: string; name: string; sprite: string }[];
+  land: { plots: number; cost: number }[];
+  stalls: { stalls: number; cost: number }[];
+  /** Textures: grass, soil, path, stall floor, fences, buildings, growth stages. */
+  look: {
+    grass: string; soil: string; path: string; floor: string; fence: string; fenceV: string;
+    house: string; barn: string; market: string; tree: string; board: string; stages: [string, string, string];
+  };
+  music: string;
+}
+
+export const WORLDS: Record<WorldId, WorldDef> = {
+  home: {
+    crops: CROPS,
+    animals: ANIMALS,
+    neighbours: NEIGHBOURS,
+    land: LAND_TIERS,
+    stalls: STALL_TIERS,
+    look: {
+      grass: 'tile_grass', soil: 'farm_soil', path: 'farm_path', floor: 'farm_hay_floor', fence: 'farm_fence', fenceV: 'farm_fence_v',
+      house: 'farm_house', barn: 'farm_barn', market: 'farm_market', tree: 'farm_tree', board: 'farm_board',
+      stages: ['crop_seeds', 'crop_sprout', 'crop_growing'],
+    },
+    music: 'farm',
+  },
+  magic: {
+    crops: MAGIC_CROPS,
+    animals: MAGIC_ANIMALS,
+    neighbours: MAGIC_NEIGHBOURS,
+    land: MAGIC_LAND_TIERS,
+    stalls: MAGIC_STALL_TIERS,
+    look: {
+      grass: 'tile_magic_grass', soil: 'magic_soil', path: 'magic_path', floor: 'magic_floor', fence: 'magic_fence', fenceV: 'magic_fence_v',
+      house: 'magic_house', barn: 'magic_barn', market: 'magic_market', tree: 'magic_tree', board: 'magic_board',
+      stages: ['crop_seeds', 'magic_sprout', 'magic_sprout'],
+    },
+    music: 'magic',
+  },
+};
+
+export function neighbour(id: string) {
+  return [...NEIGHBOURS, ...MAGIC_NEIGHBOURS].find((n) => n.id === id) ?? NEIGHBOURS[0];
 }

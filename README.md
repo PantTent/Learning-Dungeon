@@ -87,6 +87,11 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   sometimes golden (worth 5x), farmer gear gives bonuses (Watering Can, Lucky
   Straw Hat, Comfy Brush, Big Basket, Golden Bell), and animals can be renamed
   and dressed up in hats.
+  In the full game, the Magic Portal (1,000 coins) opens a second farm in a
+  magic world: crystal house, enchanted barn, magic crops (rainbow carrots,
+  star fruit, moon melons, crystal berries, dragon peppers) and magic animals
+  (fairies, unicorns, griffins, baby dragons). Coins and gear are shared
+  between the two farms.
 - **English and French**: pick the language on the title screen, the hero
   screen or the parent dashboard (each hero keeps its own language). French
   heroes get questions from the Quebec curriculum for 1re, 2e and 3e annee:

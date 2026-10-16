@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { FR, fmtDec, fmtNum, getLang, setLang, tr } from './index';
 import { GAMES } from '../hub/games';
-import { ANIMALS, CROPS, GEAR, HATS, NEIGHBOURS } from '../farm/data';
+import { ANIMALS, CROPS, GEAR, HATS, MAGIC_ANIMALS, MAGIC_CROPS, MAGIC_NEIGHBOURS, NEIGHBOURS } from '../farm/data';
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -38,7 +38,7 @@ describe('translations', () => {
   });
 
   it('every crop and farm animal has French', () => {
-    for (const x of [...CROPS, ...ANIMALS, ...HATS, ...NEIGHBOURS]) expect(FR[x.name], x.name).toBeTruthy();
+    for (const x of [...CROPS, ...ANIMALS, ...HATS, ...NEIGHBOURS, ...MAGIC_CROPS, ...MAGIC_ANIMALS, ...MAGIC_NEIGHBOURS]) expect(FR[x.name], x.name).toBeTruthy();
     for (const g of GEAR) for (const t of [g.name, g.desc]) expect(FR[t], t).toBeTruthy();
   });
 

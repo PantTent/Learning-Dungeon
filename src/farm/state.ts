@@ -3,8 +3,8 @@ import { defaultLearningSettings, newLearningStats, upgradeSettings, type Learni
 import { getLang, type Lang } from '../i18n';
 import { uid } from '../util/rng';
 import {
-  animal, crop, FEED_TRIES, GEAR, GEAR_EFFECT, GOLDEN_CHANCE, GOLDEN_MULT, HATS, LAND_TIERS, MAX_ORDERS, NEIGHBOURS, ORDER_BONUS, ORDER_EVERY_MS,
-  START_COINS, STALL_TIERS, CROPS,
+  animal, crop, FEED_TRIES, GEAR, GEAR_EFFECT, GOLDEN_CHANCE, GOLDEN_MULT, HATS, MAX_ORDERS, ORDER_BONUS, ORDER_EVERY_MS,
+  PORTAL_COST, START_COINS, WORLDS, type WorldId,
 } from './data';
 import type { Grade } from '../questions/curriculum';
 
@@ -37,10 +37,29 @@ export interface Order {
   reward: number;
 }
 
-export interface FarmSave {
+/** One farm's land: the home farm, or the farm in the magic world. */
+export interface WorldState {
+  /** Which world this is ('home' when missing, for older saves). */
+  world?: WorldId;
+  landTier: number;
+  stallTier: number;
+  plots: Plot[];
+  animals: FarmAnimal[];
+  /** Harvested crops waiting to be sold (golden ones use the key "gold:<crop>"). */
+  basket: Record<string, number>;
+  /** Neighbour orders on the board, and when the next one arrives. */
+  orders: Order[];
+  nextOrderAt: number;
+}
+
+export interface FarmSave extends WorldState {
   version: 1;
   farmer: string;
   coins: number;
+  /** The magic portal has been built. */
+  portal?: boolean;
+  /** The farm in the magic world (once the portal is built). */
+  magic?: WorldState;
   landTier: number;
   stallTier: number;
   plots: Plot[];
@@ -72,7 +91,7 @@ export function newFarm(farmer: string, grade?: Grade, lang: Lang = getLang(), n
     coins: START_COINS,
     landTier: 0,
     stallTier: 0,
-    plots: Array.from({ length: LAND_TIERS[0].plots }, () => ({})),
+    plots: Array.from({ length: WORLDS.home.land[0].plots }, () => ({})),
     animals: [],
     basket: {},
     gear: [],
@@ -276,7 +295,8 @@ export function renameAnimal(a: FarmAnimal, name: string): void {
 export function newOrder(f: FarmSave, rand: () => number = Math.random): Order {
   const pickOne = <T>(list: T[]) => list[Math.floor(rand() * list.length)];
   // Cheaper crops come up more often.
-  const pool = CROPS.flatMap((c, i) => Array.from({ length: CROPS.length - i }, () => c.id));
+  const w = WORLDS[worldOf(f)];
+  const pool = w.crops.flatMap((c, i) => Array.from({ length: w.crops.length - i }, () => c.id));
   const kinds = rand() < 0.4 ? 2 : 1;
   const items: { crop: string; n: number }[] = [];
   while (items.length < kinds) {
@@ -285,7 +305,7 @@ export function newOrder(f: FarmSave, rand: () => number = Math.random): Order {
     items.push({ crop: id, n: 1 + Math.floor(rand() * (2 + f.landTier)) });
   }
   const value = items.reduce((sum, x) => sum + crop(x.crop).price * x.n, 0);
-  return { id: uid(), who: pickOne(NEIGHBOURS).id, items, reward: Math.round(value * ORDER_BONUS + 5) };
+  return { id: uid(), who: pickOne(w.neighbours).id, items, reward: Math.round(value * ORDER_BONUS + 5) };
 }
 
 /** A new order arrives every so often, up to MAX_ORDERS on the board. */
@@ -318,15 +338,15 @@ export function fillOrder(f: FarmSave, orderId: string, correct: boolean, now = 
 // --------------------------------------------------------------- upgrades
 
 export function stallCount(f: FarmSave): number {
-  return STALL_TIERS[f.stallTier].stalls;
+  return WORLDS[worldOf(f)].stalls[f.stallTier].stalls;
 }
 
 export function nextLand(f: FarmSave) {
-  return LAND_TIERS[f.landTier + 1];
+  return WORLDS[worldOf(f)].land[f.landTier + 1];
 }
 
 export function nextStalls(f: FarmSave) {
-  return STALL_TIERS[f.stallTier + 1];
+  return WORLDS[worldOf(f)].stalls[f.stallTier + 1];
 }
 
 export function buyLand(f: FarmSave): boolean {
@@ -354,6 +374,66 @@ export function buyAnimal(f: FarmSave, kind: string, now = Date.now()): FarmAnim
   return addAnimal(f, kind, now, true);
 }
 
+// ------------------------------------------------------------ magic world
+
+export function worldOf(w: WorldState): WorldId {
+  return w.world ?? 'home';
+}
+
+function newMagicWorld(now: number): WorldState {
+  const w: WorldState = {
+    world: 'magic',
+    landTier: 0,
+    stallTier: 0,
+    plots: Array.from({ length: WORLDS.magic.land[0].plots }, () => ({})),
+    animals: [],
+    basket: {},
+    orders: [],
+    nextOrderAt: now + ORDER_EVERY_MS,
+  };
+  return w;
+}
+
+/** Build the portal (full game). Creates the magic farm, with a unicorn waiting. */
+export function buyPortal(root: FarmSave, now = Date.now()): boolean {
+  if (root.portal || root.coins < PORTAL_COST) return false;
+  root.coins -= PORTAL_COST;
+  root.portal = true;
+  root.magic = newMagicWorld(now);
+  const view = enterWorld(root, 'magic');
+  addAnimal(view, 'unicorn', now, true);
+  view.orders.push(newOrder(view), newOrder(view));
+  return true;
+}
+
+const WORLD_KEYS = ['world', 'landTier', 'stallTier', 'plots', 'animals', 'basket', 'orders', 'nextOrderAt'] as const;
+const SHARED_KEYS = ['version', 'farmer', 'coins', 'gear', 'hats', 'settings', 'learning', 'createdAt', 'lastPlayed', 'portal', 'magic'] as const;
+
+/**
+ * The farm as seen from one world: land, animals, basket and orders belong to
+ * that world, while coins, gear, hats and settings are shared. Everything in
+ * this file works on the result.
+ */
+export function enterWorld(root: FarmSave, id: WorldId): FarmSave {
+  if (id === 'home' || !root.portal) return root;
+  root.magic ??= newMagicWorld(Date.now());
+  const w = root.magic;
+  const view = {} as FarmSave;
+  for (const k of WORLD_KEYS) {
+    Object.defineProperty(view, k, { get: () => w[k], set: (v) => ((w as unknown as Record<string, unknown>)[k] = v), enumerable: true });
+  }
+  for (const k of SHARED_KEYS) {
+    Object.defineProperty(view, k, { get: () => root[k], set: (v) => ((root as unknown as Record<string, unknown>)[k] = v), enumerable: true });
+  }
+  Object.defineProperty(view, 'root', { value: root, enumerable: false });
+  return view;
+}
+
+/** The whole save behind a world view. */
+export function rootOf(f: FarmSave): FarmSave {
+  return (f as FarmSave & { root?: FarmSave }).root ?? f;
+}
+
 // ------------------------------------------------------------------- save
 
 export function loadFarm(): FarmSave | undefined {
@@ -368,13 +448,19 @@ export function loadFarm(): FarmSave | undefined {
     f.hats ??= [];
     f.orders ??= [];
     f.nextOrderAt ??= Date.now();
+    if (f.magic) {
+      f.magic.world = 'magic';
+      f.magic.basket ??= {};
+      f.magic.orders ??= [];
+    }
     return f;
   } catch {
     return undefined;
   }
 }
 
-export function saveFarm(f: FarmSave): void {
+export function saveFarm(view: FarmSave): void {
+  const f = rootOf(view);
   f.lastPlayed = Date.now();
   try {
     globalThis.localStorage?.setItem(KEY, JSON.stringify(f));

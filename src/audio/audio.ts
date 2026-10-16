@@ -449,6 +449,32 @@ export const SONGS: Record<string, Song> = {
       },
     ],
   },
+  // Dreamy, twinkly music for the magic world, in F Lydian.
+  magic: {
+    bpm: 88,
+    tracks: [
+      {
+        wave: 'triangle',
+        vol: 0.14,
+        steps: [
+          'A5 - C6 - E6 - - - D6 - B5 - C6 - - -',
+          'G5 - B5 - D6 - - - C6 - A5 - G5 - - -',
+          'A5 - C6 - F6 - - - E6 - D6 - B5 - C6 -',
+          'A5 - - - G5 - - - F5 - - - - - . .',
+        ].join(' '),
+      },
+      {
+        wave: 'square',
+        vol: 0.018,
+        steps: [rep('F4 A4 C5 E5', 4), rep('G4 B4 D5 G5', 4), rep('F4 A4 C5 F5', 2) + ' ' + rep('E4 G4 B4 E5', 2), rep('F4 A4 C5 E5', 4)].join(' '),
+      },
+      {
+        wave: 'triangle',
+        vol: 0.12,
+        steps: [rep('F2 . . .', 4), rep('G2 . . .', 4), rep('F2 . . .', 2) + ' ' + rep('E2 . . .', 2), rep('F2 . . .', 4)].join(' '),
+      },
+    ],
+  },
   // Fast, exciting battle music in E minor.
   battle: {
     bpm: 150,

@@ -3,11 +3,11 @@ import { FREE_LIMITS } from '../hub/games';
 import { fullGame } from '../hub/ownership';
 import { fullGamePrompt } from '../ui/unlockPrompt';
 import { playMusic, sfx } from '../audio/audio';
-import { ANIMALS, CROPS, FEED_TRIES, GEAR, HATS, LAND_TIERS, MAX_ORDERS, NEIGHBOURS, STALL_TIERS, animal, crop, hat } from '../farm/data';
+import { FEED_TRIES, GEAR, HATS, MAX_ORDERS, PORTAL_COST, WORLDS, animal, crop, hat, neighbour, type WorldId } from '../farm/data';
 import {
   buyAnimal, buyGear, buyHat, buyLand, buyStalls, canFill, clock, collect, feed, fillOrder, growTime, growth, happyLeft, harvest, hasGear,
   isHungry, loadFarm, nextLand, nextStalls, parseKey, plant, plotState, refreshOrders, renameAnimal, saleValue, saveFarm, sell, stallCount,
-  wearHat, accrue, type FarmAnimal, type FarmSave, type Order,
+  wearHat, accrue, buyPortal, enterWorld, rootOf, type FarmAnimal, type FarmSave, type Order,
 } from '../farm/state';
 import { SPRITES } from '../art/pixelData';
 import { openKeyboard } from '../ui/keyboard';
@@ -66,23 +66,33 @@ export class FarmScene extends Phaser.Scene {
   private tip!: Phaser.GameObjects.Text;
   private world!: Phaser.GameObjects.Container;
   private busy = false;
+  /** Which farm we're on: home, or the magic world through the portal. */
+  private worldId: WorldId = 'home';
 
   constructor() {
     super('Farm');
   }
 
-  create() {
-    const f = loadFarm();
-    if (!f) {
+  private get look() {
+    return WORLDS[this.worldId].look;
+  }
+
+  create(data: { world?: WorldId } = {}) {
+    const root = loadFarm();
+    if (!root) {
       this.scene.start('FarmSetup', { fresh: true });
       return;
     }
+    this.worldId = data.world === 'magic' && root.portal ? 'magic' : 'home';
+    const f = enterWorld(root, this.worldId);
     this.f = f;
     setLang(f.settings.lang);
     this.engine = new QuestionEngine(f.learning, f.settings);
     this.busy = false;
-    playMusic('farm');
-    grassBackground(this);
+    playMusic(WORLDS[this.worldId].music);
+    this.cameras.main.resetFX();
+    this.cameras.main.fadeIn(400);
+    grassBackground(this, this.look.grass);
     this.drawScenery();
     this.world = this.add.container(0, 0);
     this.buildGarden();
@@ -99,21 +109,34 @@ export class FarmScene extends Phaser.Scene {
 
   private drawScenery() {
     // Dirt paths between the parts of the farm.
-    this.add.tileSprite(0, 446, W, 48, 'farm_path').setOrigin(0).setTileScale(3);
-    this.add.tileSprite(270, 70, 40, 400, 'farm_path').setOrigin(0).setTileScale(3);
-    sprite(this, 92, 150, 'farm_house', 3);
-    sprite(this, 208, 154, 'farm_barn', 3);
-    sprite(this, 40, 300, 'farm_tree', 3);
-    sprite(this, 610, 500, 'farm_tree', 2);
+    const L = this.look;
+    this.add.tileSprite(0, 446, W, 48, L.path).setOrigin(0).setTileScale(3);
+    this.add.tileSprite(270, 70, 40, 400, L.path).setOrigin(0).setTileScale(3);
+    sprite(this, 92, 150, L.house, 3);
+    sprite(this, 208, 154, L.barn, 3);
+    sprite(this, 40, 300, L.tree, 3);
+    sprite(this, 610, 500, L.tree, 2);
+    if (this.worldId === 'magic') this.sparkles();
+
+    // The magic portal (once it's built): step through to the other farm.
+    if (rootOf(this.f).portal) {
+      const px = 460;
+      const py = 392;
+      const glow = this.add.image(px, py, 'glow').setScale(9).setTint(0xb070ff).setAlpha(0.5).setBlendMode('ADD');
+      this.tweens.add({ targets: glow, alpha: 0.2, scale: 7, duration: 1200, yoyo: true, repeat: -1 });
+      const portal = sprite(this, px, py, 'farm_portal', 2.4).setInteractive({ useHandCursor: true });
+      portal.on('pointerup', () => this.travel());
+      txt(this, px, py + 46, this.worldId === 'home' ? tr('Magic world') : tr('Home farm'), 16, '#e0c8ff').setOrigin(0.5);
+    }
 
     // The market stall: tap to sell the harvest.
-    const market = sprite(this, 150, 330, 'farm_market', 3).setInteractive({ useHandCursor: true });
+    const market = sprite(this, 150, 330, L.market, 3).setInteractive({ useHandCursor: true });
     market.on('pointerup', () => this.openMarket());
     txt(this, 150, 384, tr('Market'), 18, '#ffe9a0').setOrigin(0.5);
     this.basketText = txt(this, 150, 410, '', 15, '#ffffff').setOrigin(0.5);
 
     // The neighbours' order board.
-    const board = sprite(this, 226, 256, 'farm_board', 2.5).setInteractive({ useHandCursor: true });
+    const board = sprite(this, 226, 256, L.board, 2.5).setInteractive({ useHandCursor: true });
     board.on('pointerup', () => this.openOrders());
     txt(this, 226, 296, tr('Orders'), 16, '#ffe9a0').setOrigin(0.5);
     this.boardBadge = txt(this, 258, 224, '', 15, '#ffffff', { backgroundColor: '#c0392b', padding: { x: 5, y: 1 } }).setOrigin(0.5).setDepth(5);
@@ -131,7 +154,7 @@ export class FarmScene extends Phaser.Scene {
     const g = this.add.graphics().setDepth(50);
     g.fillStyle(0x1d1730, 0.92).fillRoundedRect(8, 6, 420, 52, 10);
     g.lineStyle(2, 0xffd24a, 1).strokeRoundedRect(8, 6, 420, 52, 10);
-    txt(this, 22, 32, tr("{name}'s farm", { name: this.f.farmer }), 20, '#ffd24a').setOrigin(0, 0.5).setDepth(51);
+    txt(this, 22, 32, this.worldId === 'magic' ? tr("{name}'s magic farm", { name: this.f.farmer }) : tr("{name}'s farm", { name: this.f.farmer }), 20, '#ffd24a').setOrigin(0, 0.5).setDepth(51);
     sprite(this, 270, 32, 'icon_gold', 2.5).setDepth(51);
     this.coinText = txt(this, 290, 32, '', 22).setOrigin(0, 0.5).setDepth(51);
     button(this, W - 400, 32, 120, 44, tr('Shop'), () => this.openShop(), { size: 18, color: 0xb07a10 }).setDepth(51);
@@ -161,13 +184,14 @@ export class FarmScene extends Phaser.Scene {
       p.sign?.destroy();
     });
     this.plots = [];
-    const max = LAND_TIERS[LAND_TIERS.length - 1].plots;
+    const tiers = WORLDS[this.worldId].land;
+    const max = tiers[tiers.length - 1].plots;
     const owned = this.f.plots.length;
     const next = nextLand(this.f);
     for (let i = 0; i < max; i++) {
       const { x, y } = this.plotPos(i);
       const unlocked = i < owned;
-      const soil = this.add.tileSprite(x, y, GARDEN.size, GARDEN.size, 'farm_soil').setOrigin(0).setTileScale(4);
+      const soil = this.add.tileSprite(x, y, GARDEN.size, GARDEN.size, this.look.soil).setOrigin(0).setTileScale(4);
       const plantImg = this.add.image(x + GARDEN.size / 2, y + GARDEN.size / 2 - 4, 'crop_sprout').setScale(4).setVisible(false);
       const bar = this.add.graphics();
       const view: PlotView = { soil, plant: plantImg, bar };
@@ -220,7 +244,7 @@ export class FarmScene extends Phaser.Scene {
 
   private openSeeds(i: number) {
     const c = this.overlay(tr('What do you want to plant?'));
-    CROPS.forEach((cr, k) => {
+    WORLDS[this.worldId].crops.forEach((cr, k) => {
       const x = W / 2 - 330 + (k % 3) * 220;
       const y = 118 + Math.floor(k / 3) * 172;
       const g = this.add.graphics();
@@ -228,7 +252,10 @@ export class FarmScene extends Phaser.Scene {
       g.lineStyle(2, 0xffd24a, 0.8).strokeRoundedRect(x, y, 200, 158, 10);
       c.add(g);
       c.add(this.add.image(x + 40, y + 46, cr.item).setScale(4));
-      c.add(txt(this, x + 80, y + 18, tr(cr.name), 19));
+      const name = txt(this, x + 80, y + 18, tr(cr.name), 19);
+      // Long names (e.g. "Carotte arc-en-ciel") shrink to fit the card.
+      for (let size = 18; name.width > 114 && size >= 12; size--) name.setFontSize(size);
+      c.add(name);
       c.add(txt(this, x + 80, y + 46, tr('Seed: {n}', { n: cr.seedCost }), 15, '#ffd24a'));
       c.add(txt(this, x + 80, y + 66, tr('Sells: {n}', { n: cr.price }), 15, '#9aff9a'));
       c.add(txt(this, x + 80, y + 86, tr('Grows: {time}', { time: clock(growTime(cr.id, this.f)) }), 15, C.dim));
@@ -260,19 +287,20 @@ export class FarmScene extends Phaser.Scene {
     // Fence around the pen.
     const fx = PEN.x - 8;
     const fy = PEN.y - 8;
-    this.world.add(this.add.tileSprite(fx, fy, PEN.w + 16, 48, 'farm_fence').setOrigin(0).setTileScale(3));
-    this.world.add(this.add.tileSprite(fx, fy + PEN.h - 24, PEN.w + 16, 48, 'farm_fence').setOrigin(0).setTileScale(3));
-    this.world.add(this.add.tileSprite(fx - 12, fy, 48, PEN.h + 16, 'farm_fence_v').setOrigin(0).setTileScale(3));
-    this.world.add(this.add.tileSprite(fx + PEN.w - 20, fy, 48, PEN.h + 16, 'farm_fence_v').setOrigin(0).setTileScale(3));
+    this.world.add(this.add.tileSprite(fx, fy, PEN.w + 16, 48, this.look.fence).setOrigin(0).setTileScale(3));
+    this.world.add(this.add.tileSprite(fx, fy + PEN.h - 24, PEN.w + 16, 48, this.look.fence).setOrigin(0).setTileScale(3));
+    this.world.add(this.add.tileSprite(fx - 12, fy, 48, PEN.h + 16, this.look.fenceV).setOrigin(0).setTileScale(3));
+    this.world.add(this.add.tileSprite(fx + PEN.w - 20, fy, 48, PEN.h + 16, this.look.fenceV).setOrigin(0).setTileScale(3));
 
-    const max = STALL_TIERS[STALL_TIERS.length - 1].stalls;
+    const stallTiers = WORLDS[this.worldId].stalls;
+    const max = stallTiers[stallTiers.length - 1].stalls;
     const open = stallCount(this.f);
     const next = nextStalls(this.f);
     for (let i = 0; i < max; i++) {
       const { x, y } = this.stallPos(i);
       const w = PEN.cellW - 12;
       const h = PEN.cellH - 14;
-      const floor = this.add.tileSprite(x, y + 24, w, h - 24, 'farm_hay_floor').setOrigin(0).setTileScale(3);
+      const floor = this.add.tileSprite(x, y + 24, w, h - 24, this.look.floor).setOrigin(0).setTileScale(3);
       this.world.add(floor);
       if (i >= open) {
         floor.setAlpha(0.3);
@@ -458,15 +486,16 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private orderCard(c: Phaser.GameObjects.Container, o: Order, x: number, y: number) {
-    const who = NEIGHBOURS.find((n) => n.id === o.who) ?? NEIGHBOURS[0];
+    const who = neighbour(o.who);
     c.add(this.add.image(x + 46, y + 60, who.sprite).setScale(4));
-    c.add(txt(this, x + 90, y + 46, tr(who.name), 18, '#3a2410', { wordWrap: { width: 150 } }));
-    c.add(txt(this, x + 90, y + 72, tr('would like:'), 14, '#6a5a3a'));
+    const name = txt(this, x + 90, y + 34, tr(who.name), 16, '#3a2410', { wordWrap: { width: 150 } });
+    c.add(name);
+    c.add(txt(this, x + 90, name.y + name.height + 2, tr('would like:'), 14, '#6a5a3a'));
     o.items.forEach((it, k) => {
       const yy = y + 124 + k * 44;
       const have = this.f.basket[it.crop] ?? 0;
       c.add(this.add.image(x + 46, yy, crop(it.crop).item).setScale(3));
-      c.add(txt(this, x + 80, yy, `${tr(crop(it.crop).name)} x${it.n}`, 18, '#3a2410').setOrigin(0, 0.5));
+      c.add(txt(this, x + 76, yy, `${tr(crop(it.crop).name)} x${it.n}`, 15, '#3a2410', { wordWrap: { width: 120 } }).setOrigin(0, 0.5));
       c.add(txt(this, x + 236, yy, `${Math.min(have, it.n)}/${it.n}`, 16, have >= it.n ? '#1e8a3a' : '#b03030').setOrigin(1, 0.5));
     });
     c.add(txt(this, x + 126, y + 226, tr('Reward: {n} coins', { n: fmtNum(o.reward) }), 17, '#8a5410').setOrigin(0.5));
@@ -480,7 +509,7 @@ export class FarmScene extends Phaser.Scene {
 
   private deliver(o: Order) {
     this.busy = true;
-    const who = NEIGHBOURS.find((n) => n.id === o.who) ?? NEIGHBOURS[0];
+    const who = neighbour(o.who);
     const q = this.engine.next();
     new QuestionPanel(this, q, {
       header: tr('Order for {name}', { name: tr(who.name) }),
@@ -626,7 +655,7 @@ export class FarmScene extends Phaser.Scene {
     if (tab === 'animals') {
       const free = stallCount(this.f) - this.f.animals.length;
       c.add(txt(this, W / 2, 158, free > 0 ? tr('Free stalls: {n}', { n: free }) : tr('No free stalls. Buy more stalls in Upgrades!'), 16, free > 0 ? C.good : '#ffb36b').setOrigin(0.5));
-      ANIMALS.forEach((an, k) => {
+      WORLDS[this.worldId].animals.forEach((an, k) => {
         const x = W / 2 - 340 + k * 172;
         const y = 180;
         const g = this.add.graphics();
@@ -665,7 +694,24 @@ export class FarmScene extends Phaser.Scene {
           ? { icon: 'farm_hay', title: tr('More stalls'), desc: st.stalls - stallCount(this.f) === 1 ? tr('1 more animal stall') : tr('{n} more animal stalls', { n: st.stalls - stallCount(this.f) }), cost: st.cost, buy: () => buyStalls(this.f), paid: this.stallsArePaid() }
           : { icon: 'farm_hay', title: tr('More stalls'), desc: tr('Your barn is full size!') },
       );
-      rows.push({ icon: 'farm_portal', title: tr('Magic portal'), desc: tr('A door to a magical world... coming soon!') });
+      if (this.worldId === 'home') {
+        const root = rootOf(this.f);
+        if (root.portal) rows.push({ icon: 'farm_portal', title: tr('Magic portal'), desc: tr('Built! Tap the portal on your farm to visit the magic world.') });
+        else if (!fullGame('farm')) rows.push({ icon: 'farm_portal', title: tr('Magic portal'), desc: tr('A door to a magical world with unicorns and dragons!'), paid: true });
+        else {
+          rows.push({
+            icon: 'farm_portal', title: tr('Magic portal'), desc: tr('A door to a magical world with unicorns and dragons!'), cost: PORTAL_COST,
+            buy: () => {
+              if (!buyPortal(root)) return false;
+              // Show the new portal right away (no shop on top).
+              saveFarm(this.f);
+              sfx('summon');
+              this.scene.restart({ world: 'home' });
+              return false;
+            },
+          });
+        }
+      }
       rows.forEach((r, k) => {
         const y = 170 + k * 86;
         const g = this.add.graphics();
@@ -676,7 +722,7 @@ export class FarmScene extends Phaser.Scene {
         c.add(txt(this, W / 2 - 240, y + 44, r.desc, 15, C.dim));
         if (r.paid) {
           c.add(button(this, W / 2 + 240, y + 38, 150, 46, tr('Full game'), () => {
-            fullGamePrompt(this, 'farm', tr('A bigger farm is part of the full game.'));
+            fullGamePrompt(this, 'farm', r.icon === 'farm_portal' ? tr('The magic world is part of the full game.') : tr('A bigger farm is part of the full game.'));
           }, { size: 16, color: 0x7a5a2a }));
         } else if (r.buy && r.cost !== undefined) {
           const b = button(this, W / 2 + 240, y + 38, 150, 46, tr('{n} coins', { n: fmtNum(r.cost) }), () => {
@@ -697,11 +743,11 @@ export class FarmScene extends Phaser.Scene {
 
   /** The free farm goes up to FREE_LIMITS; bigger is the full game. */
   private landIsPaid(): boolean {
-    return this.f.landTier + 1 > FREE_LIMITS.farmLandTier && !fullGame('farm');
+    return this.worldId === 'home' && this.f.landTier + 1 > FREE_LIMITS.farmLandTier && !fullGame('farm');
   }
 
   private stallsArePaid(): boolean {
-    return this.f.stallTier + 1 > FREE_LIMITS.farmStallTier && !fullGame('farm');
+    return this.worldId === 'home' && this.f.stallTier + 1 > FREE_LIMITS.farmStallTier && !fullGame('farm');
   }
 
   private buyLandSign() {
@@ -730,6 +776,40 @@ export class FarmScene extends Phaser.Scene {
       return;
     }
     this.openShop('upgrades');
+  }
+
+  // ------------------------------------------------------------- portal
+
+  /** Step through the portal to the other farm. */
+  private travel() {
+    if (this.busy) return;
+    this.busy = true;
+    saveFarm(this.f);
+    sfx('summon');
+    this.cameras.main.flash(500, 200, 150, 255);
+    this.cameras.main.fadeOut(500, 40, 10, 80);
+    this.time.delayedCall(520, () => this.scene.restart({ world: this.worldId === 'home' ? 'magic' : 'home' }));
+  }
+
+  /** Little floating lights in the magic world. */
+  private sparkles() {
+    for (let i = 0; i < 30; i++) {
+      const d = this.add.image(Phaser.Math.Between(0, W), Phaser.Math.Between(60, H - 40), 'dot')
+        .setTint(Phaser.Utils.Array.GetRandom([0xfff0a0, 0xb0f0ff, 0xffb0e0]))
+        .setAlpha(0.3)
+        .setScale(0.5)
+        .setBlendMode('ADD')
+        .setDepth(30);
+      this.tweens.add({
+        targets: d,
+        y: d.y - Phaser.Math.Between(20, 60),
+        alpha: { from: 0.1, to: 0.8 },
+        duration: Phaser.Math.Between(1800, 3600),
+        yoyo: true,
+        repeat: -1,
+        delay: Phaser.Math.Between(0, 2000),
+      });
+    }
   }
 
   // ------------------------------------------------------------ helpers
@@ -767,7 +847,8 @@ export class FarmScene extends Phaser.Scene {
         return;
       }
       const g = growth(p, now, this.f);
-      const tex = state === 'ready' ? crop(p.crop!).sprite : g < 0.2 ? 'crop_seeds' : g < 0.55 ? 'crop_sprout' : 'crop_growing';
+      const [seeds, sprout, grown] = this.look.stages;
+      const tex = state === 'ready' ? crop(p.crop!).sprite : g < 0.2 ? seeds : g < 0.55 ? sprout : grown;
       v.plant.setTexture(tex).setVisible(true);
       if (state === 'growing') {
         const { x, y } = this.plotPos(i);

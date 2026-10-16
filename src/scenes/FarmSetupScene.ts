@@ -9,9 +9,9 @@ import { C, H, W, button, langButton, panel, sprite, txt, type Button } from '..
 const NAMES = ['Max', 'Nova', 'Rex', 'Luna', 'Finn', 'Zara', 'Leo', 'Ivy', 'Kai', 'Milo', 'Ash', 'Sky'];
 
 /** Grass background shared by the farm screens. */
-export function grassBackground(scene: Phaser.Scene) {
+export function grassBackground(scene: Phaser.Scene, tex = 'tile_grass') {
   scene.cameras.main.setBackgroundColor(0x7ccb4c);
-  scene.add.tileSprite(0, 0, W, H, 'tile_grass').setOrigin(0).setTileScale(3);
+  scene.add.tileSprite(0, 0, W, H, tex).setOrigin(0).setTileScale(3);
 }
 
 /** Start of Learning Farm: go to the farm, or make a new one. */
