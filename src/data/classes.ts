@@ -26,13 +26,17 @@ export interface SkillDef {
   melee?: boolean;
   /** Area spells: chance to freeze/stun each enemy hit (on a right answer). */
   stunChance?: number;
+  /** Special look for the spell's missile (default: a small glowing orb). */
+  anim?: 'orb' | 'snow';
 }
 
-export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal';
+export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder';
 
 /** Super attack unlocked by answering 3 questions right in a row. */
 export interface PowerDef {
   name: string;
+  /** Spell school this ultimate belongs to (picked by the hero's chosen spells). */
+  fx?: Fx;
   style: PowerStyle;
   color: number;
   css: string;
@@ -59,7 +63,7 @@ export interface ClassDef {
 export const CLASSES: ClassDef[] = [
   {
     id: 'warrior',
-    power: { name: 'Whirlwind Slam', style: 'whirlwind', color: 0xff6040, css: '#ff7a5a' },
+    power: { fx: 'slash', name: 'Whirlwind Slam', style: 'whirlwind', color: 0xff6040, css: '#ff7a5a' },
     name: 'Warrior',
     role: 'Tough fighter',
     blurb: 'Lots of health and heavy hits. Great for beginners!',
@@ -79,7 +83,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'mage',
-    power: { name: 'Meteor', style: 'meteor', color: 0xff8a2a, css: '#ffa040' },
+    power: { fx: 'fire', name: 'Meteor', style: 'meteor', color: 0xff8a2a, css: '#ffa040' },
     name: 'Mage',
     role: 'Spell blaster',
     blurb: 'Fire and ice magic. Huge damage, less health.',
@@ -98,7 +102,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'ranger',
-    power: { name: 'Arrow Storm', style: 'arrowstorm', color: 0x9aff6a, css: '#a8ff7a' },
+    power: { fx: 'arrow', name: 'Arrow Storm', style: 'arrowstorm', color: 0x9aff6a, css: '#a8ff7a' },
     name: 'Ranger',
     role: 'Sharp shooter',
     blurb: 'An archer with high Dexterity, so lots of critical hits.',
@@ -117,7 +121,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'paladin',
-    power: { name: 'Divine Hammer', style: 'hammer', color: 0xffe066, css: '#ffe066' },
+    power: { fx: 'holy', name: 'Divine Hammer', style: 'hammer', color: 0xffe066, css: '#ffe066' },
     name: 'Paladin',
     role: 'Holy knight',
     blurb: 'Armored hero who can heal with holy light.',
@@ -137,7 +141,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'necromancer',
-    power: { name: 'Army of Bones', style: 'bones', color: 0xb070ff, css: '#c08aff' },
+    power: { fx: 'shadow', name: 'Army of Bones', style: 'bones', color: 0xb070ff, css: '#c08aff' },
     name: 'Necromancer',
     role: 'Master of bones',
     blurb: 'Raises skeletons to fight and drains life from foes.',
@@ -157,7 +161,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'druid',
-    power: { name: 'Wrath of the Wild', style: 'vines', color: 0x6ad04a, css: '#8aff6a' },
+    power: { fx: 'nature', name: 'Wrath of the Wild', style: 'vines', color: 0x6ad04a, css: '#8aff6a' },
     name: 'Druid',
     role: 'Nature guardian',
     blurb: 'Calls on nature to heal and to crush enemies with thorns.',
@@ -176,7 +180,7 @@ export const CLASSES: ClassDef[] = [
   },
   {
     id: 'demonologist',
-    power: { name: 'Infernal', style: 'infernal', color: 0x5aff4a, css: '#7aff6a' },
+    power: { fx: 'fel', name: 'Infernal', style: 'infernal', color: 0x5aff4a, css: '#7aff6a' },
     name: 'Demonologist',
     role: 'Imp summoner',
     blurb: 'Summons a fiery imp helper and rains green fire.',

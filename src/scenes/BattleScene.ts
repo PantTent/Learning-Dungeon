@@ -4,7 +4,7 @@ import { makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
 import { AREAS, areaOf, type AreaDef } from '../data/areas';
 import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
-import { MAX_CHOSEN, chosenSpells } from '../data/spells';
+import { MAX_CHOSEN, activePower, chosenSpells } from '../data/spells';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, manaRegen, saveProfile } from '../state/profile';
@@ -272,7 +272,7 @@ export class BattleScene extends Phaser.Scene {
       if (this.isBoss && !p.dev) {
         c.add(txt(this, 320, H - 150, 'Your power is saved for after the boss!', 15, '#ffe9a0').setOrigin(0.5));
       } else {
-        const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${cls.power.name}! \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
+        const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${this.ultimate().name}! \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
         c.add(pb);
         this.tweens.add({ targets: pb, scale: 1.06, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       }
@@ -358,9 +358,16 @@ export class BattleScene extends Phaser.Scene {
 
   // ------------------------------------------------------------ power attack
 
+  /** This hero's ultimate: it matches the school most of their chosen spells use. */
+  private ultimate(): PowerDef {
+    const p = current();
+    return activePower(classOf(p), p.level, p.spells);
+  }
+
   private powerSkill(): SkillDef {
     const cls = classOf(current());
-    return { id: 'power', name: `\u2605 ${cls.power.name}`, desc: 'Super attack!', unlock: 1, mp: 0, kind: 'damage', power: 3, fx: cls.skills[0].fx };
+    const pw = this.ultimate();
+    return { id: 'power', name: `\u2605 ${pw.name}`, desc: 'Super attack!', unlock: 1, mp: 0, kind: 'damage', power: 3, fx: pw.fx ?? cls.skills[0].fx };
   }
 
   /** 3 right in a row charges the power; using it (right or wrong) spends it. */
@@ -382,7 +389,7 @@ export class BattleScene extends Phaser.Scene {
 
   private refreshPower() {
     const n = Math.min(3, current().streak ?? 0);
-    const color = classOf(current()).power.color;
+    const color = this.ultimate().color;
     this.powerStars.forEach((st, i) => {
       this.tweens.killTweensOf(st);
       st.setScale(1).setFillStyle(i < n ? (n >= 3 ? color : 0xffd24a) : 0x3a2f50);
@@ -547,6 +554,85 @@ export class BattleScene extends Phaser.Scene {
         });
         break;
       }
+      case 'ice': {
+        // Giant icicles crash down on the target.
+        const shards: Phaser.GameObjects.Triangle[] = [];
+        const n = 7;
+        for (let i = 0; i < n; i++) {
+          const x = tx - 90 + i * 30 + Phaser.Math.Between(-8, 8);
+          const h = 90 + Math.random() * 70;
+          const sh = this.add.triangle(x, -h, 0, 0, 30, 0, 15, h, i % 2 ? 0xbfe8ff : 0x7ac8ff).setOrigin(0.5, 1).setStrokeStyle(2, 0xffffff).setDepth(D);
+          shards.push(sh);
+          this.tweens.add({
+            targets: sh,
+            y: ty + 40,
+            duration: 300,
+            delay: i * 70,
+            ease: 'Quad.In',
+            onComplete: () => {
+              this.burst(sh.x, ty + 30, 0xdff4ff, 8, D);
+              if (i === n - 1) {
+                const frost = this.add.image(tx, ty, 'glow').setScale(12).setTint(0x8fd8ff).setBlendMode('ADD').setDepth(D - 1);
+                this.tweens.add({ targets: frost, alpha: 0, duration: 800, onComplete: () => frost.destroy() });
+                impact();
+                this.tweens.add({ targets: shards, alpha: 0, duration: 500, delay: 300, onComplete: () => shards.forEach((x) => x.destroy()) });
+              }
+            },
+          });
+        }
+        break;
+      }
+      case 'nova': {
+        // Orbs of magic gather around the target, then implode.
+        const orbs: Phaser.GameObjects.Image[] = [];
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          const o = this.add.image(tx + Math.cos(a) * 170, ty + Math.sin(a) * 120, 'glow').setScale(0).setTint(pw.color).setBlendMode('ADD').setDepth(D);
+          orbs.push(o);
+          this.tweens.add({ targets: o, scale: 3.5, duration: 220, delay: i * 40, ease: 'Back.Out' });
+        }
+        this.time.delayedCall(10 * 40 + 300, () => {
+          this.tweens.add({
+            targets: orbs,
+            x: tx,
+            y: ty,
+            scale: 1.5,
+            duration: 260,
+            ease: 'Quad.In',
+            onComplete: () => {
+              orbs.forEach((o) => o.destroy());
+              const big = this.add.image(tx, ty, 'glow').setScale(2).setTint(pw.color).setBlendMode('ADD').setDepth(D);
+              this.tweens.add({ targets: big, scale: 16, alpha: 0, duration: 600, onComplete: () => big.destroy() });
+              impact();
+            },
+          });
+        });
+        break;
+      }
+      case 'thunder': {
+        // Storm clouds, then bolts from the sky.
+        const cloud = this.add.rectangle(W / 2, 0, W, 120, 0x1a1a2e, 0).setOrigin(0.5, 0).setDepth(D - 1);
+        this.tweens.add({ targets: cloud, fillAlpha: 0.9, duration: 250 });
+        const sky = this.add.image(tx, -30, 'dot').setVisible(false);
+        const bolts = 5;
+        for (let i = 0; i < bolts; i++) {
+          this.time.delayedCall(250 + i * 130, () => {
+            sky.setPosition(tx + Phaser.Math.Between(-160, 160), -30);
+            const spot = this.add.image(tx + Phaser.Math.Between(-30, 30), ty + Phaser.Math.Between(-20, 20), 'dot').setVisible(false);
+            sfx('lightning');
+            this.lightning(sky, spot, () => {
+              this.burst(spot.x, spot.y, 0xbfe8ff, 10, D);
+              spot.destroy();
+              if (i === bolts - 1) {
+                impact();
+                sky.destroy();
+                this.tweens.add({ targets: cloud, alpha: 0, duration: 500, delay: 200, onComplete: () => cloud.destroy() });
+              }
+            });
+          });
+        }
+        break;
+      }
       case 'vines': {
         const spikes: Phaser.GameObjects.Triangle[] = [];
         for (let i = 0; i < 9; i++) {
@@ -583,10 +669,10 @@ export class BattleScene extends Phaser.Scene {
     const p = current();
     const after = () => this.time.delayedCall(350, () => this.afterPlayerAction());
     if (sk.id === 'power') {
-      this.powerAnim(classOf(p).power, target, () => {
+      this.powerAnim(this.ultimate(), target, () => {
         const r = this.calcDamage(sk, target, correct);
         this.hit(target, r, correct, sk.fx);
-        this.floatText(target.sprite.x, target.sprite.y - 140, correct ? 'x3 POWER!' : 'x1.5 (half power)', correct ? classOf(p).power.css : '#ffb36b', 26);
+        this.floatText(target.sprite.x, target.sprite.y - 140, correct ? 'x3 POWER!' : 'x1.5 (half power)', correct ? this.ultimate().css : '#ffb36b', 26);
         this.time.delayedCall(500, after);
       });
       return;
@@ -695,7 +781,7 @@ export class BattleScene extends Phaser.Scene {
       if (i >= foes.length) {
         // Mana comes back slowly (5% a round), so big spells need planning or potions.
         const s = derive(p);
-        p.mp = Math.min(s.maxMp, p.mp + Math.max(2, Math.round(s.maxMp * 0.05)));
+        p.mp = Math.min(s.maxMp, p.mp + Math.max(1, Math.round(s.maxMp * 0.02)));
         this.heroMp.set(p.mp, s.maxMp);
         saveProfile(p);
         if (this.isBoss && this.bossAsked >= BOSS_QUESTIONS) return this.bossFail();
@@ -1116,6 +1202,14 @@ export class BattleScene extends Phaser.Scene {
       yoyo: true,
       onComplete: () => {
         const list = target ? [target] : this.alive();
+        if (sk.anim === 'snow') {
+          this.snowstorm(list, onHit);
+          return;
+        }
+        if (sk.anim === 'orb') {
+          this.bigOrb(list[0].sprite, sk.fx === 'arcane' ? 0x9a3aff : color, onHit);
+          return;
+        }
         let landed = 0;
         list.forEach((f, i) =>
           this.time.delayedCall(i * 90, () =>
@@ -1264,6 +1358,75 @@ export class BattleScene extends Phaser.Scene {
         onHit();
       },
     });
+  }
+
+  /** A big glowing ball (Fireball, Arcane Blast) that explodes on impact. */
+  private bigOrb(to: Phaser.GameObjects.Image, color: number, onHit: () => void) {
+    const x0 = this.hero.x - 40;
+    const y0 = this.hero.y - 20;
+    const orb = this.add.image(x0, y0, 'glow').setScale(0.5).setTint(color).setBlendMode('ADD').setDepth(160);
+    const core = this.add.circle(x0, y0, 4, color).setDepth(161);
+    const shine = this.add.circle(x0, y0, 2, 0xffffff).setDepth(162);
+    const trail = this.add.particles(0, 0, 'dot', {
+      follow: orb, speed: 50, lifespan: 420, scale: { start: 1.6, end: 0 }, tint: [color, 0xffffff], blendMode: 'ADD', frequency: 10,
+    }).setDepth(159);
+    // Charge up, then fly.
+    this.tweens.add({ targets: orb, scale: 7, duration: 300, ease: 'Back.Out' });
+    this.tweens.add({ targets: core, radius: 22, duration: 300 });
+    this.tweens.add({ targets: shine, radius: 9, duration: 300 });
+    this.time.delayedCall(320, () =>
+      this.tweens.add({
+        targets: [orb, core, shine],
+        x: to.x,
+        y: to.y,
+        duration: 420,
+        ease: 'Quad.In',
+        onComplete: () => {
+          orb.destroy();
+          core.destroy();
+          shine.destroy();
+          trail.stop();
+          this.time.delayedCall(450, () => trail.destroy());
+          this.burst(to.x, to.y, color, 34);
+          this.burst(to.x, to.y, 0xffffff, 12);
+          const ring = this.add.circle(to.x, to.y, 10).setStrokeStyle(5, color).setDepth(165);
+          this.tweens.add({ targets: ring, radius: 90, alpha: 0, duration: 380, onComplete: () => ring.destroy() });
+          this.cameras.main.shake(160, 0.008);
+          onHit();
+        },
+      }),
+    );
+  }
+
+  /** Blizzard: a swirl of white snowflakes blows across into every target. */
+  private snowstorm(list: Foe[], onHit: () => void) {
+    this.cameras.main.flash(140, 200, 230, 255, false);
+    const n = 70;
+    let done = false;
+    for (let i = 0; i < n; i++) {
+      const f = list[i % list.length];
+      const flake = this.add.image(this.hero.x - 30 + Phaser.Math.Between(-30, 30), this.hero.y - 60 + Phaser.Math.Between(-90, 50), 'dot')
+        .setScale(Phaser.Math.FloatBetween(0.8, 1.8))
+        .setTint(i % 4 ? 0xffffff : 0xbfe8ff)
+        .setDepth(160);
+      this.tweens.add({
+        targets: flake,
+        x: f.sprite.x + Phaser.Math.Between(-45, 45),
+        y: f.sprite.y + Phaser.Math.Between(-45, 35),
+        angle: 360,
+        duration: Phaser.Math.Between(420, 620),
+        delay: i * 9,
+        ease: 'Sine.In',
+        onComplete: () => {
+          flake.destroy();
+          if (!done && i >= n * 0.6) {
+            done = true;
+            list.forEach((x) => this.burst(x.sprite.x, x.sprite.y, 0xdff4ff, 14));
+            onHit();
+          }
+        },
+      });
+    }
   }
 
   /** A crackling zig-zag lightning bolt. */

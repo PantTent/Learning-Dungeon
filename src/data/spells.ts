@@ -1,7 +1,7 @@
 // Every class's spell list. A new spell (or a stronger rank of one) unlocks
 // every 2 levels; the hero picks 3 to bring into battle (plus the free basic
 // attack). Stronger spells cost much more mana.
-import type { Fx, SkillDef } from './classes';
+import type { ClassDef, Fx, PowerDef, SkillDef } from './classes';
 
 type Kind = SkillDef['kind'];
 
@@ -43,12 +43,12 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
     s('frostbolt1', 'Frost Bolt I', 3, 'stun', 1.2, 'frost', 'Ice that freezes an enemy for a turn.'),
     s('missiles1', 'Arcane Missiles I', 5, 'damage', 1.5, 'arcane', 'A burst of magic missiles.'),
     s('chain1', 'Chain Lightning I', 7, 'aoe', 0.85, 'lightning', 'Lightning jumps between ALL enemies.'),
-    s('fireball', 'Fireball', 9, 'damage', 2.0, 'fire', 'A big exploding ball of fire.'),
-    s('blizzard1', 'Blizzard I', 11, 'aoe', 1.05, 'frost', 'Ice storm on ALL enemies. Might freeze them!', { stunChance: 0.3 }),
-    s('frostbolt2', 'Frost Bolt II', 13, 'stun', 1.8, 'frost', 'A bigger freezing bolt.'),
+    s('fireball', 'Fireball', 9, 'damage', 2.0, 'fire', 'A big exploding ball of fire.', { anim: 'orb' }),
+    s('blizzard1', 'Blizzard I', 11, 'aoe', 1.05, 'frost', 'Ice storm on ALL enemies. Might freeze them!', { stunChance: 0.3, anim: 'snow' }),
+    s('flamewave', 'Flame Wave', 13, 'aoe', 1.15, 'fire', 'A wave of fire hits ALL enemies.'),
     s('chain2', 'Chain Lightning II', 15, 'aoe', 1.2, 'lightning', 'Stronger chain lightning.'),
-    s('arcaneblast', 'Arcane Blast', 17, 'damage', 2.6, 'arcane', 'A massive blast of pure magic.'),
-    s('blizzard2', 'Blizzard II', 19, 'aoe', 1.45, 'frost', 'A huge blizzard. Might freeze them!', { stunChance: 0.4 }),
+    s('arcaneblast', 'Arcane Blast', 17, 'damage', 2.6, 'arcane', 'A massive blast of pure magic.', { anim: 'orb' }),
+    s('blizzard2', 'Blizzard II', 19, 'aoe', 1.45, 'frost', 'A huge blizzard. Might freeze them!', { stunChance: 0.4, anim: 'snow' }),
   ],
   ranger: [
     s('shoot', 'Shoot', 1, 'damage', 1, 'arrow', 'Fire an arrow.'),
@@ -127,4 +127,47 @@ export function chosenSpells(list: SkillDef[], level: number, chosen: string[] |
   const unlocked = unlockedSpells(list, level).slice(1);
   if (!chosen) return unlocked.slice(-MAX_CHOSEN);
   return chosen.map((id) => unlocked.find((s) => s.id === id)).filter((s): s is SkillDef => !!s).slice(0, MAX_CHOSEN);
+}
+
+/** Ultimate (power attack) for each spell school. */
+export const SCHOOL_POWERS: Partial<Record<Fx, PowerDef>> = {
+  slash: { fx: 'slash', name: 'Whirlwind Slam', style: 'whirlwind', color: 0xff6040, css: '#ff7a5a' },
+  fire: { fx: 'fire', name: 'Meteor', style: 'meteor', color: 0xff8a2a, css: '#ffa040' },
+  frost: { fx: 'frost', name: 'Glacier Crash', style: 'ice', color: 0x8fd8ff, css: '#9fe0ff' },
+  arcane: { fx: 'arcane', name: 'Arcane Nova', style: 'nova', color: 0xc060ff, css: '#d08aff' },
+  lightning: { fx: 'lightning', name: 'Thunderstorm', style: 'thunder', color: 0x9ad0ff, css: '#bfe8ff' },
+  arrow: { fx: 'arrow', name: 'Arrow Storm', style: 'arrowstorm', color: 0x9aff6a, css: '#a8ff7a' },
+  holy: { fx: 'holy', name: 'Divine Hammer', style: 'hammer', color: 0xffe066, css: '#ffe066' },
+  shadow: { fx: 'shadow', name: 'Shadow Nova', style: 'nova', color: 0x9a4aff, css: '#b88aff' },
+  nature: { fx: 'nature', name: 'Wrath of the Wild', style: 'vines', color: 0x6ad04a, css: '#8aff6a' },
+  fel: { fx: 'fel', name: 'Infernal', style: 'infernal', color: 0x5aff4a, css: '#7aff6a' },
+};
+
+/** A few class-flavored names for the same school. */
+const CLASS_POWER_NAMES: Record<string, Partial<Record<Fx, string>>> = {
+  druid: { arcane: 'Starfall' },
+};
+
+/**
+ * The ultimate depends on the hero's chosen spells: the school most of them
+ * use wins (healing doesn't count). Ties and no spells fall back to the
+ * class's own ultimate.
+ */
+export function activePower(cls: ClassDef, level: number, chosen: string[] | undefined): PowerDef {
+  const counts = new Map<Fx, number>();
+  for (const sp of chosenSpells(cls.skills, level, chosen)) {
+    if (sp.fx === 'heal' || !SCHOOL_POWERS[sp.fx]) continue;
+    counts.set(sp.fx, (counts.get(sp.fx) ?? 0) + 1);
+  }
+  const best = Math.max(0, ...counts.values());
+  if (best === 0) return cls.power;
+  const top = [...counts.entries()].filter(([, n]) => n === best).map(([fx]) => fx);
+  if (cls.power.fx && top.includes(cls.power.fx)) return cls.power;
+  if (top.length > 1) return cls.power;
+  const fx = top[0];
+  // Necromancers raise an army for shadow magic.
+  if (fx === 'shadow' && cls.id === 'necromancer') return cls.power;
+  const pw = SCHOOL_POWERS[fx]!;
+  const name = CLASS_POWER_NAMES[cls.id]?.[fx];
+  return name ? { ...pw, name } : pw;
 }

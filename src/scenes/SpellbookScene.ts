@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/audio';
-import { MAX_CHOSEN, chosenSpells } from '../data/spells';
+import { MAX_CHOSEN, activePower, chosenSpells } from '../data/spells';
 import type { Fx } from '../data/classes';
 import { classOf, current, saveProfile } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
@@ -65,6 +65,13 @@ export class SpellbookScene extends Phaser.Scene {
         }));
       }
     }
+
+    // The ultimate follows the school most chosen spells use.
+    const pw = activePower(cls, p.level, p.spells);
+    const same = chosenSpells(list, p.level, p.spells).filter((x) => x.fx === pw.fx).length;
+    const why = same >= 2 ? `most of your spells are ${FX_NAME[pw.fx ?? 'slash']}` : `the ${cls.name} ultimate`;
+    c.add(txt(this, W / 2, 448, `\u2605 Ultimate: ${pw.name} \u2605`, 22, pw.css).setOrigin(0.5));
+    c.add(txt(this, W / 2, 478, `(${why}. Pick spells of one kind to change it!)`, 14, C.dim).setOrigin(0.5));
 
     // All spells: unlocked ones can be added, locked ones show their level
     list.slice(1).forEach((sp, i) => {

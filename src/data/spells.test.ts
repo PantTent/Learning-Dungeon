@@ -1,5 +1,5 @@
 import { CLASSES } from './classes';
-import { MAX_CHOSEN, chosenSpells, manaCost } from './spells';
+import { MAX_CHOSEN, activePower, chosenSpells, manaCost } from './spells';
 
 describe('spellbooks', () => {
   for (const c of CLASSES) {
@@ -34,5 +34,30 @@ describe('spellbooks', () => {
     expect(chosenSpells(mage.skills, 9, undefined).map((s) => s.id)).toEqual(['missiles1', 'chain1', 'fireball']);
     expect(chosenSpells(mage.skills, 9, ['frostbolt1', 'blizzard1']).map((s) => s.id)).toEqual(['frostbolt1']);
     expect(chosenSpells(mage.skills, 20, ['a', 'frostbolt1', 'chain2', 'arcaneblast', 'fireball']).length).toBeLessThanOrEqual(MAX_CHOSEN);
+  });
+});
+
+describe('ultimate follows the chosen spells', () => {
+  const mage = CLASSES.find((c) => c.id === 'mage')!;
+  it('uses the school most spells share', () => {
+    expect(activePower(mage, 20, ['fireball', 'flamewave', 'frostbolt1']).name).toBe('Meteor');
+    expect(activePower(mage, 20, ['frostbolt1', 'blizzard1', 'chain1']).name).toBe('Glacier Crash');
+    expect(activePower(mage, 20, ['missiles1', 'arcaneblast', 'fireball']).name).toBe('Arcane Nova');
+    expect(activePower(mage, 20, ['chain1', 'chain2', 'blizzard2']).name).toBe('Thunderstorm');
+  });
+  it('falls back to the class ultimate on a tie or with no spells', () => {
+    expect(activePower(mage, 20, ['frostbolt1', 'chain1', 'missiles1'])).toBe(mage.power);
+    expect(activePower(mage, 20, [])).toBe(mage.power);
+  });
+  it('gives every class a valid ultimate for any choice', () => {
+    for (const c of CLASSES) {
+      const pw = activePower(c, 20, undefined);
+      expect(pw.name.length).toBeGreaterThan(0);
+      expect(activePower(c, 20, c.skills.slice(1, 4).map((s) => s.id)).style).toBeTruthy();
+    }
+  });
+  it('druids get Starfall from moon magic', () => {
+    const druid = CLASSES.find((c) => c.id === 'druid')!;
+    expect(activePower(druid, 20, ['moonfire1', 'moonfire2', 'rejuv1']).name).toBe('Starfall');
   });
 });
