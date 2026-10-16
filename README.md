@@ -69,6 +69,10 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 - **Potions** in four strengths (Minor, Medium, Major, Superior) for health
   and mana. They drop from monsters and chests, scaled by monster level, and
   stronger ones unlock in the shop as you level up.
+- **Game picker**: the app opens to a list of games. A new player picks one
+  game for free; more games can be unlocked later (store purchases are not set
+  up yet). Unlocking and the parent dashboard are behind a grown-ups check
+  (type your birth year). The developer code on the picker unlocks every game.
 - **English and French**: pick the language on the title screen, the hero
   screen or the parent dashboard (each hero keeps its own language). French
   heroes get questions from the Quebec curriculum for 1re, 2e and 3e annee:
@@ -77,7 +81,7 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   (sounds and syllables, vocabulary, spelling, homophones, grammar, short
   stories). Read-aloud uses a French voice. All game text is translated
   (`src/i18n`).
-- **Parent dashboard** (hold the button on the title screen): accuracy by
+- **Parent dashboard** (Parents button on the title screen, behind the grown-ups check): accuracy by
   topic, weakest first. You can also set the math/reading mix and turn on
   read-aloud.
 - **Sound**: chiptune music for the menus, dungeon, battles and the boss, plus

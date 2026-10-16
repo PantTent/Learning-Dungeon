@@ -5,6 +5,7 @@ import { getClass } from '../data/classes';
 import { setLang, tr } from '../i18n';
 import { deleteProfile, loadProfiles, session, type Profile } from '../state/profile';
 import { C, H, W, button, langButton, panel, soundButton, sprite, txt } from '../ui/widgets';
+import { parentGate } from '../ui/parentGate';
 
 export const MAX_PROFILES = 3;
 
@@ -56,16 +57,11 @@ export class TitleScene extends Phaser.Scene {
       else this.emptyCard(x, 160, slotW);
     }
 
-    // Parents: press and hold so kids don't wander in by accident.
-    const parent = button(this, W - 110, H - 40, 190, 50, tr('Parents (hold)'), () => {}, { size: 18, color: 0x3a3450 });
-    let holdTimer: Phaser.Time.TimerEvent | null = null;
-    parent.on('pointerdown', () => {
-      holdTimer = this.time.delayedCall(1200, () => this.scene.start('Parent'));
-    });
-    parent.on('pointerup', () => holdTimer?.remove());
-    parent.on('pointerout', () => holdTimer?.remove());
+    // Parents: grown-ups only, so kids don't wander in by accident.
+    button(this, W - 110, H - 40, 190, 50, tr('Parents'), () => parentGate(this, () => this.scene.start('Parent')), { size: 18, color: 0x3a3450 });
+    button(this, 96, H - 40, 160, 50, tr('All games'), () => this.scene.start('Hub'), { size: 18, color: 0x2e4a5a });
 
-    txt(this, 20, H - 30, tr('v0.1 - Area 1: {area}', { area: tr(AREAS[0].name) }), 14, C.dim);
+    txt(this, W / 2, H - 26, tr('v0.1 - Area 1: {area}', { area: tr(AREAS[0].name) }), 14, C.dim).setOrigin(0.5);
   }
 
   private profileCard(x: number, y: number, w: number, p: Profile) {

@@ -8,6 +8,6 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     buildTextures(this);
-    this.scene.start('Title');
+    this.scene.start('Hub');
   }
 }

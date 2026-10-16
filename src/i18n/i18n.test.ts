@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { FR, fmtDec, fmtNum, getLang, setLang, tr } from './index';
+import { GAMES } from '../hub/games';
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -29,6 +30,10 @@ describe('translations', () => {
   it('every tr() string has French', () => {
     const missing = trKeys().filter(({ key }) => !FR[key]?.trim());
     expect(missing.map((m) => `${m.file.split('/src/')[1]}: ${m.key}`)).toEqual([]);
+  });
+
+  it('every game card has French', () => {
+    for (const g of GAMES) for (const s of [g.name, g.blurb]) expect(FR[s], s).toBeTruthy();
   });
 
   it('French keeps the same {placeholders}', () => {

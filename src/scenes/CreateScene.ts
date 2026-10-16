@@ -5,8 +5,9 @@ import { WEAPON_NAMES } from './shared';
 import { isDevCode, makeDeveloper, newProfile, saveProfile, session } from '../state/profile';
 import { C, W, button, langButton, panel, sprite, toast, txt, type Button } from '../ui/widgets';
 import { defaultGrade, gradeLabel, gradesFor, type Grade } from '../questions/curriculum';
-import { getLang, tr } from '../i18n';
+import { tr } from '../i18n';
 import { menuBackground } from './TitleScene';
+import { openKeyboard } from '../ui/keyboard';
 
 const NAMES = ['Max', 'Nova', 'Rex', 'Luna', 'Finn', 'Zara', 'Leo', 'Ivy', 'Kai', 'Milo', 'Ash', 'Sky'];
 
@@ -61,17 +62,17 @@ export class CreateScene extends Phaser.Scene {
     this.nameText = txt(this, 224, 465, this.heroName, 24).setOrigin(0, 0.5);
     txt(this, 432, 465, tr('Edit'), 15, '#7fd3ff').setOrigin(1, 0.5);
     this.add.zone(210, 440, 236, 50).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerup', () =>
-      this.openKeyboard(tr("What's your hero's name?"), this.heroName, true, (name) => {
+      openKeyboard(this, tr("What's your hero's name?"), this.heroName, true, (name) => {
         this.heroName = name.trim() || this.heroName;
         this.nameText?.setText(this.heroName);
-      }),
+      }, NAMES),
     );
 
     // Secret code box (for the game's developer).
     if (!data.keep) this.devMode = false;
     const codeLabel = () => (this.devMode ? tr('DEV ON') : tr('Code'));
     this.codeButton = button(this, W - 60, 30, 96, 36, codeLabel(), () =>
-      this.openKeyboard(tr('Type a secret code'), '', false, (code) => {
+      openKeyboard(this, tr('Type a secret code'), '', false, (code) => {
         if (!code.trim()) return;
         this.devMode = isDevCode(code);
         this.codeButton?.label.setText(codeLabel());
@@ -153,60 +154,6 @@ export class CreateScene extends Phaser.Scene {
       b.destroy();
       this.gradeButtons[i] = button(this, 494 + i * 62, 486, 54, 46, label, () => this.setGrade(x), { size: 22, color: x === g ? 0x2f9a4a : 0x4b3a78 });
     });
-  }
-
-  /** Big friendly on-screen keyboard (hero name or secret code). */
-  private openKeyboard(title: string, initial: string, nameCase: boolean, onDone: (value: string) => void) {
-    const c = this.add.container(0, 0).setDepth(500);
-    c.add(this.add.rectangle(0, 0, W, 540, 0x000000, 0.75).setOrigin(0).setInteractive());
-    c.add(panel(this, 40, 20, W - 80, 500, 0x1d1730, 0x7fd3ff));
-    c.add(txt(this, W / 2, 50, title, 26, '#ffd24a').setOrigin(0.5));
-    const g = this.add.graphics();
-    g.fillStyle(0x0f0b1a, 1).fillRoundedRect(W / 2 - 200, 78, 400, 58, 10);
-    g.lineStyle(3, 0x7fd3ff, 1).strokeRoundedRect(W / 2 - 200, 78, 400, 58, 10);
-    c.add(g);
-    const shown = txt(this, W / 2, 107, '', 32).setOrigin(0.5);
-    c.add(shown);
-    let name = initial;
-    const refresh = () => shown.setText(name.length ? name : ' ');
-    refresh();
-    const type = (k: string) => {
-      if (k === 'DEL') name = name.slice(0, -1);
-      else if (k === 'SPACE') {
-        if (name.length && name.length < 12 && !name.endsWith(' ')) name += ' ';
-      } else if (name.length < 12) name += nameCase && (name.length === 0 || name.endsWith(' ')) ? k.toUpperCase() : k.toLowerCase();
-      refresh();
-    };
-    const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
-    // French names often have accents (Léa, Zoé, François).
-    if (nameCase && getLang() === 'fr') rows.push('ÉÈÊËÀÂÇÏÎÔ');
-    const kw = 70;
-    const kh = 60;
-    rows.forEach((row, r) => {
-      const x0 = W / 2 - (row.length * (kw + 8)) / 2 + kw / 2;
-      [...row].forEach((ch, i) => c.add(button(this, x0 + i * (kw + 8), 182 + r * (kh + 10), kw, kh, ch, () => type(ch), { size: 26 })));
-    });
-    c.add(button(this, W / 2 + 4 * 78 + 30, 182 + 2 * 70, 116, kh, tr('Delete'), () => type('DEL'), { size: 20, color: 0x8a3a3a }));
-    c.add(button(this, W / 2 - 4 * 78 - 30, 182 + 2 * 70, 116, kh, tr('Space'), () => type('SPACE'), { size: 20, color: 0x3a3450 }));
-    if (nameCase) {
-      c.add(button(this, W / 2 - 180, 460, 200, 60, tr('Random name'), () => {
-        name = NAMES[Math.floor(Math.random() * NAMES.length)];
-        refresh();
-      }, { size: 20, color: 0x2e5a7a }));
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (/^\p{L}$/u.test(e.key)) type(e.key);
-      else if (e.key === 'Backspace') type('DEL');
-      else if (e.key === ' ') type('SPACE');
-      else if (e.key === 'Enter') done();
-    };
-    const done = () => {
-      this.input.keyboard?.off('keydown', onKey);
-      c.destroy();
-      onDone(name);
-    };
-    this.input.keyboard?.on('keydown', onKey);
-    c.add(button(this, W / 2 + 140, 460, 220, 60, tr('Done'), done, { size: 24, color: 0x2f9a4a }));
   }
 
   private start() {
