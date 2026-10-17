@@ -1,0 +1,16 @@
+{
+  "name": "Learning Dungeon",
+  "short_name": "Learning",
+  "description": "Learning games: answer questions to battle monsters and build a farm.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#14101e",
+  "theme_color": "#14101e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

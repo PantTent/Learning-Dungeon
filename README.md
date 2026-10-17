@@ -127,15 +127,27 @@ npm run dev        # then open the printed URL on the tablet (same Wi-Fi)
 Once the repo is on GitHub with Pages enabled (Settings -> Pages -> Source:
 GitHub Actions), every push publishes a playable web version.
 
-### On Android
-Every push to `main` builds an APK through GitHub Actions (`Android APK`
-workflow). Open the run, download `learning-dungeon-apk` from **Artifacts**,
-copy it to the tablet, and open it. Allow "install unknown apps" when asked.
+### On Android (the app)
 
-To build locally you need Android Studio:
-```bash
-npm run build && npx cap sync android && npx cap open android
-```
+Every update builds a new Android app. On the tablet, open this link in the
+browser (or tap **Get the Android app** on the game picker in the website):
+
+https://github.com/PantTent/Learning-Dungeon/releases/download/android-latest/LearningDungeon.apk
+
+Open the downloaded file and allow installing from the browser if asked. To
+update, download and install the newest one the same way: every build is
+signed with the same sideload key (`android/sideload.keystore`, for our own
+devices only, not a store key) and has a higher version number, so it installs
+over the old app and keeps the saved games. The app runs full screen in
+landscape, works offline, and keeps the screen on while playing.
+
+### As a home-screen web app (Android or iPad)
+
+Open the website, then use the browser's **Add to Home screen**. It opens full
+screen in landscape and works offline (it always loads the newest version when
+online).
+
+To remake the app icons after changing the art: `python3 tools/art/make_icons.py`.
 
 ## Project layout
 

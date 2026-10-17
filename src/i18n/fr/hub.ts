@@ -41,4 +41,5 @@ export const FR_HUB: Record<string, string> = {
   'Ask a grown-up': 'Demande à un adulte',
   'Not now': 'Pas maintenant',
   'Purchases are coming soon!': 'Les achats arrivent bientôt!',
+  'Get the Android app': "Obtenir l'appli Android",
 };

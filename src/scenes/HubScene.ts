@@ -9,6 +9,7 @@ import { openKeyboard } from '../ui/keyboard';
 import { parentGate } from '../ui/parentGate';
 import { C, H, W, button, langButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
+import { androidBrowser, APK_URL } from '../util/platform';
 
 /** First screen: pick which game to play. Every game is free to try; the full games can be unlocked. */
 export class HubScene extends Phaser.Scene {
@@ -38,6 +39,10 @@ export class HubScene extends Phaser.Scene {
       button(this, W / 2, H - 28, 380, 40, tr('Unlock every game - {price}', { price: unlockPrice(getLang(), 'all') }), () => this.unlock(), { size: 17, color: 0xb07a10 });
     }
     button(this, W - 70, H - 32, 110, 40, this.own.devAll ? tr('DEV ON') : tr('Code'), () => this.enterCode(), { size: 15, color: 0x3a3450 });
+    // Playing in a browser on an Android tablet? Offer the app.
+    if (androidBrowser()) {
+      button(this, 118, H - 32, 210, 40, tr('Get the Android app'), () => window.open(APK_URL, '_blank'), { size: 15, color: 0x2e5a7a });
+    }
   }
 
   private card(g: GameInfo, x: number, y: number, w: number) {

@@ -14,6 +14,7 @@ import { ShopScene, TravelScene } from './scenes/ShopScene';
 import { TitleScene } from './scenes/TitleScene';
 import { H, W } from './ui/widgets';
 import { unlockAudio } from './audio/audio';
+import { inApp } from './util/platform';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -30,6 +31,18 @@ const game = new Phaser.Game({
 // Browsers only allow sound after the player taps or presses a key.
 window.addEventListener('pointerdown', unlockAudio);
 window.addEventListener('keydown', unlockAudio);
+
+// Rotating a tablet: wait for the new screen size to settle, then refit.
+const refit = () => [50, 300, 800].forEach((ms) => setTimeout(() => game.scale.refresh(), ms));
+window.addEventListener('orientationchange', refit);
+window.addEventListener('resize', refit);
+screen.orientation?.addEventListener?.('change', refit);
+
+// The website can be installed to the home screen and played offline.
+// (The Android app already has everything inside it.)
+if (import.meta.env.PROD && !inApp() && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
 
 // Handy for debugging in the browser console.
 (window as unknown as { game: Phaser.Game }).game = game;
