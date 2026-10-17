@@ -90,4 +90,16 @@ export const FR_MENUS: Record<string, string> = {
   'By topic (weakest first) - drag to scroll': 'Par sujet (les plus faibles d’abord) - glisse pour défiler',
   'Topic results appear here after a few battles.': 'Les résultats par sujet apparaîtront après quelques combats.',
   '{subject}: {topic}': '{subject} : {topic}',
+  // Skills and levels
+  '\u2605 Strong': '\u2605 Fort',
+  Good: 'Bien',
+  'Needs practice': 'À pratiquer',
+  New: 'Nouveau',
+  'Grade {g} level': 'Niveau {g}',
+  'Skills & levels (grown-ups)': 'Forces et niveaux (adultes)',
+  pinned: 'fixé',
+  'Skills & levels for {name}': 'Forces et niveaux de {name}',
+  'Auto: questions get easier or harder with the answers. Tap a level to pin it.': 'Auto : les questions deviennent plus faciles ou plus difficiles selon les réponses. Touche un niveau pour le fixer.',
+  'Pinned: {g}': 'Fixé : {g}',
+  Auto: 'Auto',
 };

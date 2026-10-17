@@ -1,6 +1,7 @@
-import { MATH_TOPICS, makeMathQuestion, mathTopicLevels, mathTopicsFor } from './math';
+import { MATH_TOPICS, makeMathQuestion, mathTopicsFor } from './math';
 import { QuestionEngine, isCorrect, newLearningStats, defaultLearningSettings, teacherHelp } from './engine';
-import { GRADE_BAND, mathTopicsForGrade, type Grade } from './curriculum';
+import { type Grade } from './curriculum';
+import { ladderFor, ladderRange } from './ladders';
 import type { Difficulty } from './types';
 
 const N = 400;
@@ -167,29 +168,28 @@ describe('teacher hints and grades', () => {
     }
   });
 
-  it('grade and topic choices are respected', () => {
+  it('grade and topic choices are respected (topics come from the chosen ladders)', () => {
     for (const grade of [3, 4, 5] as Grade[]) {
-      const allowed = new Set(mathTopicsForGrade(grade));
-      const e = new QuestionEngine(newLearningStats(), { ...defaultLearningSettings(), grade, mathPercent: 100 });
+      const settings = { ...defaultLearningSettings(), grade, mathPercent: 100 };
+      const e = new QuestionEngine(newLearningStats(), settings);
       for (let i = 0; i < 300; i++) {
         const q = e.next();
-        expect(allowed.has(q.topic), `grade ${grade}: ${q.topic}`).toBe(true);
-        const [lo, hi] = GRADE_BAND[grade]!;
-        expect(q.difficulty >= lo && q.difficulty <= hi || !mathTopicLevelsIn(q.topic, lo, hi), `${q.topic} d${q.difficulty}`).toBe(true);
+        const steps = ladderFor(q.group!, 'en');
+        const { max } = ladderRange(steps, grade);
+        const ok = steps.slice(0, max + 1).some((st) => st.topics.includes(q.topic));
+        expect(ok, `grade ${grade}: ${q.group} ${q.topic}`).toBe(true);
+        e.record(q, i % 4 !== 0);
       }
     }
     const e = new QuestionEngine(newLearningStats(), { ...defaultLearningSettings(), groups: ['fractions', 'figurative'] });
+    const fractionTopics = new Set(ladderFor('fractions', 'en').flatMap((st) => st.topics));
     for (let i = 0; i < 200; i++) {
       const q = e.next();
-      expect(['fractions-equiv', 'fractions-compare', 'fractions-add', 'fractions-mult', 'figurative']).toContain(q.topic);
+      expect(fractionTopics.has(q.topic) || q.topic === 'figurative', q.topic).toBe(true);
       e.record(q, i % 3 !== 0);
     }
   });
 });
-
-function mathTopicLevelsIn(topic: string, lo: number, hi: number) {
-  return mathTopicLevels(topic).some((l) => l >= lo && l <= hi);
-}
 
 describe('focus practice', () => {
   it('times-table questions only use the chosen tables and are correct', () => {

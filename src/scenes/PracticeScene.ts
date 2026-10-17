@@ -1,10 +1,32 @@
 import Phaser from 'phaser';
 import { playMusic } from '../audio/audio';
-import { defaultGrade, gradeLabel, gradesFor, groupsForGrade, topicGroups, type TopicGroup } from '../questions/curriculum';
+import { defaultGrade, gradeLabel, gradesFor, groupsForGrade, topicGroups, type Grade, type TopicGroup } from '../questions/curriculum';
+import { groupReport, type Strength } from '../questions/engine';
+import { ladderFor, ladderGrades } from '../questions/ladders';
+import { parentGate } from '../ui/parentGate';
 import { tr } from '../i18n';
 import { current, saveProfile } from '../state/profile';
 import { C, W, H, button, panel, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
+
+/** Badge text and color for a group's strength. */
+function strengthBadge(st: Strength): { label: string; color: string } {
+  switch (st) {
+    case 'strong':
+      return { label: tr('\u2605 Strong'), color: '#5ef07a' };
+    case 'good':
+      return { label: tr('Good'), color: '#ffe066' };
+    case 'practice':
+      return { label: tr('Needs practice'), color: '#ff9a6b' };
+    default:
+      return { label: tr('New'), color: '#a99cc8' };
+  }
+}
+
+/** "Grade 3 level" / "niveau 3e". */
+function levelText(g: Grade, lang: 'en' | 'fr'): string {
+  return tr('Grade {g} level', { g: gradeLabel(g, lang) });
+}
 
 /**
  * "What do you want to practice today?" Shown every time a hero is played,
@@ -50,14 +72,15 @@ export class PracticeScene extends Phaser.Scene {
 
     const visible = new Set(groups.map((g) => g.id));
     const chosen = s.groups.filter((id) => visible.has(id)).length;
-    c.add(txt(this, 40, H - 52, chosen === 1 ? tr('1 topic group picked') : chosen ? tr('{n} topic groups picked', { n: chosen }) : tr('Pick at least one topic!'), 18, chosen ? C.dim : C.bad).setOrigin(0, 0.5));
-    const go = button(this, W - 150, H - 50, 250, 64, tr("Let's go!"), () => {
+    c.add(txt(this, 40, 482, chosen === 1 ? tr('1 topic group picked') : chosen ? tr('{n} topic groups picked', { n: chosen }) : tr('Pick at least one topic!'), 15, chosen ? C.dim : C.bad).setOrigin(0, 0.5));
+    c.add(button(this, 384, H - 28, 280, 44, tr('Skills & levels (grown-ups)'), () => parentGate(this, () => this.skills()), { size: 16, color: 0x5a3a8a }));
+    const go = button(this, W - 150, H - 40, 250, 60, tr("Let's go!"), () => {
       saveProfile(p);
       this.scene.start('Dungeon');
     }, { color: 0x2f9a4a, size: 28 });
     go.setEnabled(chosen > 0);
     c.add(go);
-    c.add(button(this, W / 2 - 40, H - 50, 150, 48, tr('Back'), () => {
+    c.add(button(this, 120, H - 28, 150, 44, tr('Back'), () => {
       saveProfile(p);
       this.scene.start('Title');
     }, { size: 20, color: 0x3a3450 }));
@@ -83,10 +106,17 @@ export class PracticeScene extends Phaser.Scene {
       const cy = 184 + Math.floor(i / 2) * 66;
       const focus = g.id === 'multiply' ? s.focus.multiply : g.id === 'divide' ? s.focus.divide : [];
       const label = focus.length ? `${g.label} (${focus.join(', ')})` : g.label;
-      c.add(button(this, cx, cy, chipW, 56, `${on ? '✔ ' : ''}${label}`, () => {
+      c.add(button(this, cx, cy, chipW, 56, '', () => {
         s.groups = on ? s.groups.filter((id) => id !== g.id) : [...s.groups, g.id];
         this.draw();
-      }, { size: label.length > 18 ? 15 : 17, color: on ? 0x2f7a3a : 0x2a2340, textColor: on ? '#ffffff' : C.dim }));
+      }, { color: on ? 0x2f7a3a : 0x2a2340 }));
+      const name = txt(this, cx, cy - 9, `${on ? '✔ ' : ''}${label}`, label.length > 18 ? 15 : 17, on ? '#ffffff' : C.dim).setOrigin(0.5);
+      for (let size = 15; name.width > chipW - 12 && size >= 11; size--) name.setFontSize(size);
+      c.add(name);
+      // How they're doing, and the level they're on now.
+      const rep = groupReport(current().learning, s, g.id);
+      const badge = strengthBadge(rep.strength);
+      c.add(txt(this, cx, cy + 14, `${badge.label}  \u00b7  ${levelText(rep.grade, s.lang)}${rep.pinned ? ` (${tr('pinned')})` : ''}`, 12, badge.color).setOrigin(0.5));
     });
 
     // Focus practice: drill specific times tables (e.g. only the 5s).
@@ -98,6 +128,60 @@ export class PracticeScene extends Phaser.Scene {
       c.add(button(this, x + 16 + bw / 2, 434, bw, 40, m.length ? tr('x tables: {list}', { list: m.join(', ') }) : tr('x tables: all'), () => this.focusPicker('multiply'), { size: 15, color: 0x5a3a8a }));
       c.add(button(this, x + 32 + bw * 1.5, 434, bw, 40, d.length ? tr('/ facts: {list}', { list: d.join(', ') }) : tr('/ facts: all'), () => this.focusPicker('divide'), { size: 15, color: 0x5a3a8a }));
     }
+  }
+
+  /**
+   * Grown-ups: how each topic group is going, and its level. "Auto" moves
+   * with the answers; or pin a group to one grade (e.g. easier multiplying).
+   */
+  private skills() {
+    const p = current();
+    const s = p.settings;
+    const c = this.add.container(0, 0).setDepth(100);
+    const redraw = () => {
+      c.removeAll(true);
+      c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.8).setOrigin(0).setInteractive());
+      c.add(panel(this, 16, 12, W - 32, H - 24, 0x1d1730, 0xb98aff));
+      c.add(txt(this, W / 2, 38, tr('Skills & levels for {name}', { name: p.name }), 24, '#ffd24a').setOrigin(0.5));
+      c.add(txt(this, W / 2, 66, tr('Auto: questions get easier or harder with the answers. Tap a level to pin it.'), 14, C.dim).setOrigin(0.5));
+      const groups = groupsForGrade(s.grade, s.lang);
+      const half = Math.ceil(groups.length / 2);
+      groups.forEach((g, i) => {
+        const col = i < half ? 0 : 1;
+        const row = i < half ? i : i - half;
+        const x = 34 + col * 456;
+        const y = 88 + row * 54;
+        const rep = groupReport(p.learning, s, g.id);
+        const badge = strengthBadge(rep.strength);
+        const bg = this.add.graphics();
+        bg.fillStyle(g.subject === 'math' ? 0x1f2a48 : 0x3a2618, 1).fillRoundedRect(x, y, 440, 48, 8);
+        c.add(bg);
+        const name = txt(this, x + 10, y + 4, g.label, 15);
+        for (let size = 14; name.width > 170 && size >= 11; size--) name.setFontSize(size);
+        c.add(name);
+        const acc = rep.answered ? `${Math.round(rep.accuracy * 100)}% (${rep.answered})` : '';
+        c.add(txt(this, x + 10, y + 37, `${badge.label}  ${acc}`, 12, badge.color).setOrigin(0, 0.5));
+        c.add(txt(this, x + 186, y + 24, levelText(rep.grade, s.lang), 13, '#e8e0ff').setOrigin(0, 0.5));
+        // Level button: Auto -> each grade on the ladder (up to one above) -> Auto.
+        const options = ladderGrades(ladderFor(g.id, s.lang)).filter((gr) => gr <= s.grade + 1);
+        const pinned = s.levels?.[g.id];
+        const label = pinned ? tr('Pinned: {g}', { g: gradeLabel(pinned, s.lang) }) : tr('Auto');
+        c.add(button(this, x + 372, y + 24, 124, 36, label, () => {
+          s.levels ??= {};
+          const k = pinned ? options.indexOf(pinned) : -1;
+          const next = options[k + 1];
+          if (next) s.levels[g.id] = next;
+          else delete s.levels[g.id];
+          saveProfile(p);
+          redraw();
+        }, { size: 14, color: pinned ? 0xb07a10 : 0x2f7a3a }));
+      });
+      c.add(button(this, W / 2, H - 42, 200, 48, tr('Done'), () => {
+        c.destroy();
+        this.draw();
+      }, { size: 22, color: 0x2f9a4a }));
+    };
+    redraw();
   }
 
   /** Pick "everything for the grade" or specific tables, like only the 5s. */

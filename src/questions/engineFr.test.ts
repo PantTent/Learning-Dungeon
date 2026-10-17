@@ -1,5 +1,5 @@
 import { defaultLearningSettings, newLearningStats, QuestionEngine, upgradeSettings } from './engine';
-import { gradeBand, GRADES_FR, mathTopicsForGrade, TOPIC_GROUPS_FR } from './curriculum';
+import { GRADES_FR, mathTopicsForGrade, TOPIC_GROUPS_FR } from './curriculum';
 import { READING_BANK_FR } from './readingBankFr';
 import { EARLY_GENERATORS } from './mathEarly';
 import { topicLabel } from './labels';
@@ -16,22 +16,20 @@ describe('French questions', () => {
     for (const grade of GRADES_FR) for (const t of mathTopicsForGrade(grade, 'fr')) expect(EARLY_GENERATORS[t], t).toBeTruthy();
   });
 
-  it.each(GRADES_FR)('grade %i gives only French questions at the right level', (grade) => {
+  it.each(GRADES_FR)('grade %i gives only French questions, at most one level up', (grade) => {
     setLang('fr');
     const settings = { ...defaultLearningSettings('fr'), grade };
     const e = new QuestionEngine(newLearningStats(), settings);
-    const [lo, hi] = gradeBand(grade, 'fr');
-    const math = new Set(mathTopicsForGrade(grade, 'fr'));
     let reading = 0;
     for (let i = 0; i < 400; i++) {
       const q = e.next();
-      if (q.subject === 'math') expect(math.has(q.topic), q.topic).toBe(true);
+      if (q.subject === 'math') expect(q.topic.startsWith('e-'), q.topic).toBe(true);
       else {
         reading++;
         expect(q.id.startsWith('rf:')).toBe(true);
         expect(q.topic.startsWith('fr-')).toBe(true);
       }
-      expect(q.difficulty >= lo && q.difficulty <= hi, `${q.topic} d${q.difficulty}`).toBe(true);
+      expect(q.difficulty <= grade + 1, `${q.topic} d${q.difficulty}`).toBe(true);
       expect(topicLabel(q.topic)).not.toBe(q.topic);
       e.record(q, i % 4 !== 0);
     }

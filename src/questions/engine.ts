@@ -1,13 +1,14 @@
 // Picks the next question for the child, adapting difficulty per subject
 // and bringing missed questions back a few turns later for another try.
 import type { Difficulty, Question, Subject } from './types';
-import { makeMathQuestion, mathTopicLevels } from './math';
-import { allGroupIds, defaultGrade, enabledTopics, fitGrade, gradeBand, mathTopicsForGrade, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
+import { makeMathQuestion } from './math';
+import { allGroupIds, defaultGrade, fitGrade, gradeBand, mathTopicsForGrade, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
 import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
 import { getLang, type Lang as LangT } from '../i18n';
 import { clamp, pick, shuffle } from '../util/rng';
+import { ladderFor, ladderRange, type Step } from './ladders';
 
 export interface TopicStat {
   asked: number;
@@ -25,6 +26,10 @@ export interface LearningStats {
   totalCorrect: number;
   /** Per-day totals, key "YYYY-MM-DD". */
   days: Record<string, TopicStat>;
+  /** Position on each group's skill ladder (see ladders.ts). */
+  ladder?: Record<string, number>;
+  /** Last answers per group (1 = right, 0 = wrong), newest last. */
+  recentByGroup?: Record<string, number[]>;
 }
 
 export interface LearningSettings {
@@ -39,6 +44,8 @@ export interface LearningSettings {
   focus: { multiply: number[]; divide: number[] };
   /** Language of the questions (and the whole game for this hero). */
   lang: Lang;
+  /** Parent-pinned grade for a group (missing = automatic). */
+  levels?: Record<string, Grade>;
 }
 
 export function newLearningStats(): LearningStats {
@@ -70,6 +77,7 @@ export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings 
     groups: groups.length ? groups : d.groups,
     focus: { multiply: s.focus?.multiply ?? [], divide: s.focus?.divide ?? [] },
     lang,
+    levels: s.levels ?? {},
   };
 }
 
@@ -87,26 +95,59 @@ function readingBank(lang: LangT) {
   return lang === 'fr' ? { bank: READING_BANK_FR, prefix: 'rf' } : { bank: READING_BANK, prefix: 'r' };
 }
 
+/** Strength label for a group, from the last answers. */
+export type Strength = 'new' | 'strong' | 'good' | 'practice';
+
+export interface GroupReport {
+  /** Recent answers counted (up to RECENT). */
+  answered: number;
+  /** Share right among recent answers (0..1). */
+  accuracy: number;
+  strength: Strength;
+  /** Grade of the step the child is on now. */
+  grade: Grade;
+  /** True when a parent pinned the level. */
+  pinned: boolean;
+}
+
+/** How many recent answers per group decide its strength. */
+export const RECENT = 20;
+/** Ladder moves: right answers climb a quarter step, wrong ones drop almost half. */
+const CLIMB = 0.25;
+const DROP = 0.45;
+
 function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function pickDifficulty(level: number, [lo, hi]: [Difficulty, Difficulty]): Difficulty {
-  // Occasionally give an easier one to keep confidence up.
-  if (Math.random() < 0.15) return clamp(Math.floor(level) - 1, lo, hi) as Difficulty;
-  const base = Math.floor(level);
-  const frac = level - base;
-  return clamp(Math.random() < frac ? base + 1 : base, lo, hi) as Difficulty;
-}
-
 /** Normalize a typed answer so "1,200" and " 1200 " both match "1200". */
 export function normalize(ans: string): string {
-  return ans.trim().toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ');
+  return ans.trim().toLowerCase().replace(/[,\u00a0\u202f]/g, '').replace(/\s+/g, ' ');
 }
 
 export function isCorrect(q: Question, given: string): boolean {
   return normalize(given) === normalize(q.answer);
+}
+
+/** Where a group's ladder is, and its range for this grade / pinned level. */
+function ladderState(stats: LearningStats, settings: LearningSettings, groupId: string) {
+  const steps = ladderFor(groupId, settings.lang);
+  const pinned = settings.levels?.[groupId];
+  const range = ladderRange(steps, settings.grade, pinned);
+  const saved = stats.ladder?.[groupId];
+  const pos = clamp(saved ?? range.start, range.min, range.max + 0.99);
+  return { steps, range, pos, pinned };
+}
+
+export function groupReport(stats: LearningStats, settings: LearningSettings, groupId: string): GroupReport {
+  const recent = stats.recentByGroup?.[groupId] ?? [];
+  const answered = recent.length;
+  const accuracy = answered ? recent.reduce((a, b) => a + b, 0) / answered : 0;
+  const strength: Strength = answered < 5 ? 'new' : accuracy >= 0.85 ? 'strong' : accuracy >= 0.65 ? 'good' : 'practice';
+  const { steps, pos, pinned } = ladderState(stats, settings, groupId);
+  const step = steps[Math.floor(pos)];
+  return { answered, accuracy, strength, grade: step?.g ?? settings.grade, pinned: !!pinned };
 }
 
 export class QuestionEngine {
@@ -115,80 +156,88 @@ export class QuestionEngine {
     private settings: LearningSettings,
   ) {}
 
-  /** Math topics allowed right now: in the child's grade AND in a chosen group. */
-  private mathTopics(): string[] {
-    const on = enabledTopics(this.settings.groups, this.settings.lang);
-    const { multiply, divide } = this.settings.focus;
-    const groups = this.settings.groups;
-    // A focus (e.g. "only the 5s") replaces the whole group with focused questions.
-    const focusMult = multiply.length > 0 && groups.includes('multiply');
-    const focusDiv = divide.length > 0 && groups.includes('divide');
+  /** The chosen groups for a subject that have questions in this grade. */
+  private groups(subject: Subject) {
     const lang = this.settings.lang;
-    const multTopics = new Set(topicGroups(lang).find((g) => g.id === 'multiply')?.topics ?? []);
-    const divTopics = new Set(topicGroups(lang).find((g) => g.id === 'divide')?.topics ?? []);
-    const topics = mathTopicsForGrade(this.settings.grade, lang).filter(
-      (t) => on.has(t) && !(focusMult && multTopics.has(t)) && !(focusDiv && divTopics.has(t)),
+    const inGrade = new Set(mathTopicsForGrade(this.settings.grade, lang));
+    return topicGroups(lang).filter(
+      (g) =>
+        g.subject === subject &&
+        this.settings.groups.includes(g.id) &&
+        ladderFor(g.id, lang).length > 0 &&
+        (subject === 'reading' || g.topics.some((t) => inGrade.has(t))),
     );
-    if (focusMult) topics.push('times-table');
-    if (focusDiv) topics.push('div-table');
-    return topics;
   }
 
-  private readingTopics(): Set<string> {
-    const on = enabledTopics(this.settings.groups, this.settings.lang);
-    return new Set(readingBank(this.settings.lang).bank.map((b) => b.topic).filter((t) => on.has(t)));
+  /** Focus practice (e.g. only the 5s) replaces the multiply / divide ladders. */
+  private focusTopic(groupId: string): { topic: string; factors: number[] } | undefined {
+    const { multiply, divide } = this.settings.focus;
+    if (groupId === 'multiply' && multiply.length) return { topic: 'times-table', factors: multiply };
+    if (groupId === 'divide' && divide.length) return { topic: 'div-table', factors: divide };
+    return undefined;
+  }
+
+  private allowed(q: Question): boolean {
+    if (!q.group) return true;
+    return this.settings.groups.includes(q.group);
   }
 
   next(): Question {
-    const mathTopics = this.mathTopics();
-    const readingTopics = this.readingTopics();
-    const allowed = (q: Question) => (q.subject === 'math' ? mathTopics.includes(q.topic) : readingTopics.has(q.topic));
-
-    // Re-ask a missed question when it's due (if its topic is still chosen).
-    this.stats.retry = this.stats.retry.filter((r) => allowed(r.q));
+    // Re-ask a missed question when it's due (if its group is still chosen).
+    this.stats.retry = this.stats.retry.filter((r) => this.allowed(r.q));
     const due = this.stats.retry.findIndex((r) => r.due <= this.stats.totalAsked);
     if (due >= 0) {
       const [r] = this.stats.retry.splice(due, 1);
       return { ...r.q, isRetry: true };
     }
 
+    const math = this.groups('math');
+    const reading = this.groups('reading');
     let subject: Subject = Math.random() * 100 < this.settings.mathPercent ? 'math' : 'reading';
-    if (subject === 'math' && mathTopics.length === 0) subject = 'reading';
-    if (subject === 'reading' && readingTopics.size === 0) subject = 'math';
-    if (subject === 'math' && mathTopics.length === 0) subject = 'reading'; // nothing chosen at all: fall back to reading
+    if (subject === 'math' && !math.length) subject = 'reading';
+    if (subject === 'reading' && !reading.length) subject = 'math';
+    const groups = subject === 'math' ? math : reading;
+    // Nothing chosen at all: fall back to everything for the grade.
+    const pool = groups.length ? groups : topicGroups(this.settings.lang).filter((g) => g.subject === subject && ladderFor(g.id, this.settings.lang).length);
 
-    const band = gradeBand(this.settings.grade, this.settings.lang);
-    this.stats.level[subject] = clamp(this.stats.level[subject], band[0], band[1] + 0.49);
-    const d = pickDifficulty(this.stats.level[subject], band);
-    const q = subject === 'math' ? this.mathQuestion(d, mathTopics) : this.readingQuestion(d, readingTopics);
+    // Weaker groups come up more often.
+    const weights = pool.map((g) => {
+      const rep = groupReport(this.stats, this.settings, g.id);
+      return rep.answered < 5 ? 1.3 : 0.5 + (1 - rep.accuracy) * 1.5;
+    });
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let group = pool[0];
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) {
+        group = pool[i];
+        break;
+      }
+    }
+
+    const q = this.questionFor(group.id, subject);
+    q.group = group.id;
     this.stats.recent.push(q.id);
     // Remember lots of past questions so repeats are rare.
     if (this.stats.recent.length > 250) this.stats.recent.shift();
     return q;
   }
 
-  private mathQuestion(d: Difficulty, allowed: string[]): Question {
-    const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
-    // Prefer topics that have questions at this difficulty; otherwise any allowed topic.
-    let topics = allowed.filter((t) => mathTopicLevels(t).includes(d));
-    if (!topics.length) topics = allowed.filter((t) => mathTopicLevels(t).some((l) => l >= lo && l <= hi));
-    if (!topics.length) topics = allowed;
-    // Favor topics the child is weaker at.
-    const weights = topics.map((t) => {
-      const s = this.stats.topics[t];
-      if (!s || s.asked < 3) return 1.5;
-      return 0.6 + (1 - s.correct / s.asked) * 2;
-    });
-    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-    let topic = topics[0];
-    for (let i = 0; i < topics.length; i++) {
-      r -= weights[i];
-      if (r <= 0) {
-        topic = topics[i];
-        break;
-      }
+  private questionFor(groupId: string, subject: Subject): Question {
+    const { steps, range, pos } = ladderState(this.stats, this.settings, groupId);
+    let i = Math.floor(pos);
+    // Now and then a step down, to review and keep confidence up.
+    if (i > range.min && Math.random() < 0.2) i--;
+    const step: Step = steps[i];
+    if (subject === 'math') {
+      const focus = this.focusTopic(groupId);
+      if (focus) return this.mathQuestion(focus.topic, step.d, focus.factors);
+      return this.mathQuestion(pick(step.topics), step.d);
     }
-    const factors = topic === 'times-table' ? this.settings.focus.multiply : topic === 'div-table' ? this.settings.focus.divide : undefined;
+    return this.readingQuestion(step.d, new Set(step.topics));
+  }
+
+  private mathQuestion(topic: string, d: Difficulty, factors?: number[]): Question {
     for (let tries = 0; tries < 20; tries++) {
       const q = makeMathQuestion(topic, d, factors);
       if (!this.stats.recent.includes(q.id)) return q;
@@ -199,17 +248,16 @@ export class QuestionEngine {
   private readingQuestion(d: Difficulty, topics: Set<string>): Question {
     const recent = new Set(this.stats.recent);
     const { bank, prefix } = readingBank(this.settings.lang);
-    const all = bank.map((item, i) => ({ item, i })).filter((x) => topics.size === 0 || topics.has(x.item.topic));
-    const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
-    let pool = all.filter((x) => x.item.difficulty === d && !recent.has(`${prefix}:${x.i}`));
-    if (pool.length === 0) pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !recent.has(`${prefix}:${x.i}`));
-    // Out of new ones at this level: repeat ones from the grade, skipping the latest few.
-    if (pool.length === 0) {
+    const all = bank.map((item, i) => ({ item, i })).filter((x) => topics.has(x.item.topic));
+    const id = (x: { i: number }) => `${prefix}:${x.i}`;
+    let pool = all.filter((x) => x.item.difficulty === d && !recent.has(id(x)));
+    // Out of new ones at this level: repeat ones from this level, skipping the latest few.
+    if (!pool.length) {
       const latest = new Set(this.stats.recent.slice(-20));
-      pool = all.filter((x) => x.item.difficulty >= lo && x.item.difficulty <= hi && !latest.has(`${prefix}:${x.i}`));
+      pool = all.filter((x) => x.item.difficulty === d && !latest.has(id(x)));
     }
-    if (pool.length === 0) pool = all.filter((x) => !recent.has(`${prefix}:${x.i}`));
-    if (pool.length === 0) pool = all.length ? all : bank.map((item, i) => ({ item, i }));
+    if (!pool.length) pool = all.filter((x) => x.item.difficulty === d);
+    if (!pool.length) pool = all.length ? all : bank.map((item, i) => ({ item, i }));
     const { item, i } = pick(pool);
     return {
       id: `${prefix}:${i}`,
@@ -237,6 +285,17 @@ export class QuestionEngine {
 
     const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
     s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), lo, hi + 0.49);
+
+    // Climb or step down this group's ladder.
+    if (q.group) {
+      const { range, pos } = ladderState(s, this.settings, q.group);
+      s.ladder ??= {};
+      s.ladder[q.group] = clamp(pos + (correct ? CLIMB : -DROP), range.min, range.max + 0.99);
+      s.recentByGroup ??= {};
+      const rec = (s.recentByGroup[q.group] ??= []);
+      rec.push(correct ? 1 : 0);
+      if (rec.length > RECENT) rec.shift();
+    }
 
     if (!correct && !s.retry.some((r) => r.q.id === q.id)) {
       // Ask it again in a few questions with fresh answer order.

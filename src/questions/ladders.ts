@@ -1,0 +1,153 @@
+// Skill ladders: each topic group is a ladder of steps from very basic to
+// hard, reaching below (and a little above) the child's grade. Every group
+// has its own position on its ladder: right answers climb, wrong answers step
+// down, so a child who finds 7 x 143 hard goes back to times tables, then
+// "groups of", and climbs again as they get better.
+import type { Lang } from '../i18n';
+import { mathTopicLevels } from './math';
+import { READING_BANK } from './readingBank';
+import { READING_BANK_FR } from './readingBankFr';
+import { topicGroups, type Grade } from './curriculum';
+import type { Difficulty } from './types';
+
+export interface Step {
+  /** Topics asked on this step (one is picked at random). */
+  topics: string[];
+  d: Difficulty;
+  /** School grade this step belongs to. */
+  g: Grade;
+}
+
+const st = (topics: string | string[], d: Difficulty, g: Grade): Step => ({ topics: typeof topics === 'string' ? [topics] : topics, d, g });
+
+/** English math ladders (Massachusetts grades), easiest first. Early steps use the bilingual early-grade questions. */
+const EN_MATH: Record<string, Step[]> = {
+  multiply: [
+    st('e-doubles', 2, 2),
+    st('e-mult', 3, 2),
+    st('mult-facts', 1, 3),
+    st('mult-2x1', 1, 3),
+    st('mult-2x1', 2, 4),
+    st('mult-big', 2, 4),
+    st('mult-big', 3, 4),
+    st('mult-2x2', 2, 4),
+    st('mult-2x2', 3, 5),
+    st('mult-3x2', 3, 5),
+  ],
+  divide: [
+    st('e-div', 3, 2),
+    st('div-facts', 1, 3),
+    st('div-remainder', 2, 4),
+    st('div-long', 3, 4),
+    st('div-2digit', 3, 5),
+  ],
+  'add-sub': [
+    st(['e-add', 'e-sub'], 1, 1),
+    st(['e-add', 'e-sub', 'e-missing'], 2, 2),
+    st(['e-add', 'e-sub'], 3, 3),
+    st('add-sub', 1, 3),
+    st('add-sub', 2, 4),
+    st('add-sub', 3, 5),
+  ],
+  numbers: [
+    st(['e-place', 'e-compare', 'e-skip'], 2, 2),
+    st(['place-value', 'compare', 'patterns', 'rounding'], 1, 3),
+    st(['place-value', 'compare', 'patterns', 'rounding', 'factors'], 2, 4),
+    st(['place-value', 'rounding', 'factors', 'order-ops'], 3, 5),
+  ],
+  fractions: [
+    st('e-fractions', 2, 2),
+    st('e-fractions', 3, 3),
+    st('fractions-equiv', 2, 3),
+    st(['fractions-equiv', 'fractions-add'], 3, 4),
+    st(['fractions-compare', 'fractions-mult'], 3, 4),
+    st('fractions-unlike', 3, 5),
+  ],
+  decimals: [
+    st('decimals', 2, 4),
+    st(['decimals', 'decimal-ops'], 3, 5),
+  ],
+  measure: [
+    st(['e-measure', 'e-time', 'e-shapes'], 2, 2),
+    st(['measurement', 'area-perimeter', 'e-measure'], 1, 3),
+    st(['measurement', 'area-perimeter', 'angles'], 2, 4),
+    st(['area-perimeter', 'angles', 'volume'], 3, 5),
+  ],
+  word: [
+    st('e-word', 2, 2),
+    st('e-word', 3, 3),
+    st('word-problems', 1, 3),
+    st('word-problems', 2, 4),
+    st('word-problems', 3, 5),
+  ],
+};
+
+function hasReading(lang: Lang, topic: string, d: Difficulty): boolean {
+  const bank = lang === 'fr' ? READING_BANK_FR : READING_BANK;
+  return bank.some((b) => b.topic === topic && b.difficulty === d);
+}
+
+/** Ladder for any group without a hand-made one: its topics at difficulty 1, 2, 3. */
+function generic(groupId: string, lang: Lang): Step[] {
+  const group = topicGroups(lang).find((g) => g.id === groupId);
+  if (!group) return [];
+  const steps: Step[] = [];
+  for (const d of [1, 2, 3] as Difficulty[]) {
+    const topics = group.topics.filter((t) => (group.subject === 'math' ? mathTopicLevels(t).includes(d) : hasReading(lang, t, d)));
+    // In French the difficulty is the school year; English reading spans grades 3-5.
+    if (topics.length) steps.push({ topics, d, g: (lang === 'fr' ? d : d + 2) as Grade });
+  }
+  return steps;
+}
+
+const cache = new Map<string, Step[]>();
+
+export function ladderFor(groupId: string, lang: Lang): Step[] {
+  const key = `${lang}:${groupId}`;
+  let steps = cache.get(key);
+  if (!steps) {
+    steps = (lang === 'en' && EN_MATH[groupId]) || generic(groupId, lang);
+    cache.set(key, steps);
+  }
+  return steps;
+}
+
+export interface LadderRange {
+  /** Where a child of this grade starts. */
+  start: number;
+  /** Lowest and highest step allowed. */
+  min: number;
+  max: number;
+}
+
+/**
+ * Range on a ladder. Normally the child can drop all the way to the first
+ * step, and climb one step past their grade. A parent can pin a group to one
+ * grade ("pinned"): then it stays on that grade's steps.
+ */
+export function ladderRange(steps: Step[], grade: Grade, pinned?: Grade): LadderRange {
+  const last = steps.length - 1;
+  if (last < 0) return { start: 0, min: 0, max: 0 };
+  const firstOf = (g: Grade) => steps.findIndex((s) => s.g >= g);
+  const lastUpTo = (g: Grade) => {
+    let i = -1;
+    steps.forEach((s, k) => s.g <= g && (i = k));
+    return i;
+  };
+  if (pinned) {
+    let min = steps.findIndex((s) => s.g === pinned);
+    let max = lastUpTo(pinned);
+    if (min < 0) min = max >= 0 ? max : 0;
+    if (max < min) max = min;
+    return { start: min, min, max };
+  }
+  const top = Math.max(0, lastUpTo(grade));
+  const first = firstOf(grade);
+  const start = first < 0 ? top : Math.min(first, top);
+  return { start, min: 0, max: Math.min(last, top + 1) };
+}
+
+/** Grades that have steps on this ladder (for the parent's level picker). */
+export function ladderGrades(steps: Step[]): Grade[] {
+  return [...new Set(steps.map((s) => s.g))].sort((a, b) => a - b);
+}

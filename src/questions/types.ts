@@ -29,6 +29,8 @@ export interface Question {
   teach?: string;
   /** True when a missed question is being asked again. */
   isRetry?: boolean;
+  /** Topic group (skill ladder) this question was picked for. */
+  group?: string;
 }
 
 /** A hand-written question before it gets an id/subject attached. */

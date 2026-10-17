@@ -100,6 +100,13 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
   (sounds and syllables, vocabulary, spelling, homophones, grammar, short
   stories). Read-aloud uses a French voice. All game text is translated
   (`src/i18n`).
+- **Skill ladders** (`src/questions/ladders.ts`): every topic group is a
+  ladder from very basic (below grade) to a bit above grade. Each group moves
+  on its own: right answers climb, wrong answers step down (e.g. 7 x 143 ->
+  2-digit x 1-digit -> times tables -> "groups of"). The topic screen shows
+  each group's strength (Strong / Good / Needs practice / New) and current
+  grade level; "Skills & levels" (grown-ups) shows accuracy and lets a parent
+  pin a group to a grade.
 - **Parent dashboard** (Parents button on the title screen, behind the grown-ups check): accuracy by
   topic, weakest first. You can also set the math/reading mix and turn on
   read-aloud.

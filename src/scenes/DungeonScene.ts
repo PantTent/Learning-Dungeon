@@ -83,10 +83,15 @@ export class DungeonScene extends Phaser.Scene {
     this.cameras.main.fadeIn(300);
 
     // The hero's pet trots along one step behind.
+    // It starts on the hero's tile (the tile beside might be a wall). The
+    // container moves; only the image inside bobs, so the two never fight.
     this.petSprite = undefined;
+    this.petBody = undefined;
     if (p.pet) {
-      this.petSprite = this.add.image(this.player.x - TS, this.player.y, p.pet.sprite).setScale(S * 0.85).setDepth(19);
-      this.tweens.add({ targets: this.petSprite, y: this.petSprite.y - 4, duration: 450, yoyo: true, repeat: -1 });
+      this.petSprite = this.add.container(this.player.x, this.player.y).setDepth(19);
+      this.petBody = this.add.image(0, 0, p.pet.sprite).setScale(S * 0.85);
+      this.petSprite.add(this.petBody);
+      this.tweens.add({ targets: this.petBody, y: -4, duration: 450, yoyo: true, repeat: -1 });
     }
 
     // Caves are dark: torches, the camp and the hero carry their own light.
@@ -128,7 +133,8 @@ export class DungeonScene extends Phaser.Scene {
   private glowSpots: { x: number; y: number; r: number; flicker: number }[] = [];
   private dark?: Phaser.GameObjects.RenderTexture;
   private brush?: Phaser.GameObjects.Image;
-  private petSprite?: Phaser.GameObjects.Image;
+  private petSprite?: Phaser.GameObjects.Container;
+  private petBody?: Phaser.GameObjects.Image;
 
   private makeLightTexture() {
     if (this.textures.exists('softlight')) return;
@@ -545,7 +551,8 @@ export class DungeonScene extends Phaser.Scene {
     const prev = this.world.player;
     this.world.player = next;
     if (this.petSprite) {
-      this.petSprite.setFlipX(next.x < prev.x);
+      if (next.x !== prev.x) this.petBody?.setFlipX(next.x < prev.x);
+      this.tweens.killTweensOf(this.petSprite);
       this.tweens.add({ targets: this.petSprite, x: prev.x * TS + TS / 2, y: prev.y * TS + TS / 2, duration: 130 });
     }
     this.tweens.add({
