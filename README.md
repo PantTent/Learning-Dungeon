@@ -141,6 +141,15 @@ devices only, not a store key) and has a higher version number, so it installs
 over the old app and keeps the saved games. The app runs full screen in
 landscape, works offline, and keeps the screen on while playing.
 
+### Moving saves (website <-> app, or between devices)
+
+The app and the website keep their own saves. To move them, on the game
+picker tap **Move my save** (grown-ups check), then **Make my save code** on
+the device that has the save; it copies a code. On the other device (or in the
+app on the same tablet), open **Move my save**, paste the code and tap **Load
+this save**. It moves heroes, the farm, unlocked games and settings, and
+replaces what was on that device.
+
 ### As a home-screen web app (Android or iPad)
 
 Open the website, then use the browser's **Add to Home screen**. It opens full
