@@ -98,4 +98,6 @@ export const FR_BATTLE: Record<string, string> = {
   'The answer is {answer}. {explanation}': 'La réponse est {answer}. {explanation}',
   'Attack!': 'Attaque!',
   'Got it': 'Compris',
+  'SPELL UPGRADE: {spell}!': 'SORT AMÉLIORÉ : {spell}!',
+  '{spell} is stronger now!': '{spell} est plus fort maintenant!',
 };

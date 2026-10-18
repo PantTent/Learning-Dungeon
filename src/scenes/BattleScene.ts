@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import type { Fx, PowerDef, SkillDef } from '../data/classes';
+import { CLASSES, type Fx, type PowerDef, type SkillDef } from '../data/classes';
 import { makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
 import { AREAS, areaOf, type AreaDef } from '../data/areas';
 import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
-import { MAX_CHOSEN, activePower, chosenSpells } from '../data/spells';
+import { MAX_CHOSEN, activePower, chosenFamilies, chosenSpells, familyOf, petHealthShare } from '../data/spells';
+import { spellLabel } from '../ui/spellText';
 import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, manaRegen, saveProfile } from '../state/profile';
@@ -18,7 +19,17 @@ import { itemName } from '../i18n/itemNames';
 
 /** A spell's name in the current language (the power skill's name is already translated). */
 function skName(sk: SkillDef): string {
-  return sk.id === 'power' ? sk.name : tr(sk.name);
+  return sk.id === 'power' ? sk.name : spellLabel(spellOwner(sk), sk);
+}
+
+/** The class spell list a spell belongs to (for its rank label). */
+function spellOwner(sk: SkillDef): SkillDef[] {
+  return CLASSES.find((c) => c.skills.includes(sk))?.skills ?? [sk];
+}
+
+/** A newly unlocked rank of a spell the hero already had? */
+function isUpgrade(list: SkillDef[], sk: SkillDef): boolean {
+  return list.some((x) => x !== sk && familyOf(x.id) === familyOf(sk.id) && x.unlock < sk.unlock);
 }
 
 /** Shrink a button's label until it fits inside the button (long French spell names). */
@@ -299,7 +310,7 @@ export class BattleScene extends Phaser.Scene {
     const nextLocked = cls.skills.find((s) => s.unlock > p.level);
     if (nextLocked && !this.isBoss && skills.length < 4) {
       const n = skills.length;
-      c.add(txt(this, 34 + (n % 2) * (bw + 10), H - 116 + Math.floor(n / 2) * (bh + 8), tr('New spell at level {level}: {spell}', { level: nextLocked.unlock, spell: tr(nextLocked.name) }), 14, C.dim, { wordWrap: { width: bw - 8 } }));
+      c.add(txt(this, 34 + (n % 2) * (bw + 10), H - 116 + Math.floor(n / 2) * (bh + 8), tr('New spell at level {level}: {spell}', { level: nextLocked.unlock, spell: skName(nextLocked) }), 14, C.dim, { wordWrap: { width: bw - 8 } }));
     }
     if (!this.isBoss) {
       const pots = POTIONS.reduce((n, d) => n + (p.potions[d.id] ?? 0), 0);
@@ -720,8 +731,7 @@ export class BattleScene extends Phaser.Scene {
         this.castPose(() => {
           const had = !!p.pet;
           // Pets have about a third of the hero's health (more at higher ranks).
-          const rank = sk.id.endsWith('3') ? 3 : sk.id.endsWith('2') ? 2 : 1;
-          const maxHp = Math.round(derive(p).maxHp * (0.28 + rank * 0.04));
+          const maxHp = Math.round(derive(p).maxHp * petHealthShare(sk));
           p.pet = { name: cls.summon!.name, sprite: cls.summon!.sprite, maxHp, hp: correct ? maxHp : Math.round(maxHp * 0.6), power: sk.power };
           this.showPet(true);
           sfx('summon');
@@ -966,9 +976,11 @@ export class BattleScene extends Phaser.Scene {
     const levels = gainXp(p, this.earnedXp);
     // New spells drop straight into an empty battle slot.
     if (levels > 0) {
-      const cur = chosenSpells(cls.skills, p.level - levels, p.spells).map((x) => x.id);
+      // (A higher rank of a chosen spell is used automatically.)
+      const cur = chosenFamilies(cls.skills, p.level - levels, p.spells);
       for (const sp of cls.skills.filter((x) => x.unlock > p.level - levels && x.unlock <= p.level && x.unlock > 1)) {
-        if (cur.length < MAX_CHOSEN) cur.push(sp.id);
+        const fam = familyOf(sp.id);
+        if (!cur.includes(fam) && cur.length < MAX_CHOSEN) cur.push(fam);
       }
       p.spells = cur;
     }
@@ -1067,7 +1079,7 @@ export class BattleScene extends Phaser.Scene {
     const unlocked = cls.skills.find((sk) => sk.unlock > fromLevel && sk.unlock <= p.level);
     const after1 = 700 + shown.length * 220 + 200;
     if (unlocked) {
-      const t = txt(this, W / 2 + 40, 478, tr('NEW SPELL: {spell}!', { spell: tr(unlocked.name) }), 28, '#ff9af0').setOrigin(0.5).setAlpha(0);
+      const t = txt(this, W / 2 + 40, 478, isUpgrade(cls.skills, unlocked) ? tr('SPELL UPGRADE: {spell}!', { spell: skName(unlocked) }) : tr('NEW SPELL: {spell}!', { spell: skName(unlocked) }), 28, '#ff9af0').setOrigin(0.5).setAlpha(0);
       c.add(t);
       this.tweens.add({ targets: t, alpha: 1, scale: { from: 2, to: 1 }, duration: 400, delay: after1, ease: 'Back.Out' });
     }
@@ -1117,7 +1129,8 @@ export class BattleScene extends Phaser.Scene {
       const unlocked = classOf(p).skills.find((s) => s.unlock === p.level);
       if (unlocked) {
         y += 34;
-        c.add(txt(this, W / 2, y, tr('New spell: {spell}! Open your Spellbook to use it.', { spell: tr(unlocked.name) }), 18, '#ffe9a0').setOrigin(0.5));
+        const upgrade = isUpgrade(classOf(p).skills, unlocked);
+        c.add(txt(this, W / 2, y, upgrade ? tr('{spell} is stronger now!', { spell: skName(unlocked) }) : tr('New spell: {spell}! Open your Spellbook to use it.', { spell: skName(unlocked) }), 18, '#ffe9a0').setOrigin(0.5));
       }
       y += 40;
     }

@@ -33,9 +33,11 @@ Difficulty adapts per subject. Missed questions come back a few turns later.
 
 - **7 classes**: Warrior, Mage, Ranger, Paladin, Necromancer (summons
   skeletons), Druid, and Demonologist (summons an imp).
-- **Spellbook**: each class has 10 spells. A new spell or a stronger rank
-  (I/II/III) unlocks every 2 levels. Pick **3** to bring into battle, plus a
-  free basic attack. Mages get fire, ice, arcane and lightning, including
+- **Spellbook**: each class has 10 spells; a new spell or a stronger rank
+  (I/II/III) unlocks every 2 levels. Ranks of the same spell show as one card
+  (e.g. Cleave) that always uses its best unlocked rank, with its current
+  damage/heal and when the next rank comes. Pick **3** to bring into battle,
+  plus a free basic attack. Mages get fire, ice, arcane and lightning, including
   spells that hit every enemy. Stronger spells cost a lot more mana.
   After every win a little mana comes back: 0.5% of max mana per point of
   Intellect (compounded), up to 25%. Potions are still needed.

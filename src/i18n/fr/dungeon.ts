@@ -143,4 +143,12 @@ export const FR_DUNGEON: Record<string, string> = {
   'Fel fire': 'Feu maudit',
   Healing: 'Soin',
   Lightning: 'Foudre',
+  // Spell families and ranks
+  'Rank {r} of {n}': 'Rang {r} sur {n}',
+  'next at level {n}': 'suivant au niveau {n}',
+  'Unlocks at level {n}': 'Débloqué au niveau {n}',
+  'Heals ~{n}': 'Soigne ~{n}',
+  'Pet with ~{n} health': 'Compagnon de ~{n} PV',
+  '~{n} to each enemy': '~{n} à chaque ennemi',
+  '~{n} damage': '~{n} dégâts',
 };

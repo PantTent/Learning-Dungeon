@@ -42,11 +42,11 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
     s('firebolt', 'Firebolt', 1, 'damage', 1, 'fire', 'Throw a bolt of fire.'),
     s('frostbolt1', 'Frost Bolt I', 3, 'stun', 1.2, 'frost', 'Ice that freezes an enemy for a turn.'),
     s('missiles1', 'Arcane Missiles I', 5, 'damage', 1.5, 'arcane', 'A burst of magic missiles.'),
-    s('chain1', 'Chain Lightning I', 7, 'aoe', 0.85, 'lightning', 'Lightning jumps between ALL enemies.'),
+    s('chain1', 'Chain Lightning', 7, 'aoe', 0.85, 'lightning', 'Lightning jumps between ALL enemies.'),
     s('fireball', 'Fireball', 9, 'damage', 2.0, 'fire', 'A big exploding ball of fire.', { anim: 'orb' }),
     s('blizzard1', 'Blizzard I', 11, 'aoe', 1.05, 'frost', 'Ice storm on ALL enemies. Might freeze them!', { stunChance: 0.3, anim: 'snow' }),
     s('flamewave', 'Flame Wave', 13, 'aoe', 1.15, 'fire', 'A wave of fire hits ALL enemies.'),
-    s('chain2', 'Chain Lightning II', 15, 'aoe', 1.2, 'lightning', 'Stronger chain lightning.'),
+    s('thunderbolt', 'Thunderbolt', 15, 'damage', 2.1, 'lightning', 'A huge bolt of lightning from the sky.'),
     s('arcaneblast', 'Arcane Blast', 17, 'damage', 2.6, 'arcane', 'A massive blast of pure magic.', { anim: 'orb' }),
     s('blizzard2', 'Blizzard II', 19, 'aoe', 1.45, 'frost', 'A huge blizzard. Might freeze them!', { stunChance: 0.4, anim: 'snow' }),
   ],
@@ -60,7 +60,7 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
     s('rapid', 'Rapid Fire', 13, 'damage', 2.2, 'arrow', 'A super-fast volley.'),
     s('concuss2', 'Concussive Shot II', 15, 'stun', 1.7, 'arrow', 'A heavy stunning shot.'),
     s('thornvolley', 'Thorn Volley', 17, 'aoe', 1.3, 'nature', 'Thorny arrows rain on ALL enemies.'),
-    s('aimed3', 'Aimed Shot III', 19, 'damage', 2.8, 'arrow', 'The perfect shot.'),
+    s('aimed3', 'Aimed Shot II', 19, 'damage', 2.8, 'arrow', 'The perfect shot.'),
   ],
   paladin: [
     s('crusader', 'Crusader Strike', 1, 'damage', 1, 'holy', 'A strike blessed with light.', { melee: true }),
@@ -91,11 +91,11 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
     s('rejuv1', 'Rejuvenate I', 3, 'heal', 0.35, 'heal', 'Heal yourself with nature.'),
     s('entangle1', 'Entangle I', 5, 'stun', 1.2, 'nature', 'Vines hold an enemy for a turn.'),
     s('thorns1', 'Thorn Storm I', 7, 'aoe', 0.9, 'nature', 'Thorns hit ALL enemies.'),
-    s('moonfire1', 'Moonfire I', 9, 'damage', 1.8, 'arcane', 'A beam of moonlight.'),
+    s('moonfire1', 'Moonfire', 9, 'damage', 1.8, 'arcane', 'A beam of moonlight.'),
     s('rejuv2', 'Rejuvenate II', 11, 'heal', 0.55, 'heal', 'A stronger heal.'),
     s('thorns2', 'Thorn Storm II', 13, 'aoe', 1.15, 'nature', 'A bigger thorn storm.'),
     s('entangle2', 'Entangle II', 15, 'stun', 1.7, 'nature', 'Huge vines that crush and hold.'),
-    s('moonfire2', 'Moonfire II', 17, 'damage', 2.4, 'arcane', 'A blazing moonbeam.'),
+    s('starsurge', 'Starsurge', 17, 'aoe', 1.3, 'arcane', 'Falling stars hit ALL enemies.'),
     s('rejuv3', 'Rejuvenate III', 19, 'heal', 0.75, 'heal', 'A huge heal from the forest.'),
   ],
   demonologist: [
@@ -119,14 +119,82 @@ export function unlockedSpells(list: SkillDef[], level: number): SkillDef[] {
   return list.filter((s) => s.unlock <= level);
 }
 
+// ---------------------------------------------------------------- families
+// Ranks of the same spell (Cleave I, II, III) form one family. The hero picks
+// the family, and always casts its highest rank they have unlocked.
+
+/** "cleave2" -> "cleave". */
+export function familyOf(id: string): string {
+  return id.replace(/\d+$/, '');
+}
+
+/** "Cleave III" -> "Cleave". */
+export function familyName(name: string): string {
+  return name.replace(/\s+(I|II|III|IV|V)$/, '');
+}
+
+export interface SpellFamily {
+  id: string;
+  /** Ranks, weakest first. */
+  ranks: SkillDef[];
+}
+
+/** The class's spell families (without the free basic attack), in unlock order. */
+export function families(list: SkillDef[]): SpellFamily[] {
+  const out: SpellFamily[] = [];
+  for (const sk of list.slice(1)) {
+    const id = familyOf(sk.id);
+    const fam = out.find((f) => f.id === id);
+    if (fam) fam.ranks.push(sk);
+    else out.push({ id, ranks: [sk] });
+  }
+  for (const f of out) f.ranks.sort((a, b) => a.unlock - b.unlock);
+  return out;
+}
+
+/** The strongest rank unlocked at this level (undefined = not unlocked yet). */
+export function bestRank(fam: SpellFamily, level: number): SkillDef | undefined {
+  return [...fam.ranks].reverse().find((r) => r.unlock <= level);
+}
+
+/** The next rank still to unlock, if any. */
+export function nextRank(fam: SpellFamily, level: number): SkillDef | undefined {
+  return fam.ranks.find((r) => r.unlock > level);
+}
+
 /**
- * Chosen spells that are unlocked, in order. If the hero has never chosen,
- * default to the 3 newest unlocked spells.
+ * The spells brought into battle, each at its best unlocked rank. `chosen`
+ * holds family ids (older saves may hold spell ids like "cleave1"; they
+ * count as their family). If the hero never chose, use the 3 newest.
  */
 export function chosenSpells(list: SkillDef[], level: number, chosen: string[] | undefined): SkillDef[] {
-  const unlocked = unlockedSpells(list, level).slice(1);
-  if (!chosen) return unlocked.slice(-MAX_CHOSEN);
-  return chosen.map((id) => unlocked.find((s) => s.id === id)).filter((s): s is SkillDef => !!s).slice(0, MAX_CHOSEN);
+  const fams = families(list);
+  const ready = fams.map((f) => ({ f, best: bestRank(f, level) })).filter((x): x is { f: SpellFamily; best: SkillDef } => !!x.best);
+  if (!chosen) {
+    return ready
+      .sort((a, b) => b.best.unlock - a.best.unlock)
+      .slice(0, MAX_CHOSEN)
+      .sort((a, b) => fams.indexOf(a.f) - fams.indexOf(b.f))
+      .map((x) => x.best);
+  }
+  const ids = [...new Set(chosen.map(familyOf))];
+  return ids.map((id) => ready.find((x) => x.f.id === id)?.best).filter((s): s is SkillDef => !!s).slice(0, MAX_CHOSEN);
+}
+
+/** A summoned pet's share of the hero's health (about 1/3, more at higher ranks). */
+export function petHealthShare(sk: SkillDef): number {
+  const rank = Number(/(\d)$/.exec(sk.id)?.[1] ?? 1);
+  return 0.28 + rank * 0.04;
+}
+
+/** True when the spell has more than one rank (so "I / II / III" means something). */
+export function isRanked(list: SkillDef[], sk: SkillDef): boolean {
+  return list.filter((x) => familyOf(x.id) === familyOf(sk.id)).length > 1;
+}
+
+/** Saved choice as family ids (for older saves that stored spell ids). */
+export function chosenFamilies(list: SkillDef[], level: number, chosen: string[] | undefined): string[] {
+  return chosenSpells(list, level, chosen).map((s) => familyOf(s.id));
 }
 
 /** Ultimate (power attack) for each spell school. */
