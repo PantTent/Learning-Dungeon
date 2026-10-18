@@ -530,9 +530,33 @@ export class BattleScene extends Phaser.Scene {
               duration: 240,
               ease: 'Quad.In',
               onComplete: () => {
-                for (let i = 0; i < 4; i++) this.time.delayedCall(i * 60, () => this.slash(tx, ty, i % 2 ? 0xffffff : pw.color));
+                // A storm of blades: slashes all around, a spinning tornado, shockwaves.
+                for (let i = 0; i < 12; i++) {
+                  this.time.delayedCall(i * 45, () => {
+                    const ang = (i / 12) * Math.PI * 2;
+                    this.slash(tx + Math.cos(ang) * 50, ty + Math.sin(ang) * 30, i % 2 ? 0xffffff : pw.color);
+                  });
+                }
+                const tornado = this.add.graphics({ x: tx, y: ty }).setDepth(D + 1).setBlendMode('ADD');
+                const spin = { a: 0 };
+                this.tweens.add({
+                  targets: spin,
+                  a: Math.PI * 6,
+                  duration: 900,
+                  onUpdate: () => {
+                    tornado.clear();
+                    for (let k = 0; k < 5; k++) {
+                      const r = 40 + k * 26;
+                      tornado.lineStyle(6 - k, k % 2 ? 0xffffff : pw.color, 0.7);
+                      tornado.beginPath().arc(0, -k * 22, r, spin.a + k, spin.a + k + Math.PI * 1.2, false).strokePath();
+                    }
+                  },
+                  onComplete: () => this.tweens.add({ targets: tornado, alpha: 0, duration: 250, onComplete: () => tornado.destroy() }),
+                });
+                for (let k = 0; k < 4; k++) this.time.delayedCall(k * 150, () => this.ring(tx, ty, k % 2 ? 0xffffff : pw.color, 220 + k * 40, 8, 520));
+                this.tweens.add({ targets: this.hero, angle: 1080 + 720, duration: 600 });
                 impact();
-                this.tweens.add({ targets: this.hero, x: hx, y: hy, angle: 0, duration: 400, delay: 350 });
+                this.tweens.add({ targets: this.hero, x: hx, y: hy, angle: 0, duration: 400, delay: 650 });
               },
             }),
         });
@@ -1225,6 +1249,11 @@ export class BattleScene extends Phaser.Scene {
     sfx(sk.fx as Sfx);
     const color = FX_COLOR[sk.fx];
     const aim = target ?? this.alive()[Math.floor(this.alive().length / 2)];
+    // Warrior skills each have their own move.
+    if (sk.anim === 'cleave' || sk.anim === 'bash' || sk.anim === 'heroic' || sk.anim === 'execute' || sk.anim === 'storm' || sk.anim === 'thunderclap') {
+      this.warriorMove(sk.anim, aim, target, onHit);
+      return;
+    }
     if (sk.melee) {
       this.tweens.add({
         targets: this.hero,
@@ -1377,6 +1406,263 @@ export class BattleScene extends Phaser.Scene {
     g.strokePath();
     g.setRotation(Phaser.Math.FloatBetween(-0.5, 0.5));
     this.tweens.add({ targets: g, alpha: 0, scale: 1.25, duration: 260, onComplete: () => g.destroy() });
+  }
+
+  // ------------------------------------------------------------ warrior moves
+
+  /** Run up to a foe; `then` is called on arrival. */
+  private dashTo(f: Foe, then: () => void, duration = 220, dy = 0) {
+    this.tweens.add({ targets: this.hero, x: f.sprite.x + (this.isBoss ? 170 : 110), y: f.sprite.y + dy, duration, ease: 'Quad.In', onComplete: then });
+  }
+
+  private goHome(delay = 160) {
+    this.tweens.add({ targets: this.hero, x: this.heroHome.x, y: this.heroHome.y, angle: 0, scale: 6, duration: 340, delay, ease: 'Quad.Out' });
+  }
+
+  /** A jagged lightning line from (x1, y1) to (x2, y2) that flickers, then fades. */
+  private zap(x1: number, y1: number, x2: number, y2: number, ms = 220, color = 0x9ad0ff) {
+    const g = this.add.graphics().setDepth(170).setBlendMode('ADD');
+    const draw = () => {
+      g.clear();
+      for (const [w, col, al] of [[9, color, 0.5], [3, 0xffffff, 1]] as const) {
+        g.lineStyle(w, col, al);
+        g.beginPath();
+        g.moveTo(x1, y1);
+        const n = 8;
+        for (let i = 1; i < n; i++) {
+          const t = i / n;
+          const nx = -(y2 - y1);
+          const ny = x2 - x1;
+          const len = Math.hypot(nx, ny) || 1;
+          const off = Phaser.Math.Between(-18, 18);
+          g.lineTo(x1 + (x2 - x1) * t + (nx / len) * off, y1 + (y2 - y1) * t + (ny / len) * off);
+        }
+        g.lineTo(x2, y2);
+        g.strokePath();
+      }
+    };
+    draw();
+    this.time.addEvent({ delay: 45, repeat: Math.max(1, Math.floor(ms / 45) - 1), callback: draw });
+    this.time.delayedCall(ms, () => g.destroy());
+  }
+
+  /** Lightning crackling outwards from a point (on a hit, not a flying bolt). */
+  private crackle(x: number, y: number, n = 6, reach = 90, color = 0x9ad0ff) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
+      const r = reach * (0.6 + Math.random() * 0.5);
+      this.zap(x, y, x + Math.cos(a) * r, y + Math.sin(a) * r, 340 + i * 30, color);
+    }
+    const glow = this.add.image(x, y, 'glow').setScale(8).setTint(color).setBlendMode('ADD').setDepth(165);
+    this.tweens.add({ targets: glow, scale: 12, alpha: 0, duration: 560, onComplete: () => glow.destroy() });
+  }
+
+  private ring(x: number, y: number, color: number, to = 160, width = 6, ms = 420) {
+    const r = this.add.circle(x, y, 10).setStrokeStyle(width, color).setDepth(165);
+    this.tweens.add({ targets: r, radius: to, alpha: 0, duration: ms, onComplete: () => r.destroy() });
+  }
+
+  private warriorMove(kind: 'cleave' | 'bash' | 'heroic' | 'execute' | 'storm' | 'thunderclap', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    switch (kind) {
+      case 'cleave': {
+        // One long, thick sweep through every enemy.
+        const top = Math.min(...foes.map((f) => f.sprite.y));
+        const bottom = Math.max(...foes.map((f) => f.sprite.y));
+        const midY = (top + bottom) / 2;
+        const x = aim.sprite.x;
+        this.dashTo(aim, () => {
+          const g = this.add.graphics({ x: x + 40, y: midY }).setDepth(170);
+          const radius = Math.max(150, (bottom - top) / 2 + 110);
+          const sweep = { t: 0 };
+          this.tweens.add({
+            targets: sweep,
+            t: 1,
+            duration: 230,
+            ease: 'Quad.Out',
+            onUpdate: () => {
+              g.clear();
+              const a0 = Phaser.Math.DegToRad(-80);
+              const a1 = a0 + Phaser.Math.DegToRad(160) * sweep.t;
+              g.lineStyle(22, 0xb0b8d0, 0.55).beginPath().arc(0, 0, radius, a0, a1, false).strokePath();
+              g.lineStyle(10, 0xffffff, 1).beginPath().arc(0, 0, radius - 6, a0, a1, false).strokePath();
+            },
+            onComplete: () => this.tweens.add({ targets: g, alpha: 0, duration: 250, onComplete: () => g.destroy() }),
+          });
+          foes.forEach((f, i) => this.time.delayedCall(60 + i * 50, () => this.slash(f.sprite.x, f.sprite.y, 0xffffff)));
+          this.cameras.main.shake(160, 0.006);
+          onHit();
+          this.goHome(260);
+        }, 220, midY - aim.sprite.y);
+        break;
+      }
+      case 'bash': {
+        // A giant shield slams into them, grows and fades; they see stars.
+        const t = target ?? aim;
+        this.dashTo(t, () => {
+          const sh = this.add.image(t.sprite.x + 30, t.sprite.y, 'icon_shield').setScale(3).setDepth(170);
+          this.tweens.add({ targets: sh, scale: 11, alpha: 0, duration: 420, ease: 'Quad.Out', onComplete: () => sh.destroy() });
+          this.ring(t.sprite.x, t.sprite.y, 0xffe066, 130, 8);
+          this.cameras.main.shake(140, 0.01);
+          this.tweens.add({ targets: t.sprite, x: t.sprite.x - 24, duration: 90, yoyo: true });
+          // Dizzy stars circling overhead.
+          for (let i = 0; i < 3; i++) {
+            const star = this.add.star(t.sprite.x, t.sprite.y - 70, 5, 5, 11, 0xffe066).setDepth(171);
+            const o = { a: (i / 3) * Math.PI * 2 };
+            this.tweens.add({
+              targets: o,
+              a: o.a + Math.PI * 4,
+              duration: 1100,
+              onUpdate: () => star.setPosition(t.sprite.x + Math.cos(o.a) * 34, t.sprite.y - 70 + Math.sin(o.a) * 10),
+              onComplete: () => star.destroy(),
+            });
+          }
+          onHit();
+          this.goHome(200);
+        });
+        break;
+      }
+      case 'heroic': {
+        // Leap high, sword blazing gold, then crash down with a golden X.
+        const t = target ?? aim;
+        const glow = this.add.image(this.hero.x, this.hero.y, 'glow').setScale(6).setTint(0xffd24a).setBlendMode('ADD').setDepth(9);
+        const follow = this.time.addEvent({ delay: 16, loop: true, callback: () => glow.setPosition(this.hero.x, this.hero.y) });
+        const trail = this.add.particles(0, 0, 'dot', { follow: this.hero, speed: 40, lifespan: 420, scale: { start: 1.6, end: 0 }, tint: [0xffd24a, 0xffffff], blendMode: 'ADD', frequency: 12 }).setDepth(8);
+        this.tweens.add({
+          targets: this.hero,
+          x: t.sprite.x + 150,
+          y: t.sprite.y - 230,
+          scale: 7,
+          duration: 330,
+          ease: 'Quad.Out',
+          onComplete: () =>
+            this.tweens.add({
+              targets: this.hero,
+              x: t.sprite.x + 90,
+              y: t.sprite.y,
+              angle: -20,
+              duration: 170,
+              ease: 'Quad.In',
+              onComplete: () => {
+                const { x, y } = t.sprite;
+                for (const rot of [0.75, -0.75]) {
+                  const bar = this.add.rectangle(x, y, 240, 20, 0xffd24a).setRotation(rot).setDepth(172).setStrokeStyle(3, 0xfff6c0);
+                  const core = this.add.rectangle(x, y, 230, 6, 0xffffff).setRotation(rot).setDepth(173);
+                  this.tweens.add({ targets: [bar, core], scaleX: 1.3, alpha: 0, duration: 420, delay: 80, onComplete: () => { bar.destroy(); core.destroy(); } });
+                }
+                const pillar = this.add.rectangle(x, y + 50, 120, 700, 0xffe066, 0.4).setOrigin(0.5, 1).setDepth(160).setBlendMode('ADD');
+                this.tweens.add({ targets: pillar, scaleX: 0, alpha: 0, duration: 500, onComplete: () => pillar.destroy() });
+                this.ring(x, y, 0xffd24a, 180, 8);
+                this.burst(x, y, 0xffd24a, 30);
+                this.cameras.main.flash(120, 255, 230, 140);
+                this.cameras.main.shake(220, 0.014);
+                follow.remove();
+                glow.destroy();
+                trail.stop();
+                this.time.delayedCall(500, () => trail.destroy());
+                onHit();
+                this.goHome(240);
+              },
+            }),
+        });
+        break;
+      }
+      case 'execute': {
+        // The screen darkens; a huge red blade falls like a guillotine.
+        const t = target ?? aim;
+        const dim = this.add.rectangle(0, 0, W, H, 0x2a0008, 0).setOrigin(0).setDepth(140);
+        this.tweens.add({ targets: dim, fillAlpha: 0.45, duration: 200 });
+        this.dashTo(t, () => {
+          const { x, y } = t.sprite;
+          const blade = this.add.container(x, -120).setDepth(172);
+          blade.add(this.add.rectangle(0, 0, 34, 220, 0xd8dce8).setStrokeStyle(3, 0x5a0010));
+          blade.add(this.add.triangle(0, 120, -17, 0, 17, 0, 0, 40, 0xd8dce8).setStrokeStyle(3, 0x5a0010));
+          blade.add(this.add.rectangle(0, -110, 90, 18, 0x8a1020));
+          blade.add(this.add.image(0, 0, 'glow').setScale(9).setTint(0xff3040).setBlendMode('ADD'));
+          this.tweens.add({
+            targets: blade,
+            y: y - 60,
+            duration: 220,
+            ease: 'Quad.In',
+            onComplete: () => {
+              for (const rot of [0.8, -0.8]) {
+                const cut = this.add.rectangle(x, y, 200, 12, 0xff3040).setRotation(rot).setDepth(173).setBlendMode('ADD');
+                this.tweens.add({ targets: cut, scaleX: 1.4, alpha: 0, duration: 450, onComplete: () => cut.destroy() });
+              }
+              this.burst(x, y, 0xff3040, 34);
+              this.ring(x, y, 0xff3040, 170, 8);
+              this.cameras.main.shake(260, 0.02);
+              this.tweens.add({ targets: [blade, dim], alpha: 0, duration: 400, delay: 150, onComplete: () => { blade.destroy(); dim.destroy(); } });
+              onHit();
+              this.goHome(260);
+            },
+          });
+        }, 260);
+        break;
+      }
+      case 'storm': {
+        // Lightning strikes the warrior first (charging up), then the hit crackles.
+        const t = target ?? aim;
+        sfx('lightning');
+        for (let i = 0; i < 2; i++) this.time.delayedCall(i * 140, () => this.zap(this.hero.x + Phaser.Math.Between(-30, 30), -20, this.hero.x, this.hero.y - 10, 200, 0xffe066));
+        this.hero.setTint(0x9ad0ff);
+        const aura = this.add.image(this.hero.x, this.hero.y, 'glow').setScale(7).setTint(0x6ab8ff).setBlendMode('ADD').setDepth(9);
+        this.tweens.add({ targets: aura, alpha: 0.4, scale: 8.5, duration: 160, yoyo: true, repeat: 2 });
+        this.time.delayedCall(420, () => {
+          const follow = this.time.addEvent({ delay: 16, loop: true, callback: () => aura.setPosition(this.hero.x, this.hero.y) });
+          this.dashTo(t, () => {
+            sfx('lightning');
+            this.slash(t.sprite.x, t.sprite.y, 0xffe066);
+            this.crackle(t.sprite.x, t.sprite.y, 7, 100, 0x9ad0ff);
+            this.cameras.main.flash(90, 200, 230, 255);
+            follow.remove();
+            aura.destroy();
+            this.hero.clearTint();
+            onHit();
+            this.goHome(220);
+          }, 180);
+        });
+        break;
+      }
+      case 'thunderclap': {
+        // Jump above them, slam down: a shockwave, then lightning zaps out of each enemy.
+        const top = Math.min(...foes.map((f) => f.sprite.y));
+        const bottom = Math.max(...foes.map((f) => f.sprite.y));
+        const midY = (top + bottom) / 2;
+        const x = aim.sprite.x + 70;
+        this.tweens.add({
+          targets: this.hero,
+          x,
+          y: top - 200,
+          duration: 300,
+          ease: 'Quad.Out',
+          onComplete: () =>
+            this.tweens.add({
+              targets: this.hero,
+              y: midY,
+              duration: 160,
+              ease: 'Quad.In',
+              onComplete: () => {
+                sfx('boom');
+                this.cameras.main.shake(260, 0.016);
+                this.ring(x, midY + 40, 0x9ad0ff, 260, 10, 500);
+                this.ring(x, midY + 40, 0xffffff, 200, 4, 400);
+                this.burst(x, midY + 50, 0xb0a080, 24);
+                foes.forEach((f, i) =>
+                  this.time.delayedCall(80 + i * 90, () => {
+                    sfx('lightning');
+                    this.crackle(f.sprite.x, f.sprite.y, 5, 80);
+                    this.zap(f.sprite.x, f.sprite.y, f.sprite.x + Phaser.Math.Between(-20, 20), f.sprite.y - 160, 260);
+                  }),
+                );
+                onHit();
+                this.goHome(320);
+              },
+            }),
+        });
+        break;
+      }
+    }
   }
 
   private projectile(from: Phaser.GameObjects.Image, to: Phaser.GameObjects.Image, color: number, onHit: () => void) {

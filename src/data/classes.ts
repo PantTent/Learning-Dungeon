@@ -27,7 +27,7 @@ export interface SkillDef {
   /** Area spells: chance to freeze/stun each enemy hit (on a right answer). */
   stunChance?: number;
   /** Special look for the spell's missile (default: a small glowing orb). */
-  anim?: 'orb' | 'snow';
+  anim?: 'orb' | 'snow' | 'cleave' | 'bash' | 'heroic' | 'execute' | 'storm' | 'thunderclap';
 }
 
 export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder';
