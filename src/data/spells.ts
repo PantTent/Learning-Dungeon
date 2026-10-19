@@ -100,15 +100,15 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
   ],
   demonologist: [
     s('felbolt', 'Fel Bolt', 1, 'damage', 1, 'fel', 'A bolt of green fire.'),
-    s('imp1', 'Summon Imp I', 3, 'summon', 0.65, 'fel', 'An imp joins you and follows you into every fight.'),
-    s('hellfire1', 'Hellfire I', 5, 'aoe', 0.85, 'fel', 'Green fire hits ALL enemies.'),
-    s('soul1', 'Drain Soul', 7, 'drain', 1.3, 'shadow', 'Steal health from an enemy.'),
-    s('chaos1', 'Chaos Bolt', 9, 'damage', 1.9, 'fel', 'A wild bolt of chaos.'),
-    s('imp2', 'Summon Imp II', 11, 'summon', 0.9, 'fel', 'A bigger, tougher imp.'),
-    s('hellfire2', 'Hellfire II', 13, 'aoe', 1.1, 'fel', 'Hotter green fire.'),
-    s('shadowfury', 'Shadowfury', 15, 'aoe', 1.2, 'shadow', 'Shadows blast ALL enemies. Might stun them!', { stunChance: 0.25 }),
-    s('hellfire3', 'Hellfire III', 17, 'aoe', 1.4, 'fel', 'A firestorm on ALL enemies.'),
-    s('imp3', 'Summon Imp III', 19, 'summon', 1.15, 'fel', 'An imp lord!'),
+    s('imp1', 'Summon Imp I', 3, 'summon', 0.65, 'fel', 'An imp joins you and follows you into every fight.', { anim: 'imp' }),
+    s('hellfire1', 'Hellfire I', 5, 'aoe', 0.85, 'fel', 'Green fire hits ALL enemies.', { anim: 'hellfire' }),
+    s('soul1', 'Drain Soul', 7, 'drain', 1.3, 'shadow', 'Steal health from an enemy.', { anim: 'drainsoul' }),
+    s('chaos1', 'Chaos Bolt', 9, 'damage', 1.9, 'fel', 'A wild bolt of chaos.', { anim: 'chaos' }),
+    s('imp2', 'Summon Imp II', 11, 'summon', 0.9, 'fel', 'A bigger, tougher imp.', { anim: 'imp' }),
+    s('hellfire2', 'Hellfire II', 13, 'aoe', 1.1, 'fel', 'Hotter green fire.', { anim: 'hellfire' }),
+    s('shadowfury', 'Shadowfury', 15, 'aoe', 1.2, 'shadow', 'Shadows blast ALL enemies. Might stun them!', { stunChance: 0.25, anim: 'shadowfury' }),
+    s('hellfire3', 'Hellfire III', 17, 'aoe', 1.4, 'fel', 'A firestorm on ALL enemies.', { anim: 'hellfire' }),
+    s('imp3', 'Summon Imp III', 19, 'summon', 1.15, 'fel', 'An imp lord!', { anim: 'imp' }),
   ],
 };
 
@@ -246,6 +246,8 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   if (cls.id === 'ranger' && fx === 'nature') return { ...pw, name: name!, style: 'wild' };
   // Druids call down a night sky full of stars.
   if (cls.id === 'druid' && fx === 'arcane') return { ...pw, name: name!, style: 'starfall' };
+  // Demonologists tear open a rift into the void.
+  if (cls.id === 'demonologist' && fx === 'shadow') return { ...pw, name: name!, style: 'rift' };
   // Necromancers lock the enemy in a tomb of ice.
   if (cls.id === 'necromancer' && fx === 'frost') return { ...pw, name: name!, style: 'tomb' };
   return name ? { ...pw, name } : pw;

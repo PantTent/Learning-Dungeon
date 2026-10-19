@@ -464,10 +464,85 @@ export class BattleScene extends Phaser.Scene {
     const ty = target.sprite.y;
     const D = 200;
     switch (pw.style) {
-      case 'meteor':
       case 'infernal': {
-        const col = pw.style === 'meteor' ? 0xff7a2a : 0x5aff4a;
-        const rock = this.add.circle(tx + 420, -120, 30, pw.style === 'meteor' ? 0x5a2a10 : 0x1a4a1a).setDepth(D);
+        // A green portal opens in the sky; a burning fel giant crashes down
+        // inside a pillar of green fire and flames ring the enemies.
+        const px = tx + 60;
+        const portal = this.add.container(px, 70).setDepth(D - 2).setScale(0, 0.3);
+        const pg = this.add.graphics();
+        pg.fillStyle(0x0a1a0a, 1).fillEllipse(0, 0, 220, 70);
+        pg.lineStyle(6, 0x5aff4a, 1).strokeEllipse(0, 0, 220, 70);
+        pg.lineStyle(3, 0xd0ff6a, 1).strokeEllipse(0, 0, 180, 52);
+        portal.add([this.add.image(0, 0, 'glow').setScale(16, 6).setTint(0x5aff4a).setBlendMode('ADD'), pg]);
+        this.tweens.add({ targets: portal, scaleX: 1, scaleY: 1, duration: 320, ease: 'Back.Out' });
+        const giant = this.add.container(px, 70).setDepth(D).setScale(0.3);
+        giant.add([
+          this.add.image(0, 0, 'glow').setScale(11).setTint(0x5aff4a).setBlendMode('ADD'),
+          this.add.circle(0, 0, 44, 0x1a3a1a).setStrokeStyle(4, 0x3a6a2a),
+          this.add.rectangle(-20, 18, 22, 10, 0x2a4a2a),
+          this.add.circle(-16, -8, 8, 0xd0ff6a),
+          this.add.circle(16, -8, 8, 0xd0ff6a),
+          this.add.rectangle(0, 18, 30, 6, 0x5aff4a),
+        ]);
+        const trail = this.add.particles(0, 0, 'dot', { follow: giant, speed: 80, lifespan: 500, scale: { start: 2.2, end: 0 }, tint: [0x5aff4a, 0xd0ff6a], blendMode: 'ADD', frequency: 6 }).setDepth(D - 1);
+        this.tweens.add({
+          targets: giant,
+          x: tx,
+          y: ty,
+          scale: 1.4,
+          angle: 200,
+          duration: 520,
+          delay: 380,
+          ease: 'Quad.In',
+          onComplete: () => {
+            trail.stop();
+            this.time.delayedCall(500, () => trail.destroy());
+            const pillar = this.add.rectangle(tx, ty + 40, 140, 900, 0x5aff4a, 0.55).setOrigin(0.5, 1).setDepth(D).setBlendMode('ADD');
+            this.tweens.add({ targets: pillar, scaleX: 0, alpha: 0, duration: 800, onComplete: () => pillar.destroy() });
+            this.alive().forEach((f, i) => this.felFlames(f.sprite.x, f.sprite.y + 46, 160, 26, D + 1, i * 60));
+            this.tweens.add({ targets: giant, alpha: 0, scale: 2.2, duration: 400, onComplete: () => giant.destroy() });
+            this.tweens.add({ targets: portal, scaleX: 0, alpha: 0, duration: 400, onComplete: () => portal.destroy() });
+            impact();
+          },
+        });
+        break;
+      }
+      case 'rift': {
+        // A jagged tear in the air opens next to the enemy and pulls in light,
+        // void lightning lashes out at every enemy, then it snaps shut with a blast.
+        const rx = tx;
+        const ry = Math.max(110, ty - 150);
+        const rift = this.add.graphics({ x: rx, y: ry }).setDepth(D).setScale(0.1, 1);
+        const pts: { x: number; y: number }[] = [];
+        for (let i = 0; i <= 10; i++) pts.push({ x: (i % 2 ? 22 : 34) * Math.sin((i / 10) * Math.PI), y: -90 + i * 18 });
+        for (let i = 10; i >= 0; i--) pts.push({ x: -(i % 2 ? 34 : 22) * Math.sin((i / 10) * Math.PI), y: -90 + i * 18 });
+        rift.fillStyle(0x05000a, 1).fillPoints(pts, true);
+        rift.lineStyle(5, 0xb070ff, 1).strokePoints(pts, true);
+        const halo = this.add.image(rx, ry, 'glow').setScale(4, 12).setTint(0x9a4aff).setBlendMode('ADD').setDepth(D - 1).setAlpha(0);
+        this.tweens.add({ targets: rift, scaleX: 1, duration: 300, ease: 'Back.Out' });
+        this.tweens.add({ targets: halo, alpha: 0.8, duration: 300 });
+        for (let i = 0; i < 30; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = this.add.image(rx + Math.cos(a) * 260, ry + Math.sin(a) * 180, 'dot').setTint(i % 2 ? 0xb070ff : 0xffffff).setBlendMode('ADD').setDepth(D + 1);
+          this.tweens.add({ targets: d, x: rx, y: ry, scale: 0.2, duration: 500, delay: 200 + i * 15, ease: 'Quad.In', onComplete: () => d.destroy() });
+        }
+        this.time.delayedCall(700, () => {
+          this.alive().forEach((f, i) => this.time.delayedCall(i * 70, () => {
+            this.zap(rx, ry, f.sprite.x, f.sprite.y, 360, 0xb070ff);
+            this.burst(f.sprite.x, f.sprite.y, 0x9a4aff, 12, D);
+          }));
+        });
+        this.time.delayedCall(1100, () => {
+          this.tweens.add({ targets: rift, scaleX: 0, duration: 140, ease: 'Quad.In', onComplete: () => rift.destroy() });
+          this.tweens.add({ targets: halo, scale: 14, alpha: 0, duration: 500, onComplete: () => halo.destroy() });
+          this.ring(rx, ry, 0xb070ff, 260, 10, 600);
+          impact();
+        });
+        break;
+      }
+      case 'meteor': {
+        const col = 0xff7a2a;
+        const rock = this.add.circle(tx + 420, -120, 30, 0x5a2a10).setDepth(D);
         const glow = this.add.image(rock.x, rock.y, 'glow').setScale(9).setTint(col).setBlendMode('ADD').setDepth(D - 1);
         const trail = this.add.particles(0, 0, 'dot', { follow: rock, speed: 60, lifespan: 500, scale: { start: 2, end: 0 }, tint: [col, 0xffe066], blendMode: 'ADD', frequency: 8 }).setDepth(D - 2);
         this.tweens.add({
@@ -481,10 +556,6 @@ export class BattleScene extends Phaser.Scene {
             glow.destroy();
             trail.stop();
             this.time.delayedCall(500, () => trail.destroy());
-            if (pw.style === 'infernal') {
-              const pillar = this.add.rectangle(tx, ty, 120, 900, col, 0.5).setOrigin(0.5, 1).setDepth(D).setBlendMode('ADD');
-              this.tweens.add({ targets: pillar, scaleX: 0, alpha: 0, duration: 700, onComplete: () => pillar.destroy() });
-            }
             impact();
           },
         });
@@ -938,7 +1009,7 @@ export class BattleScene extends Phaser.Scene {
       }
       case 'summon': {
         const cls = classOf(p);
-        const pose = sk.anim === 'raise' ? (done: () => void) => this.raiseDead(done) : (done: () => void) => this.castPose(done);
+        const pose = sk.anim === 'raise' || sk.anim === 'imp' ? (done: () => void) => this.raiseDead(done, sk.anim === 'imp') : (done: () => void) => this.castPose(done);
         pose(() => {
           const had = !!p.pet;
           // Pets have about a third of the hero's health (more at higher ranks).
@@ -984,7 +1055,7 @@ export class BattleScene extends Phaser.Scene {
             this.heroHp.set(p.hp, s.maxHp);
             const healText = () => this.floatText(this.hero.x, this.hero.y - 60, `+${heal}`, '#7dff9a', 30);
             // The drain animation already pulls life back to the hero.
-            if (sk.anim === 'drain') this.time.delayedCall(560, healText);
+            if (sk.anim === 'drain' || sk.anim === 'drainsoul') this.time.delayedCall(sk.anim === 'drain' ? 560 : 500, healText);
             else this.projectile(target.sprite, this.hero, 0x7dff9a, healText);
           }
           after();
@@ -1458,6 +1529,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (sk.anim === 'entangle' || sk.anim === 'thornstorm' || sk.anim === 'moonfire' || sk.anim === 'starsurge') {
       this.druidMove(sk.anim, aim, target, onHit);
+      return;
+    }
+    if (sk.anim === 'hellfire' || sk.anim === 'drainsoul' || sk.anim === 'chaos' || sk.anim === 'shadowfury') {
+      this.demonMove(sk.anim, aim, target, onHit);
       return;
     }
     if (sk.melee) {
@@ -2059,6 +2134,147 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  // ------------------------------------------------------------ demonologist moves
+
+  /** Green fel flames licking up from (x, y). */
+  private felFlames(x: number, y: number, width: number, n: number, depth: number, delay = 0) {
+    for (let i = 0; i < n; i++) {
+      const f = this.add.image(x + Phaser.Math.Between(-width / 2, width / 2), y, 'glow')
+        .setScale(Phaser.Math.FloatBetween(1.6, 2.6), Phaser.Math.FloatBetween(2.6, 4))
+        .setTint(i % 3 ? 0x5aff4a : 0xd0ff6a).setBlendMode('ADD').setDepth(depth).setAlpha(0);
+      this.tweens.add({
+        targets: f,
+        alpha: { from: 0.95, to: 0 },
+        y: y - Phaser.Math.Between(60, 130),
+        scaleX: 0.4,
+        duration: Phaser.Math.Between(420, 650),
+        delay: delay + i * 22,
+        ease: 'Sine.Out',
+        onComplete: () => f.destroy(),
+      });
+    }
+  }
+
+  private demonMove(kind: 'hellfire' | 'drainsoul' | 'chaos' | 'shadowfury', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    const { x: tx, y: ty } = t.sprite;
+    const hx = this.hero.x - 30;
+    const hy = this.hero.y - 10;
+    switch (kind) {
+      case 'hellfire': {
+        // A green fire circle opens under every enemy and fel flames roar up.
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const { x, y } = f.sprite;
+          const ground = this.add.ellipse(x, y + 46, 20, 8, 0x5aff4a, 0.5).setStrokeStyle(3, 0xd0ff6a).setDepth(5).setBlendMode('ADD');
+          this.tweens.add({ targets: ground, width: 170, height: 44, duration: 260, delay: i * 80, ease: 'Quad.Out' });
+          this.tweens.add({ targets: ground, alpha: 0, duration: 400, delay: 900 + i * 80, onComplete: () => ground.destroy() });
+          this.felFlames(x, y + 46, 140, 22, f.sprite.depth + 1, 180 + i * 80);
+          this.time.delayedCall(260 + i * 80, () => this.burst(x, y, 0x5aff4a, 12));
+        });
+        this.time.delayedCall(320, onHit);
+        break;
+      }
+      case 'drainsoul': {
+        // A chain of green and purple light rips a ghostly soul out of the enemy.
+        this.castPose(() => {});
+        const g = this.add.graphics().setDepth(160).setBlendMode('ADD');
+        const st = { len: 0, p: 0 };
+        const draw = () => {
+          g.clear();
+          const n = 18;
+          for (let i = 0; i < n * st.len; i++) {
+            const k = i / n;
+            const px = hx + (tx - hx) * k;
+            const py = hy + (ty - hy) * k + Math.sin(k * 10 + st.p) * 6;
+            g.fillStyle(i % 2 ? 0x5aff4a : 0xb070ff, 0.9).fillCircle(px, py, i % 2 ? 5 : 7);
+          }
+        };
+        this.tweens.add({ targets: st, len: 1, duration: 220, onUpdate: draw });
+        this.tweens.add({ targets: st, p: 30, duration: 1100, onUpdate: draw, onComplete: () => this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() }) });
+        this.time.delayedCall(240, () => {
+          this.burst(tx, ty, 0xb070ff, 16);
+          onHit();
+          const soul = this.skull(tx, ty - 10, 34, 0xb8ffb0).setDepth(166).setAlpha(0.85);
+          this.tweens.add({ targets: t.sprite, x: t.home.x + 12, duration: 120, yoyo: true, repeat: 2 });
+          this.tweens.add({ targets: soul, x: tx + 40, y: ty - 30, duration: 300, ease: 'Sine.Out' });
+          this.tweens.add({
+            targets: soul,
+            x: hx,
+            y: hy - 20,
+            scale: 0.4,
+            duration: 420,
+            delay: 300,
+            ease: 'Quad.In',
+            onComplete: () => {
+              soul.destroy();
+              this.sparkle(this.hero, 0x7dff9a, 14);
+            },
+          });
+        });
+        break;
+      }
+      case 'chaos': {
+        // A big wobbly ball of chaos (green, purple and orange) that explodes.
+        this.castPose(() => {});
+        const cols = [0x5aff4a, 0xb070ff, 0xff7a2a];
+        const ball = this.add.container(hx, hy).setDepth(162).setScale(0.3);
+        const orbs = cols.map((c) => this.add.image(0, 0, 'glow').setScale(3.4).setTint(c).setBlendMode('ADD'));
+        ball.add([...orbs, this.add.circle(0, 0, 12, 0xffffff)]);
+        const trail = this.add.particles(0, 0, 'dot', { follow: ball, speed: 60, lifespan: 420, scale: { start: 1.4, end: 0 }, tint: cols, blendMode: 'ADD', frequency: 8 }).setDepth(161);
+        this.tweens.add({ targets: ball, scale: 1, duration: 260, ease: 'Back.Out' });
+        const spin = { a: 0 };
+        this.tweens.add({ targets: spin, a: Math.PI * 8, duration: 800, onUpdate: () => orbs.forEach((o, i) => o.setPosition(Math.cos(spin.a + i * 2.1) * 14, Math.sin(spin.a + i * 2.1) * 14)) });
+        const path = { k: 0 };
+        this.tweens.add({
+          targets: path,
+          k: 1,
+          duration: 480,
+          delay: 280,
+          ease: 'Quad.In',
+          onUpdate: () => ball.setPosition(hx + (tx - hx) * path.k, hy + (ty - hy) * path.k + Math.sin(path.k * Math.PI * 3) * 40),
+          onComplete: () => {
+            ball.destroy();
+            trail.stop();
+            this.time.delayedCall(450, () => trail.destroy());
+            cols.forEach((c, i) => {
+              this.burst(tx, ty, c, 20);
+              this.time.delayedCall(i * 80, () => this.ring(tx, ty, c, 120 + i * 30, 7));
+            });
+            this.cameras.main.shake(200, 0.014);
+            onHit();
+          },
+        });
+        break;
+      }
+      case 'shadowfury': {
+        // Dark rings slam down on every enemy and shadow spikes burst out.
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const { x, y } = f.sprite;
+          const rune = this.add.circle(x, y, 90).setStrokeStyle(6, 0x9a4aff).setDepth(f.sprite.depth + 1).setScale(2.2).setAlpha(0);
+          this.tweens.add({ targets: rune, scale: 0.6, alpha: 1, duration: 300, delay: i * 90, ease: 'Quad.In' });
+          this.time.delayedCall(300 + i * 90, () => {
+            rune.destroy();
+            const dark = this.add.image(x, y, 'glow').setScale(4).setTint(0x2a0a4a).setDepth(f.sprite.depth + 1);
+            this.tweens.add({ targets: dark, scale: 11, alpha: 0, duration: 500, onComplete: () => dark.destroy() });
+            for (let k = 0; k < 8; k++) {
+              const a = (k / 8) * Math.PI * 2;
+              const sp = this.add.triangle(x, y, 0, -6, 46, 0, 0, 6, k % 2 ? 0x9a4aff : 0x2a0a4a).setOrigin(0, 0.5).setRotation(a).setScale(0, 1).setDepth(f.sprite.depth + 2);
+              this.tweens.add({ targets: sp, scaleX: 1.4, duration: 140, ease: 'Back.Out' });
+              this.tweens.add({ targets: sp, alpha: 0, duration: 300, delay: 300, onComplete: () => sp.destroy() });
+            }
+            this.ring(x, y, 0xb070ff, 120, 6);
+            this.cameras.main.shake(90, 0.008);
+          });
+        });
+        this.time.delayedCall(320, onHit);
+        break;
+      }
+    }
+  }
+
   // ------------------------------------------------------------ druid moves
 
   /** A little green leaf. */
@@ -2273,30 +2489,41 @@ export class BattleScene extends Phaser.Scene {
     return c;
   }
 
-  /** Raise Skeleton: a glowing rune circle, ghost flames, and bones bursting out of the ground. */
-  private raiseDead(onDone: () => void) {
+  /**
+   * Raise Skeleton: a glowing rune circle, ghost flames, and bones bursting out
+   * of the ground. Summon Imp (fel): a green circle and a burst of fel fire.
+   */
+  private raiseDead(onDone: () => void, fel = false) {
     const x = this.heroHome.x - 150;
     const y = this.heroHome.y + 45;
-    sfx('shadow');
+    const col = fel ? 0x5aff4a : 0xb070ff;
+    sfx(fel ? 'fel' : 'shadow');
     this.castPose(() => {});
     const circle = this.add.container(x, y + 40).setDepth(6).setScale(0.1, 0.03);
     const g = this.add.graphics();
-    g.lineStyle(4, 0xb070ff, 1).strokeCircle(0, 0, 80).strokeCircle(0, 0, 64);
+    g.lineStyle(4, col, 1).strokeCircle(0, 0, 80).strokeCircle(0, 0, 64);
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
       const b = ((i + 2) / 5) * Math.PI * 2 - Math.PI / 2;
       g.lineBetween(Math.cos(a) * 64, Math.sin(a) * 64, Math.cos(b) * 64, Math.sin(b) * 64);
     }
-    circle.add([this.add.image(0, 0, 'glow').setScale(14).setTint(0x9a4aff).setBlendMode('ADD').setAlpha(0.6), g]);
+    circle.add([this.add.image(0, 0, 'glow').setScale(14).setTint(fel ? 0x3aaa2a : 0x9a4aff).setBlendMode('ADD').setAlpha(0.6), g]);
     this.tweens.add({ targets: circle, scaleX: 1, scaleY: 0.32, duration: 320, ease: 'Back.Out' });
     this.tweens.add({ targets: g, angle: 180, duration: 1100 });
     for (let i = 0; i < 16; i++) {
-      const f = this.add.image(x + Phaser.Math.Between(-70, 70), y + 40, 'dot').setScale(1.6).setTint(i % 3 ? 0x9a4aff : 0x7aff9a).setBlendMode('ADD').setDepth(12);
+      const f = this.add.image(x + Phaser.Math.Between(-70, 70), y + 40, 'dot').setScale(1.6).setTint(i % 3 ? col : fel ? 0xd0ff6a : 0x7aff9a).setBlendMode('ADD').setDepth(12);
       this.tweens.add({ targets: f, y: y - Phaser.Math.Between(40, 120), alpha: 0, scale: 0.3, duration: 700, delay: 150 + i * 30, onComplete: () => f.destroy() });
     }
     this.time.delayedCall(500, () => {
-      this.burst(x, y + 30, 0xe8e0d0, 18);
       this.cameras.main.shake(120, 0.008);
+      if (fel) {
+        this.felFlames(x, y + 40, 120, 24, 13);
+        this.burst(x, y, 0x5aff4a, 22);
+        this.ring(x, y + 10, 0x5aff4a, 110, 6);
+        onDone();
+        return;
+      }
+      this.burst(x, y + 30, 0xe8e0d0, 18);
       for (let i = 0; i < 6; i++) {
         const bone = this.add.rectangle(x, y + 30, 18, 5, 0xe8e0d0).setDepth(13);
         this.tweens.add({ targets: bone, x: x + Phaser.Math.Between(-80, 80), y: y - Phaser.Math.Between(20, 90), angle: 540, alpha: 0, duration: 600, ease: 'Quad.Out', onComplete: () => bone.destroy() });
