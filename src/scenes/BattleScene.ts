@@ -541,23 +541,56 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
       case 'meteor': {
-        const col = 0xff7a2a;
-        const rock = this.add.circle(tx + 420, -120, 30, 0x5a2a10).setDepth(D);
-        const glow = this.add.image(rock.x, rock.y, 'glow').setScale(9).setTint(col).setBlendMode('ADD').setDepth(D - 1);
-        const trail = this.add.particles(0, 0, 'dot', { follow: rock, speed: 60, lifespan: 500, scale: { start: 2, end: 0 }, tint: [col, 0xffe066], blendMode: 'ADD', frequency: 8 }).setDepth(D - 2);
-        this.tweens.add({
-          targets: [rock, glow],
-          x: tx,
-          y: ty,
-          duration: 650,
-          ease: 'Quad.In',
-          onComplete: () => {
-            rock.destroy();
-            glow.destroy();
-            trail.stop();
-            this.time.delayedCall(500, () => trail.destroy());
-            impact();
-          },
+        // The sky glows red, small meteors pelt every enemy, then one giant
+        // meteor crashes down and leaves a burning crater.
+        const red = this.add.rectangle(0, 0, W, H, 0x5a1000, 0).setOrigin(0).setDepth(D - 10);
+        this.tweens.add({ targets: red, fillAlpha: 0.35, duration: 300 });
+        const fall = (x: number, y: number, r: number, delay: number, ms: number, done: () => void) => {
+          const rock = this.add.container(x + 420, -120).setDepth(D);
+          rock.add([
+            this.add.image(0, 0, 'glow').setScale(r / 3.5).setTint(0xff7a2a).setBlendMode('ADD'),
+            this.add.circle(0, 0, r, 0x5a2a10).setStrokeStyle(3, 0xffb030),
+            this.add.circle(-r * 0.3, -r * 0.2, r * 0.25, 0x3a1a08),
+            this.add.circle(r * 0.35, r * 0.3, r * 0.18, 0x3a1a08),
+          ]);
+          const trail = this.add.particles(0, 0, 'dot', { follow: rock, speed: 60, lifespan: 500, scale: { start: r / 15, end: 0 }, tint: [0xff7a2a, 0xffe066], blendMode: 'ADD', frequency: 8 }).setDepth(D - 2);
+          this.tweens.add({
+            targets: rock,
+            x,
+            y,
+            angle: -180,
+            duration: ms,
+            delay,
+            ease: 'Quad.In',
+            onComplete: () => {
+              rock.destroy();
+              trail.stop();
+              this.time.delayedCall(500, () => trail.destroy());
+              done();
+            },
+          });
+        };
+        const foes = this.alive();
+        for (let i = 0; i < 6; i++) {
+          const f = foes[i % foes.length];
+          const x = f.sprite.x + Phaser.Math.Between(-50, 50);
+          const y = f.sprite.y + Phaser.Math.Between(-20, 30);
+          fall(x, y, 12, i * 90, 420, () => {
+            this.burst(x, y, 0xff7a2a, 10, D);
+            this.cameras.main.shake(80, 0.006);
+          });
+        }
+        fall(tx, ty, 46, 650, 650, () => {
+          const crater = this.add.ellipse(tx, ty + 46, 40, 14, 0x2a0a00, 0.8).setStrokeStyle(4, 0xff7a2a).setDepth(5);
+          this.tweens.add({ targets: crater, width: 240, height: 64, duration: 300, ease: 'Quad.Out' });
+          this.tweens.add({ targets: crater, alpha: 0, duration: 600, delay: 900, onComplete: () => crater.destroy() });
+          for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * Math.PI * 2;
+            const fl = this.add.image(tx + Math.cos(a) * 100, ty + 40 + Math.sin(a) * 26, 'glow').setScale(2, 4).setTint(k % 2 ? 0xff7a2a : 0xffb030).setBlendMode('ADD').setDepth(D);
+            this.tweens.add({ targets: fl, y: fl.y - 90, scaleX: 0.4, alpha: 0, duration: 700, delay: k * 30, onComplete: () => fl.destroy() });
+          }
+          this.tweens.add({ targets: red, alpha: 0, duration: 600, delay: 300, onComplete: () => red.destroy() });
+          impact();
         });
         break;
       }
@@ -829,10 +862,17 @@ export class BattleScene extends Phaser.Scene {
             onComplete: () => {
               this.burst(sh.x, ty + 30, 0xdff4ff, 8, D);
               if (i === n - 1) {
+                // One giant glacier slams down in the middle and the ground freezes.
+                const ground = this.add.ellipse(tx, ty + 46, 40, 14, 0xdff4ff, 0.7).setStrokeStyle(3, 0xffffff).setDepth(5);
+                this.tweens.add({ targets: ground, width: 280, height: 70, duration: 260 });
+                this.tweens.add({ targets: ground, alpha: 0, duration: 500, delay: 900, onComplete: () => ground.destroy() });
+                const berg = this.add.triangle(tx, -300, 0, 0, 80, 0, 40, 260, 0xbfe8ff).setOrigin(0.5, 1).setStrokeStyle(4, 0xffffff).setDepth(D + 1);
+                shards.push(berg);
+                this.tweens.add({ targets: berg, y: ty + 50, duration: 220, ease: 'Quad.In', onComplete: () => this.cameras.main.shake(200, 0.02) });
                 const frost = this.add.image(tx, ty, 'glow').setScale(12).setTint(0x8fd8ff).setBlendMode('ADD').setDepth(D - 1);
                 this.tweens.add({ targets: frost, alpha: 0, duration: 800, onComplete: () => frost.destroy() });
-                impact();
-                this.tweens.add({ targets: shards, alpha: 0, duration: 500, delay: 300, onComplete: () => shards.forEach((x) => x.destroy()) });
+                this.time.delayedCall(220, impact);
+                this.tweens.add({ targets: shards, alpha: 0, duration: 500, delay: 520, onComplete: () => shards.forEach((x) => x.destroy()) });
               }
             },
           });
@@ -840,7 +880,19 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
       case 'nova': {
-        // Orbs of magic gather around the target, then implode.
+        // A rune circle spins under the target while orbs of magic gather, then implode.
+        const rune = this.add.container(tx, ty + 30).setDepth(D - 1).setScale(0, 0);
+        const rg = this.add.graphics();
+        rg.lineStyle(4, pw.color, 1).strokeCircle(0, 0, 130).strokeCircle(0, 0, 100);
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const b = ((i + 2) / 6) * Math.PI * 2;
+          rg.lineBetween(Math.cos(a) * 100, Math.sin(a) * 100, Math.cos(b) * 100, Math.sin(b) * 100);
+        }
+        rune.add([this.add.image(0, 0, 'glow').setScale(16).setTint(pw.color).setBlendMode('ADD').setAlpha(0.4), rg]);
+        this.tweens.add({ targets: rune, scaleX: 1, scaleY: 0.36, duration: 300, ease: 'Back.Out' });
+        this.tweens.add({ targets: rg, angle: 240, duration: 1300 });
+        this.tweens.add({ targets: rune, alpha: 0, duration: 400, delay: 1000, onComplete: () => rune.destroy() });
         const orbs: Phaser.GameObjects.Image[] = [];
         for (let i = 0; i < 10; i++) {
           const a = (i / 10) * Math.PI * 2;
@@ -860,6 +912,12 @@ export class BattleScene extends Phaser.Scene {
               orbs.forEach((o) => o.destroy());
               const big = this.add.image(tx, ty, 'glow').setScale(2).setTint(pw.color).setBlendMode('ADD').setDepth(D);
               this.tweens.add({ targets: big, scale: 16, alpha: 0, duration: 600, onComplete: () => big.destroy() });
+              for (let k = 0; k < 4; k++) this.time.delayedCall(k * 110, () => this.ring(tx, ty, k % 2 ? 0xffffff : pw.color, 200 + k * 50, 8, 560));
+              for (let k = 0; k < 16; k++) {
+                const a = (k / 16) * Math.PI * 2;
+                const ray = this.add.rectangle(tx, ty, 200, 6, k % 2 ? 0xffffff : pw.color).setOrigin(0, 0.5).setRotation(a).setScale(0, 1).setBlendMode('ADD').setDepth(D);
+                this.tweens.add({ targets: ray, scaleX: 1.3, alpha: 0, duration: 500, onComplete: () => ray.destroy() });
+              }
               impact();
             },
           });
@@ -871,21 +929,27 @@ export class BattleScene extends Phaser.Scene {
         const cloud = this.add.rectangle(W / 2, 0, W, 120, 0x1a1a2e, 0).setOrigin(0.5, 0).setDepth(D - 1);
         this.tweens.add({ targets: cloud, fillAlpha: 0.9, duration: 250 });
         const sky = this.add.image(tx, -30, 'dot').setVisible(false);
-        const bolts = 5;
+        const foes = this.alive();
+        const bolts = 8;
         for (let i = 0; i < bolts; i++) {
-          this.time.delayedCall(250 + i * 130, () => {
-            sky.setPosition(tx + Phaser.Math.Between(-160, 160), -30);
-            const spot = this.add.image(tx + Phaser.Math.Between(-30, 30), ty + Phaser.Math.Between(-20, 20), 'dot').setVisible(false);
+          this.time.delayedCall(250 + i * 110, () => {
+            const f = i === bolts - 1 ? target : foes[i % foes.length];
+            sky.setPosition(f.sprite.x + Phaser.Math.Between(-160, 160), -30);
+            const spot = this.add.image(f.sprite.x + Phaser.Math.Between(-30, 30), f.sprite.y + Phaser.Math.Between(-20, 20), 'dot').setVisible(false);
             sfx('lightning');
             this.lightning(sky, spot, () => {
               this.burst(spot.x, spot.y, 0xbfe8ff, 10, D);
               spot.destroy();
               if (i === bolts - 1) {
+                for (let k = 0; k < 3; k++) this.zap(tx + (k - 1) * 14, -20, tx, ty, 360);
+                const col = this.add.rectangle(tx, ty + 40, 40, 900, 0xffffff, 0.8).setOrigin(0.5, 1).setDepth(D).setBlendMode('ADD');
+                this.tweens.add({ targets: col, scaleX: 4, alpha: 0, duration: 400, onComplete: () => col.destroy() });
+                this.crackle(tx, ty, 8, 130);
                 impact();
                 sky.destroy();
                 this.tweens.add({ targets: cloud, alpha: 0, duration: 500, delay: 200, onComplete: () => cloud.destroy() });
               }
-            });
+            }, i === 0);
           });
         }
         break;
@@ -1535,6 +1599,10 @@ export class BattleScene extends Phaser.Scene {
       this.demonMove(sk.anim, aim, target, onHit);
       return;
     }
+    if (sk.anim === 'frostbolt' || sk.anim === 'missiles' || sk.anim === 'chain' || sk.anim === 'flamewave' || sk.anim === 'thunderbolt') {
+      this.mageMove(sk.anim, aim, target, onHit);
+      return;
+    }
     if (sk.melee) {
       this.tweens.add({
         targets: this.hero,
@@ -2128,6 +2196,171 @@ export class BattleScene extends Phaser.Scene {
                 this.goHome(320);
               },
             }),
+        });
+        break;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ mage moves
+
+  private mageMove(kind: 'frostbolt' | 'missiles' | 'chain' | 'flamewave' | 'thunderbolt', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    const { x: tx, y: ty } = t.sprite;
+    const hx = this.hero.x - 34;
+    const hy = this.hero.y - 14;
+    switch (kind) {
+      case 'frostbolt': {
+        // A sharp icicle shoots out, then ice crystals freeze the enemy.
+        this.castPose(() => {});
+        const ang = Phaser.Math.Angle.Between(hx, hy, tx, ty);
+        const shard = this.add.container(hx, hy).setDepth(162).setRotation(ang).setScale(0.3);
+        shard.add([
+          this.add.image(0, 0, 'glow').setScale(4, 1.6).setTint(0x8fd8ff).setBlendMode('ADD'),
+          this.add.triangle(0, 0, -26, -9, 30, 0, -26, 9, 0xbfe8ff).setStrokeStyle(2, 0xffffff),
+        ]);
+        const trail = this.add.particles(0, 0, 'dot', { follow: shard, speed: 30, lifespan: 380, scale: { start: 1, end: 0 }, tint: [0xffffff, 0x8fd8ff], blendMode: 'ADD', frequency: 10 }).setDepth(161);
+        this.tweens.add({ targets: shard, scale: 1.2, duration: 200, ease: 'Back.Out' });
+        this.tweens.add({
+          targets: shard,
+          x: tx,
+          y: ty,
+          duration: 260,
+          delay: 200,
+          ease: 'Quad.In',
+          onComplete: () => {
+            shard.destroy();
+            trail.stop();
+            this.time.delayedCall(400, () => trail.destroy());
+            this.burst(tx, ty, 0xdff4ff, 22);
+            const crystals: Phaser.GameObjects.Triangle[] = [];
+            for (let k = 0; k < 7; k++) {
+              const a = (k / 7) * Math.PI * 2;
+              const h = Phaser.Math.Between(34, 56);
+              const c = this.add.triangle(tx, ty, 0, 0, 8, -h, 16, 0, k % 2 ? 0xbfe8ff : 0x7ac8ff).setOrigin(0.5, 1).setStrokeStyle(2, 0xffffff)
+                .setRotation(a + Math.PI / 2).setScale(0).setDepth(t.sprite.depth + 1).setAlpha(0.85);
+              crystals.push(c);
+              this.tweens.add({ targets: c, scale: 1, duration: 160, delay: k * 20, ease: 'Back.Out' });
+            }
+            t.sprite.setTint(0x8fd8ff);
+            this.time.delayedCall(900, () => t.sprite.clearTint());
+            this.tweens.add({ targets: crystals, alpha: 0, duration: 300, delay: 700, onComplete: () => crystals.forEach((c) => c.destroy()) });
+            onHit();
+          },
+        });
+        break;
+      }
+      case 'missiles': {
+        // Five purple missiles curve out and home in on the enemy one by one.
+        this.castPose(() => {});
+        const n = 5;
+        let landed = 0;
+        for (let i = 0; i < n; i++) {
+          const m = this.add.image(hx, hy, 'glow').setScale(1.8).setTint(0xd07aff).setBlendMode('ADD').setDepth(162);
+          const core = this.add.circle(hx, hy, 5, 0xffffff).setDepth(163);
+          const trail = this.add.particles(0, 0, 'dot', { follow: m, speed: 10, lifespan: 300, scale: { start: 0.9, end: 0 }, tint: [0xd07aff, 0xffffff], blendMode: 'ADD', frequency: 12 }).setDepth(161);
+          const bend = (i - 2) * 70;
+          const st = { k: 0 };
+          this.tweens.add({
+            targets: st,
+            k: 1,
+            duration: 420,
+            delay: i * 90,
+            ease: 'Sine.In',
+            onUpdate: () => {
+              const x = hx + (tx - hx) * st.k;
+              const y = hy + (ty - hy) * st.k + Math.sin(st.k * Math.PI) * bend;
+              m.setPosition(x, y);
+              core.setPosition(x, y);
+            },
+            onComplete: () => {
+              m.destroy();
+              core.destroy();
+              trail.stop();
+              this.time.delayedCall(320, () => trail.destroy());
+              this.burst(tx, ty, 0xd07aff, 8);
+              this.tweens.add({ targets: t.sprite, x: t.home.x - 8, duration: 40, yoyo: true });
+              if (++landed === n) {
+                this.ring(tx, ty, 0xd07aff, 110, 5);
+                onHit();
+              }
+            },
+          });
+        }
+        break;
+      }
+      case 'chain': {
+        // Lightning leaps from the mage to the first enemy, then jumps to the next and the next.
+        const order = [...foes].sort((a, b) => b.sprite.x - a.sprite.x || a.sprite.y - b.sprite.y);
+        let fx = hx;
+        let fy = hy;
+        order.forEach((f, i) => {
+          const x0 = fx;
+          const y0 = fy;
+          this.time.delayedCall(i * 170, () => {
+            this.zap(x0, y0, f.sprite.x, f.sprite.y, 300);
+            this.crackle(f.sprite.x, f.sprite.y, 4, 60);
+            this.flash(f.sprite, 0xbfe8ff);
+            if (i === 0) this.cameras.main.flash(80, 180, 220, 255, false);
+          });
+          fx = f.sprite.x;
+          fy = f.sprite.y;
+        });
+        this.time.delayedCall(Math.max(0, order.length - 1) * 170 + 120, onHit);
+        break;
+      }
+      case 'flamewave': {
+        // A wall of fire rolls across the floor and through every enemy.
+        this.castPose(() => {});
+        const wave = this.add.container(hx - 20, 310).setDepth(166);
+        const flames: Phaser.GameObjects.Image[] = [];
+        for (let k = 0; k < 9; k++) {
+          const f = this.add.image(Phaser.Math.Between(-24, 24), -160 + k * 40, 'glow').setScale(5, 6).setTint(k % 2 ? 0xff7a2a : 0xffb030).setBlendMode('ADD');
+          flames.push(f);
+          this.tweens.add({ targets: f, scaleY: 7.5, scaleX: 4, duration: 120, yoyo: true, repeat: -1, delay: k * 30 });
+        }
+        wave.add(flames);
+        const trail = this.add.particles(0, 0, 'dot', { follow: wave, followOffset: { x: 0, y: 0 }, x: { min: -20, max: 20 }, y: { min: -170, max: 170 }, speedY: { min: -120, max: -40 }, lifespan: 500, scale: { start: 1.4, end: 0 }, tint: [0xff7a2a, 0xffe066], blendMode: 'ADD', frequency: 6 }).setDepth(165);
+        const hit = new Set<Foe>();
+        this.tweens.add({
+          targets: wave,
+          x: Math.min(...foes.map((f) => f.sprite.x)) - 120,
+          duration: 1000,
+          ease: 'Sine.In',
+          onUpdate: () => foes.forEach((f) => {
+            if (!hit.has(f) && wave.x <= f.sprite.x + 20) {
+              hit.add(f);
+              this.burst(f.sprite.x, f.sprite.y, 0xff7a2a, 14);
+              if (hit.size === 1) onHit();
+            }
+          }),
+          onComplete: () => {
+            trail.stop();
+            this.time.delayedCall(520, () => trail.destroy());
+            this.tweens.add({ targets: wave, alpha: 0, duration: 200, onComplete: () => wave.destroy() });
+          },
+        });
+        break;
+      }
+      case 'thunderbolt': {
+        // A dark storm cloud gathers over the enemy, then one giant bolt crashes down.
+        this.castPose(() => {});
+        const cloud = this.add.container(tx, ty - 200).setDepth(167).setAlpha(0).setScale(0.6);
+        for (const [dx, dy, r] of [[-50, 10, 34], [0, -6, 44], [50, 10, 34], [-24, 22, 30], [26, 22, 30]]) cloud.add(this.add.circle(dx, dy, r, 0x3a3a5a));
+        cloud.add(this.add.circle(-10, -14, 20, 0x5a5a7a));
+        this.tweens.add({ targets: cloud, alpha: 1, scale: 1, duration: 360, ease: 'Quad.Out' });
+        this.time.delayedCall(200, () => this.zap(tx - 40, ty - 190, tx + 30, ty - 180, 160));
+        this.time.delayedCall(440, () => {
+          sfx('lightning');
+          for (let k = 0; k < 3; k++) this.zap(tx + (k - 1) * 10, ty - 180, tx, ty, 300);
+          const col = this.add.rectangle(tx, ty, 30, 200, 0xffffff, 0.8).setOrigin(0.5, 1).setDepth(166).setBlendMode('ADD');
+          this.tweens.add({ targets: col, scaleX: 3, alpha: 0, duration: 320, onComplete: () => col.destroy() });
+          this.crackle(tx, ty, 6, 90);
+          this.cameras.main.flash(100, 200, 230, 255, false);
+          this.cameras.main.shake(180, 0.014);
+          this.tweens.add({ targets: cloud, alpha: 0, duration: 400, delay: 300, onComplete: () => cloud.destroy() });
+          onHit();
         });
         break;
       }
@@ -3010,7 +3243,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   /** A crackling zig-zag lightning bolt. */
-  private lightning(from: Phaser.GameObjects.Image, to: Phaser.GameObjects.Image, onHit: () => void) {
+  private lightning(from: Phaser.GameObjects.Image, to: Phaser.GameObjects.Image, onHit: () => void, flash = true) {
     const g = this.add.graphics().setDepth(160).setBlendMode('ADD');
     const draw = () => {
       g.clear();
@@ -3028,7 +3261,7 @@ export class BattleScene extends Phaser.Scene {
       }
     };
     draw();
-    this.cameras.main.flash(80, 180, 220, 255, false);
+    if (flash) this.cameras.main.flash(80, 180, 220, 255, false);
     this.time.addEvent({ delay: 50, repeat: 3, callback: draw });
     this.time.delayedCall(220, () => {
       g.destroy();

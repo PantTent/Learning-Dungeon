@@ -29,6 +29,8 @@ export interface SkillDef {
   /** Special look for the spell's missile (default: a small glowing orb). */
   anim?:
     | 'orb' | 'snow'
+    // mage
+    | 'frostbolt' | 'missiles' | 'chain' | 'flamewave' | 'thunderbolt'
     // warrior
     | 'cleave' | 'bash' | 'heroic' | 'execute' | 'storm' | 'thunderclap'
     // paladin
