@@ -34,10 +34,12 @@ export interface SkillDef {
     // paladin
     | 'crusader' | 'holylight' | 'judge' | 'consecrate' | 'sunfire' | 'flamestrike' | 'hammerthrow'
     // ranger
-    | 'aimed' | 'multishot' | 'concuss' | 'venom' | 'rapid' | 'thornvolley';
+    | 'aimed' | 'multishot' | 'concuss' | 'venom' | 'rapid' | 'thornvolley'
+    // necromancer
+    | 'raise' | 'drain' | 'bonespikes' | 'chill' | 'gravefrost' | 'lance';
 }
 
-export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder' | 'wild';
+export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder' | 'wild' | 'tomb';
 
 /** Super attack unlocked by answering 3 questions right in a row. */
 export interface PowerDef {

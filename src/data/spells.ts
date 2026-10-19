@@ -76,15 +76,15 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
   ],
   necromancer: [
     s('shadowbolt', 'Shadow Bolt', 1, 'damage', 1, 'shadow', 'A bolt of shadow.'),
-    s('raise1', 'Raise Skeleton I', 3, 'summon', 0.6, 'shadow', 'A skeleton joins you and follows you into every fight.'),
-    s('drain1', 'Drain Life I', 5, 'drain', 1.2, 'shadow', 'Steal health from an enemy.'),
-    s('spikes1', 'Bone Spikes I', 7, 'aoe', 0.85, 'shadow', 'Spikes of bone hit ALL enemies.'),
-    s('chill', 'Chilling Touch', 9, 'stun', 1.7, 'frost', 'Icy grave-cold that freezes an enemy.'),
-    s('raise2', 'Raise Skeleton II', 11, 'summon', 0.85, 'shadow', 'A tougher skeleton warrior.'),
-    s('drain2', 'Drain Life II', 13, 'drain', 1.7, 'shadow', 'Steal lots of health.'),
-    s('gravefrost', 'Grave Frost', 15, 'aoe', 1.15, 'frost', 'A freezing storm on ALL enemies. Might freeze them!', { stunChance: 0.3, anim: 'snow' }),
-    s('lance2', 'Shadow Lance', 17, 'damage', 2.4, 'shadow', 'A huge spear of darkness.'),
-    s('raise3', 'Raise Skeleton III', 19, 'summon', 1.1, 'shadow', 'A skeleton champion.'),
+    s('raise1', 'Raise Skeleton I', 3, 'summon', 0.6, 'shadow', 'A skeleton joins you and follows you into every fight.', { anim: 'raise' }),
+    s('drain1', 'Drain Life I', 5, 'drain', 1.2, 'shadow', 'Steal health from an enemy.', { anim: 'drain' }),
+    s('spikes1', 'Bone Spikes I', 7, 'aoe', 0.85, 'shadow', 'Spikes of bone hit ALL enemies.', { anim: 'bonespikes' }),
+    s('chill', 'Chilling Touch', 9, 'stun', 1.7, 'frost', 'Icy grave-cold that freezes an enemy.', { anim: 'chill' }),
+    s('raise2', 'Raise Skeleton II', 11, 'summon', 0.85, 'shadow', 'A tougher skeleton warrior.', { anim: 'raise' }),
+    s('drain2', 'Drain Life II', 13, 'drain', 1.7, 'shadow', 'Steal lots of health.', { anim: 'drain' }),
+    s('gravefrost', 'Grave Frost', 15, 'aoe', 1.15, 'frost', 'A freezing storm on ALL enemies. Might freeze them!', { stunChance: 0.3, anim: 'gravefrost' }),
+    s('lance2', 'Shadow Lance', 17, 'damage', 2.4, 'shadow', 'A huge spear of darkness.', { anim: 'lance' }),
+    s('raise3', 'Raise Skeleton III', 19, 'summon', 1.1, 'shadow', 'A skeleton champion.', { anim: 'raise' }),
   ],
   druid: [
     s('wrath', 'Wrath', 1, 'damage', 1, 'nature', 'A blast of nature energy.'),
@@ -244,5 +244,7 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   const name = CLASS_POWER_NAMES[cls.id]?.[fx];
   // Rangers call spirit animals instead of plain vines.
   if (cls.id === 'ranger' && fx === 'nature') return { ...pw, name: name!, style: 'wild' };
+  // Necromancers lock the enemy in a tomb of ice.
+  if (cls.id === 'necromancer' && fx === 'frost') return { ...pw, name: name!, style: 'tomb' };
   return name ? { ...pw, name } : pw;
 }

@@ -668,26 +668,75 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
       case 'bones': {
+        // A giant ghost skull rises behind the enemies, a ring of skeletons
+        // climbs out of the ground, and they all charge together.
+        const big = this.skull(tx - 40, ty - 40, 150, pw.color).setDepth(D - 3).setAlpha(0).setScale(0.4);
+        this.tweens.add({ targets: big, alpha: 0.55, scale: 1, y: ty - 90, duration: 500, ease: 'Back.Out' });
+        this.tweens.add({ targets: big, angle: { from: -4, to: 4 }, duration: 160, yoyo: true, repeat: 4, delay: 500 });
         const bones: Phaser.GameObjects.Image[] = [];
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * Math.PI * 2;
-          const b = this.add.image(tx + Math.cos(a) * 110, ty + Math.sin(a) * 60 + 20, 'minion_skeleton').setScale(0).setDepth(D).setFlipX(Math.cos(a) > 0);
+        const n = 8;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          const x = tx + Math.cos(a) * 140;
+          const y = ty + Math.sin(a) * 70 + 20;
+          const b = this.add.image(x, y + 60, 'minion_skeleton').setScale(4).setAlpha(0).setDepth(D).setFlipX(Math.cos(a) > 0);
           bones.push(b);
-          this.puff(b.x, b.y, 0xb070ff);
-          this.tweens.add({ targets: b, scale: 4, duration: 260, delay: i * 90, ease: 'Back.Out' });
+          this.time.delayedCall(200 + i * 70, () => {
+            this.burst(x, y + 30, 0xe8e0d0, 8, D);
+            const flame = this.add.image(x, y + 30, 'glow').setScale(3, 5).setTint(i % 2 ? pw.color : 0x7aff9a).setBlendMode('ADD').setDepth(D - 1);
+            this.tweens.add({ targets: flame, scaleY: 0, alpha: 0, y: y - 40, duration: 600, onComplete: () => flame.destroy() });
+          });
+          this.tweens.add({ targets: b, y, alpha: 1, duration: 300, delay: 200 + i * 70, ease: 'Back.Out' });
         }
-        this.time.delayedCall(5 * 90 + 350, () => {
+        this.time.delayedCall(200 + n * 70 + 380, () => {
+          this.tweens.add({ targets: big, y: ty, scale: 1.4, alpha: 0, duration: 260, ease: 'Quad.In', onComplete: () => big.destroy() });
           this.tweens.add({
             targets: bones,
             x: tx,
             y: ty,
-            duration: 200,
+            duration: 220,
             ease: 'Quad.In',
             onComplete: () => {
+              for (let k = 0; k < 10; k++) {
+                const bone = this.add.rectangle(tx, ty, 22, 6, 0xe8e0d0).setDepth(D + 1);
+                this.tweens.add({ targets: bone, x: tx + Phaser.Math.Between(-160, 160), y: ty + Phaser.Math.Between(-120, 80), angle: 720, alpha: 0, duration: 700, ease: 'Quad.Out', onComplete: () => bone.destroy() });
+              }
               impact();
               this.tweens.add({ targets: bones, alpha: 0, scale: 2, duration: 400, onComplete: () => bones.forEach((b) => b.destroy()) });
             },
           });
+        });
+        break;
+      }
+      case 'tomb': {
+        // Ice grows into a big tombstone around the enemy, then shatters.
+        const tomb = this.add.container(tx, ty).setDepth(D).setScale(1, 0);
+        const body = this.add.graphics();
+        body.fillStyle(0x8fd8ff, 0.55).fillRoundedRect(-75, -100, 150, 170, { tl: 70, tr: 70, bl: 6, br: 6 });
+        body.lineStyle(5, 0xffffff, 1).strokeRoundedRect(-75, -100, 150, 170, { tl: 70, tr: 70, bl: 6, br: 6 });
+        body.lineStyle(6, 0xdff4ff, 0.9).lineBetween(0, -70, 0, -20).lineBetween(-20, -52, 20, -52);
+        body.fillStyle(0xffffff, 0.5).fillRect(-55, -40, 10, 80);
+        tomb.add(body);
+        this.tweens.add({ targets: tomb, scaleY: 1, duration: 420, ease: 'Back.Out' });
+        target.sprite.setTint(0x8fd8ff);
+        for (let i = 0; i < 20; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = this.add.image(tx + Math.cos(a) * 180, ty + Math.sin(a) * 120, 'dot').setTint(0xdff4ff).setBlendMode('ADD').setDepth(D + 1);
+          this.tweens.add({ targets: d, x: tx, y: ty, alpha: 0.2, duration: 450, delay: i * 15, onComplete: () => d.destroy() });
+        }
+        const ghost = this.skull(tx, ty - 170, 60, 0xdff4ff).setDepth(D + 2).setAlpha(0);
+        this.tweens.add({ targets: ghost, alpha: 0.85, y: ty - 150, duration: 300, delay: 300 });
+        this.time.delayedCall(950, () => {
+          this.tweens.add({ targets: ghost, alpha: 0, scale: 1.5, duration: 300, onComplete: () => ghost.destroy() });
+          tomb.destroy();
+          target.sprite.clearTint();
+          for (let i = 0; i < 16; i++) {
+            const h = Phaser.Math.Between(20, 44);
+            const sh = this.add.triangle(tx, ty - 20, 0, 0, h / 2, h, h, 0, i % 2 ? 0xbfe8ff : 0x7ac8ff).setStrokeStyle(2, 0xffffff).setDepth(D + 1);
+            const a = (i / 16) * Math.PI * 2;
+            this.tweens.add({ targets: sh, x: tx + Math.cos(a) * 220, y: ty + Math.sin(a) * 160, angle: 540, alpha: 0, duration: 700, ease: 'Quad.Out', onComplete: () => sh.destroy() });
+          }
+          impact();
         });
         break;
       }
@@ -837,7 +886,8 @@ export class BattleScene extends Phaser.Scene {
       }
       case 'summon': {
         const cls = classOf(p);
-        this.castPose(() => {
+        const pose = sk.anim === 'raise' ? (done: () => void) => this.raiseDead(done) : (done: () => void) => this.castPose(done);
+        pose(() => {
           const had = !!p.pet;
           // Pets have about a third of the hero's health (more at higher ranks).
           const maxHp = Math.round(derive(p).maxHp * petHealthShare(sk));
@@ -880,7 +930,10 @@ export class BattleScene extends Phaser.Scene {
             const heal = Math.round(r.dmg * 0.6);
             p.hp = Math.min(s.maxHp, p.hp + heal);
             this.heroHp.set(p.hp, s.maxHp);
-            this.projectile(target.sprite, this.hero, 0x7dff9a, () => this.floatText(this.hero.x, this.hero.y - 60, `+${heal}`, '#7dff9a', 30));
+            const healText = () => this.floatText(this.hero.x, this.hero.y - 60, `+${heal}`, '#7dff9a', 30);
+            // The drain animation already pulls life back to the hero.
+            if (sk.anim === 'drain') this.time.delayedCall(560, healText);
+            else this.projectile(target.sprite, this.hero, 0x7dff9a, healText);
           }
           after();
         });
@@ -1345,6 +1398,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (sk.anim === 'aimed' || sk.anim === 'multishot' || sk.anim === 'concuss' || sk.anim === 'venom' || sk.anim === 'rapid' || sk.anim === 'thornvolley') {
       this.rangerMove(sk.anim, aim, target, onHit);
+      return;
+    }
+    if (sk.anim === 'drain' || sk.anim === 'bonespikes' || sk.anim === 'chill' || sk.anim === 'gravefrost' || sk.anim === 'lance') {
+      this.necroMove(sk.anim, aim, target, onHit);
       return;
     }
     if (sk.melee) {
@@ -1940,6 +1997,232 @@ export class BattleScene extends Phaser.Scene {
                 this.goHome(320);
               },
             }),
+        });
+        break;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ necromancer moves
+
+  /** A cartoon skull drawn with shapes (for ghosts and big shadow magic). */
+  private skull(x: number, y: number, size: number, color: number) {
+    const c = this.add.container(x, y);
+    const r = size / 2;
+    c.add(this.add.image(0, 0, 'glow').setScale(size / 12).setTint(color).setBlendMode('ADD'));
+    c.add(this.add.circle(0, -r * 0.15, r, color));
+    c.add(this.add.rectangle(0, r * 0.75, r * 1.1, r * 0.55, color));
+    c.add(this.add.circle(-r * 0.4, -r * 0.1, r * 0.28, 0x120a1c));
+    c.add(this.add.circle(r * 0.4, -r * 0.1, r * 0.28, 0x120a1c));
+    c.add(this.add.triangle(0, r * 0.35, 0, r * 0.22, r * 0.12, 0, r * 0.24, r * 0.22, 0x120a1c));
+    for (let k = -1; k <= 1; k++) c.add(this.add.rectangle(k * r * 0.3, r * 0.82, 3, r * 0.4, 0x120a1c));
+    return c;
+  }
+
+  /** Raise Skeleton: a glowing rune circle, ghost flames, and bones bursting out of the ground. */
+  private raiseDead(onDone: () => void) {
+    const x = this.heroHome.x - 150;
+    const y = this.heroHome.y + 45;
+    sfx('shadow');
+    this.castPose(() => {});
+    const circle = this.add.container(x, y + 40).setDepth(6).setScale(0.1, 0.03);
+    const g = this.add.graphics();
+    g.lineStyle(4, 0xb070ff, 1).strokeCircle(0, 0, 80).strokeCircle(0, 0, 64);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      const b = ((i + 2) / 5) * Math.PI * 2 - Math.PI / 2;
+      g.lineBetween(Math.cos(a) * 64, Math.sin(a) * 64, Math.cos(b) * 64, Math.sin(b) * 64);
+    }
+    circle.add([this.add.image(0, 0, 'glow').setScale(14).setTint(0x9a4aff).setBlendMode('ADD').setAlpha(0.6), g]);
+    this.tweens.add({ targets: circle, scaleX: 1, scaleY: 0.32, duration: 320, ease: 'Back.Out' });
+    this.tweens.add({ targets: g, angle: 180, duration: 1100 });
+    for (let i = 0; i < 16; i++) {
+      const f = this.add.image(x + Phaser.Math.Between(-70, 70), y + 40, 'dot').setScale(1.6).setTint(i % 3 ? 0x9a4aff : 0x7aff9a).setBlendMode('ADD').setDepth(12);
+      this.tweens.add({ targets: f, y: y - Phaser.Math.Between(40, 120), alpha: 0, scale: 0.3, duration: 700, delay: 150 + i * 30, onComplete: () => f.destroy() });
+    }
+    this.time.delayedCall(500, () => {
+      this.burst(x, y + 30, 0xe8e0d0, 18);
+      this.cameras.main.shake(120, 0.008);
+      for (let i = 0; i < 6; i++) {
+        const bone = this.add.rectangle(x, y + 30, 18, 5, 0xe8e0d0).setDepth(13);
+        this.tweens.add({ targets: bone, x: x + Phaser.Math.Between(-80, 80), y: y - Phaser.Math.Between(20, 90), angle: 540, alpha: 0, duration: 600, ease: 'Quad.Out', onComplete: () => bone.destroy() });
+      }
+      onDone();
+    });
+    this.tweens.add({ targets: circle, alpha: 0, duration: 400, delay: 1000, onComplete: () => circle.destroy() });
+  }
+
+  private necroMove(kind: 'drain' | 'bonespikes' | 'chill' | 'gravefrost' | 'lance', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    const { x: tx, y: ty } = t.sprite;
+    const hx = this.hero.x - 30;
+    const hy = this.hero.y - 10;
+    switch (kind) {
+      case 'drain': {
+        // A dark wavy tendril grabs the enemy and pulls red life orbs back to the hero.
+        this.castPose(() => {});
+        const g = this.add.graphics().setDepth(160).setBlendMode('ADD');
+        const wave = { p: 0, len: 0 };
+        const draw = () => {
+          g.clear();
+          for (const [w, col, al] of [[12, 0x6a2aaa, 0.6], [4, 0xd0a0ff, 1]] as const) {
+            g.lineStyle(w, col, al).beginPath();
+            const n = 24;
+            for (let i = 0; i <= n * wave.len; i++) {
+              const k = i / n;
+              const px = hx + (tx - hx) * k;
+              const py = hy + (ty - hy) * k + Math.sin(k * Math.PI * 4 + wave.p) * 18 * Math.sin(k * Math.PI);
+              if (i === 0) g.moveTo(px, py);
+              else g.lineTo(px, py);
+            }
+            g.strokePath();
+          }
+        };
+        this.tweens.add({ targets: wave, len: 1, duration: 260, onUpdate: draw });
+        this.tweens.add({ targets: wave, p: Math.PI * 8, duration: 1100, onUpdate: draw, onComplete: () => this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() }) });
+        this.time.delayedCall(280, () => {
+          this.burst(tx, ty, 0xb070ff, 16);
+          onHit();
+          for (let i = 0; i < 10; i++) {
+            const o = this.add.image(tx, ty, 'glow').setScale(1.3).setTint(i % 2 ? 0xff4a6a : 0x7dff9a).setBlendMode('ADD').setDepth(162);
+            const cur = { k: 0 };
+            this.tweens.add({
+              targets: cur,
+              k: 1,
+              duration: 520,
+              delay: i * 55,
+              ease: 'Sine.In',
+              onUpdate: () => o.setPosition(tx + (hx - tx) * cur.k, ty + (hy - ty) * cur.k - Math.sin(cur.k * Math.PI) * 50),
+              onComplete: () => o.destroy(),
+            });
+          }
+          this.time.delayedCall(600, () => this.sparkle(this.hero, 0x7dff9a, 14));
+        });
+        break;
+      }
+      case 'bonespikes': {
+        // The ground cracks and sharp bones burst up under every enemy.
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const { x, y } = f.sprite;
+          const crack = this.add.graphics({ x, y: y + 46 }).setDepth(5);
+          crack.lineStyle(3, 0x120a1c, 1);
+          for (let k = 0; k < 6; k++) {
+            const a = (k / 6) * Math.PI * 2;
+            crack.lineBetween(0, 0, Math.cos(a) * 60, Math.sin(a) * 16);
+          }
+          crack.setScale(0);
+          this.tweens.add({ targets: crack, scale: 1, duration: 200, delay: i * 90 });
+          this.tweens.add({ targets: crack, alpha: 0, duration: 400, delay: 1000, onComplete: () => crack.destroy() });
+          this.time.delayedCall(220 + i * 90, () => {
+            const spikes: Phaser.GameObjects.Triangle[] = [];
+            for (let k = 0; k < 7; k++) {
+              const h = 60 + Math.random() * 50 + (k === 3 ? 40 : 0);
+              const sp = this.add.triangle(x - 60 + k * 20, y + 50, 0, h, 9, 0, 18, h, k % 2 ? 0xe8e0d0 : 0xcfc4b0).setOrigin(0.5, 1).setStrokeStyle(2, 0x6a5a4a).setScale(1, 0).setDepth(f.sprite.depth + 1);
+              spikes.push(sp);
+              this.tweens.add({ targets: sp, scaleY: 1, duration: 130, delay: k * 25, ease: 'Back.Out' });
+            }
+            this.burst(x, y + 40, 0xb070ff, 12);
+            this.cameras.main.shake(100, 0.008);
+            this.tweens.add({ targets: spikes, scaleY: 0, alpha: 0, duration: 300, delay: 600, onComplete: () => spikes.forEach((s) => s.destroy()) });
+          });
+        });
+        this.time.delayedCall(300, onHit);
+        break;
+      }
+      case 'chill': {
+        // A ghost skull flies over, breathes frost and freezes the enemy in ice.
+        const sk = this.skull(hx, hy - 30, 40, 0xbfe8ff).setDepth(165).setAlpha(0);
+        this.tweens.add({ targets: sk, alpha: 0.9, duration: 150 });
+        this.tweens.add({
+          targets: sk,
+          x: tx + 20,
+          y: ty - 40,
+          duration: 420,
+          ease: 'Sine.InOut',
+          onUpdate: () => sk.setY(sk.y + Math.sin(sk.x / 30) * 1.5),
+          onComplete: () => {
+            this.burst(tx, ty, 0xdff4ff, 26);
+            const ice = this.add.rectangle(tx, ty, 100, 110, 0x8fd8ff, 0.45).setStrokeStyle(4, 0xffffff).setDepth(t.sprite.depth + 1).setScale(0.3);
+            const shine = this.add.rectangle(tx - 26, ty - 20, 10, 60, 0xffffff, 0.6).setDepth(t.sprite.depth + 2).setAngle(20).setScale(0.3);
+            this.tweens.add({ targets: [ice, shine], scale: 1, duration: 200, ease: 'Back.Out' });
+            this.ring(tx, ty, 0x8fd8ff, 120, 6);
+            t.sprite.setTint(0x8fd8ff);
+            this.time.delayedCall(900, () => t.sprite.clearTint());
+            this.tweens.add({ targets: [ice, shine], alpha: 0, duration: 400, delay: 700, onComplete: () => { ice.destroy(); shine.destroy(); } });
+            this.tweens.add({ targets: sk, alpha: 0, scale: 1.6, duration: 300, onComplete: () => sk.destroy() });
+            onHit();
+          },
+        });
+        break;
+      }
+      case 'gravefrost': {
+        // Icy grave fog rolls over the enemies, ghost faces swirl and ice shards stab up.
+        this.castPose(() => {});
+        this.cameras.main.flash(140, 160, 200, 255, false);
+        const fog: Phaser.GameObjects.Image[] = [];
+        for (let i = 0; i < 14; i++) {
+          const f = this.add.image(this.hero.x - 40, this.hero.y + Phaser.Math.Between(-60, 80), 'glow').setScale(Phaser.Math.FloatBetween(4, 7)).setTint(i % 3 ? 0x7ab8ff : 0xb070ff).setBlendMode('ADD').setAlpha(0.5).setDepth(158);
+          fog.push(f);
+          const goal = foes[i % foes.length].sprite;
+          this.tweens.add({ targets: f, x: goal.x + Phaser.Math.Between(-60, 60), y: goal.y + Phaser.Math.Between(-30, 40), duration: 520, delay: i * 20, ease: 'Sine.Out' });
+        }
+        foes.forEach((f, i) => {
+          const ghost = this.skull(f.sprite.x + 50, f.sprite.y - 40, 26, 0xdff4ff).setDepth(166).setAlpha(0);
+          this.tweens.add({ targets: ghost, alpha: 0.8, x: f.sprite.x - 40, y: f.sprite.y - 70, duration: 700, delay: 200 + i * 80, onComplete: () => this.tweens.add({ targets: ghost, alpha: 0, duration: 200, onComplete: () => ghost.destroy() }) });
+          this.time.delayedCall(480 + i * 90, () => {
+            for (let k = 0; k < 5; k++) {
+              const h = 50 + Math.random() * 40;
+              const sh = this.add.triangle(f.sprite.x - 48 + k * 24, f.sprite.y + 48, 0, h, 10, 0, 20, h, k % 2 ? 0xbfe8ff : 0x7ac8ff).setOrigin(0.5, 1).setStrokeStyle(2, 0xffffff).setScale(1, 0).setDepth(f.sprite.depth + 1);
+              this.tweens.add({ targets: sh, scaleY: 1, duration: 120, delay: k * 30, ease: 'Back.Out' });
+              this.tweens.add({ targets: sh, alpha: 0, duration: 300, delay: 700, onComplete: () => sh.destroy() });
+            }
+            this.burst(f.sprite.x, f.sprite.y, 0xdff4ff, 12);
+          });
+        });
+        this.tweens.add({ targets: fog, alpha: 0, duration: 500, delay: 900, onComplete: () => fog.forEach((f) => f.destroy()) });
+        this.time.delayedCall(520, onHit);
+        break;
+      }
+      case 'lance': {
+        // A huge spear of darkness forms over the hero and is hurled through the enemy.
+        const lx = this.hero.x;
+        const ly = this.hero.y - 110;
+        const lance = this.add.container(lx, ly).setDepth(166).setScale(0.2).setAlpha(0);
+        lance.add([
+          this.add.image(0, 0, 'glow').setScale(9, 2.4).setTint(0x9a4aff).setBlendMode('ADD'),
+          this.add.rectangle(10, 0, 130, 10, 0x2a0a4a).setStrokeStyle(2, 0xd0a0ff),
+          this.add.triangle(-72, 0, 0, 12, 34, 0, 34, 24, 0xd0a0ff).setStrokeStyle(2, 0xffffff),
+          this.add.triangle(76, 0, 0, 0, 20, 10, 0, 20, 0x6a2aaa),
+        ]);
+        this.castPose(() => {});
+        this.tweens.add({ targets: lance, scale: 1.2, alpha: 1, duration: 360, ease: 'Back.Out' });
+        for (let i = 0; i < 18; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = this.add.image(lx + Math.cos(a) * 120, ly + Math.sin(a) * 70, 'dot').setTint(0xb070ff).setBlendMode('ADD').setDepth(165);
+          this.tweens.add({ targets: d, x: lx, y: ly, alpha: 0.2, duration: 360, delay: i * 12, onComplete: () => d.destroy() });
+        }
+        this.time.delayedCall(440, () => {
+          lance.setRotation(Phaser.Math.Angle.Between(tx, ty, lx, ly));
+          const trail = this.add.particles(0, 0, 'dot', { follow: lance, speed: 40, lifespan: 400, scale: { start: 1.4, end: 0 }, tint: [0x9a4aff, 0x2a0a4a], blendMode: 'ADD', frequency: 8 }).setDepth(164);
+          this.tweens.add({
+            targets: lance,
+            x: tx,
+            y: ty,
+            duration: 170,
+            ease: 'Quad.In',
+            onComplete: () => {
+              trail.stop();
+              this.time.delayedCall(420, () => trail.destroy());
+              this.cameras.main.shake(200, 0.016);
+              this.burst(tx, ty, 0x9a4aff, 34);
+              this.burst(tx, ty, 0x120a1c, 14);
+              for (let k = 0; k < 3; k++) this.time.delayedCall(k * 90, () => this.ring(tx, ty, k % 2 ? 0xd0a0ff : 0x6a2aaa, 140 + k * 30, 7));
+              this.tweens.add({ targets: lance, x: tx - 180, y: ty + (ty - ly) * 0.3, alpha: 0, duration: 260, onComplete: () => lance.destroy() });
+              onHit();
+            },
+          });
         });
         break;
       }
