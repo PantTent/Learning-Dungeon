@@ -27,7 +27,12 @@ export interface SkillDef {
   /** Area spells: chance to freeze/stun each enemy hit (on a right answer). */
   stunChance?: number;
   /** Special look for the spell's missile (default: a small glowing orb). */
-  anim?: 'orb' | 'snow' | 'cleave' | 'bash' | 'heroic' | 'execute' | 'storm' | 'thunderclap';
+  anim?:
+    | 'orb' | 'snow'
+    // warrior
+    | 'cleave' | 'bash' | 'heroic' | 'execute' | 'storm' | 'thunderclap'
+    // paladin
+    | 'crusader' | 'holylight' | 'judge' | 'consecrate' | 'sunfire' | 'flamestrike' | 'hammerthrow';
 }
 
 export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder';

@@ -565,6 +565,12 @@ export class BattleScene extends Phaser.Scene {
       case 'hammer': {
         const pillar = this.add.rectangle(tx, ty + 40, 110, 900, 0xffe066, 0).setOrigin(0.5, 1).setDepth(D - 1).setBlendMode('ADD');
         this.tweens.add({ targets: pillar, fillAlpha: 0.45, duration: 250 });
+        // Heavenly beams fan down around the enemy while the hammer falls.
+        for (let i = 0; i < 6; i++) {
+          const bx = tx - 250 + i * 100;
+          const beam = this.add.rectangle(bx, ty + 60, 30, 900, 0xfff0a0, 0).setOrigin(0.5, 1).setDepth(D - 2).setBlendMode('ADD').setRotation((bx - tx) / 1400);
+          this.tweens.add({ targets: beam, fillAlpha: 0.35, duration: 200, delay: i * 60, yoyo: true, hold: 500, onComplete: () => beam.destroy() });
+        }
         const hammer = this.add.container(tx, -150).setDepth(D);
         hammer.add(this.add.rectangle(0, -40, 16, 120, 0x8a5a2a).setStrokeStyle(3, 0x3a2410));
         hammer.add(this.add.rectangle(0, 30, 110, 60, 0xffd24a).setStrokeStyle(4, 0x7a5a10));
@@ -578,6 +584,13 @@ export class BattleScene extends Phaser.Scene {
           ease: 'Quad.In',
           onComplete: () => {
             impact();
+            this.holyCross(tx, ty, 260);
+            // Rays of light burst outwards.
+            for (let i = 0; i < 12; i++) {
+              const a = (i / 12) * Math.PI * 2;
+              const ray = this.add.rectangle(tx, ty, 260, 8, 0xfff0a0, 0.9).setOrigin(0, 0.5).setRotation(a).setDepth(D + 1).setBlendMode('ADD').setScale(0.2, 1);
+              this.tweens.add({ targets: ray, scaleX: 1.2, alpha: 0, duration: 600, onComplete: () => ray.destroy() });
+            }
             this.tweens.add({ targets: [hammer, pillar], alpha: 0, duration: 500, delay: 200, onComplete: () => { hammer.destroy(); pillar.destroy(); } });
           },
         });
@@ -740,7 +753,8 @@ export class BattleScene extends Phaser.Scene {
       case 'heal': {
         const s = derive(p);
         const amt = Math.round(s.maxHp * sk.power * (correct ? 1 : 0.5));
-        this.castPose(() => {
+        const pose = sk.anim === 'holylight' ? (done: () => void) => this.holyLight(done) : (done: () => void) => this.castPose(done);
+        pose(() => {
           p.hp = Math.min(s.maxHp, p.hp + amt);
           this.heroHp.set(p.hp, s.maxHp);
           this.sparkle(this.hero, FX_COLOR.heal);
@@ -1254,6 +1268,10 @@ export class BattleScene extends Phaser.Scene {
       this.warriorMove(sk.anim, aim, target, onHit);
       return;
     }
+    if (sk.anim === 'crusader' || sk.anim === 'judge' || sk.anim === 'consecrate' || sk.anim === 'sunfire' || sk.anim === 'flamestrike' || sk.anim === 'hammerthrow') {
+      this.paladinMove(sk.anim, aim, target, onHit);
+      return;
+    }
     if (sk.melee) {
       this.tweens.add({
         targets: this.hero,
@@ -1406,6 +1424,194 @@ export class BattleScene extends Phaser.Scene {
     g.strokePath();
     g.setRotation(Phaser.Math.FloatBetween(-0.5, 0.5));
     this.tweens.add({ targets: g, alpha: 0, scale: 1.25, duration: 260, onComplete: () => g.destroy() });
+  }
+
+  // ------------------------------------------------------------ paladin moves
+
+  /** Holy Light: a beam from the sky onto the hero, golden rings rising. */
+  private holyLight(onDone: () => void) {
+    const { x, y } = this.hero;
+    sfx('holy');
+    const beam = this.add.rectangle(x, y + 50, 90, 700, 0xfff0a0, 0).setOrigin(0.5, 1).setDepth(9).setBlendMode('ADD');
+    this.tweens.add({ targets: beam, fillAlpha: 0.5, duration: 200, yoyo: true, hold: 300, onComplete: () => beam.destroy() });
+    for (let i = 0; i < 4; i++) {
+      const r = this.add.ellipse(x, y + 40, 120, 30).setStrokeStyle(4, 0xffe066).setDepth(11);
+      this.tweens.add({ targets: r, y: y - 80, alpha: 0, scaleX: 0.5, duration: 700, delay: i * 120, onComplete: () => r.destroy() });
+    }
+    this.sparkle(this.hero, 0xfff0a0, 24);
+    this.tweens.add({ targets: this.hero, y: this.heroHome.y - 14, duration: 300, yoyo: true, ease: 'Sine.InOut', onComplete: onDone });
+  }
+
+  /** A golden cross of light. */
+  private holyCross(x: number, y: number, size = 120) {
+    for (const [w, h] of [[16, size], [size * 0.75, 16]]) {
+      const bar = this.add.rectangle(x, y - size * 0.1, w, h, 0xfff0a0).setDepth(172).setBlendMode('ADD');
+      this.tweens.add({ targets: bar, scale: 1.3, alpha: 0, duration: 450, onComplete: () => bar.destroy() });
+    }
+  }
+
+  private paladinMove(kind: 'crusader' | 'judge' | 'consecrate' | 'sunfire' | 'flamestrike' | 'hammerthrow', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    switch (kind) {
+      case 'crusader': {
+        // A blessed strike: gold slash and a cross of light.
+        this.dashTo(t, () => {
+          this.slash(t.sprite.x, t.sprite.y, 0xffe066);
+          this.holyCross(t.sprite.x, t.sprite.y, 110);
+          this.burst(t.sprite.x, t.sprite.y, 0xfff0a0, 14);
+          onHit();
+          this.goHome(160);
+        });
+        break;
+      }
+      case 'judge': {
+        // A golden sigil locks onto the enemy, then a beam of judgement slams down.
+        sfx('holy');
+        this.castPose(() => {});
+        const { x, y } = t.sprite;
+        const sigil = this.add.container(x, y).setDepth(168);
+        const g = this.add.graphics();
+        g.lineStyle(4, 0xffe066, 1).strokeCircle(0, 0, 70).strokeCircle(0, 0, 52);
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          g.lineBetween(Math.cos(a) * 52, Math.sin(a) * 52, Math.cos(a) * 70, Math.sin(a) * 70);
+        }
+        g.lineStyle(3, 0xfff0a0, 1).lineBetween(-40, 0, 40, 0).lineBetween(0, -40, 0, 40);
+        sigil.add(g);
+        sigil.setScale(0.2).setAlpha(0);
+        this.tweens.add({ targets: sigil, scale: 1, alpha: 1, angle: 180, duration: 380, ease: 'Back.Out' });
+        this.time.delayedCall(420, () => {
+          const beam = this.add.rectangle(x, y + 30, 70, 700, 0xfff0a0, 0.75).setOrigin(0.5, 1).setDepth(169).setBlendMode('ADD');
+          this.tweens.add({ targets: beam, scaleX: 0, alpha: 0, duration: 420, onComplete: () => beam.destroy() });
+          this.ring(x, y, 0xffe066, 150, 8);
+          this.cameras.main.flash(100, 255, 240, 170);
+          this.cameras.main.shake(140, 0.01);
+          this.tweens.add({ targets: sigil, scale: 0.6, alpha: 0, duration: 500, delay: 200, onComplete: () => sigil.destroy() });
+          onHit();
+        });
+        break;
+      }
+      case 'consecrate': {
+        // Holy ground spreads under every enemy and light rises from it.
+        sfx('holy');
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const { x, y } = f.sprite;
+          const ground = this.add.ellipse(x, y + 46, 20, 8, 0xffe066, 0.55).setDepth(5).setBlendMode('ADD');
+          ground.setStrokeStyle(3, 0xfff6c0);
+          this.tweens.add({ targets: ground, width: 170, height: 46, duration: 300, delay: i * 80, ease: 'Quad.Out' });
+          this.tweens.add({ targets: ground, alpha: 0, duration: 400, delay: 900 + i * 80, onComplete: () => ground.destroy() });
+          this.time.delayedCall(250 + i * 80, () => {
+            for (let k = 0; k < 4; k++) {
+              const col = this.add.rectangle(x - 50 + k * 33, y + 46, 12, 10, 0xfff0a0, 0.8).setOrigin(0.5, 1).setDepth(167).setBlendMode('ADD');
+              this.tweens.add({ targets: col, height: 130 + Math.random() * 60, alpha: 0, duration: 520, delay: k * 50, onComplete: () => col.destroy() });
+            }
+            this.burst(x, y + 30, 0xffe066, 10);
+          });
+        });
+        this.time.delayedCall(320, onHit);
+        break;
+      }
+      case 'sunfire': {
+        // A little sun forms above the paladin and shoots a sunbeam.
+        const sx = this.hero.x - 20;
+        const sy = this.hero.y - 120;
+        const sun = this.add.container(sx, sy).setDepth(168).setScale(0.2);
+        const rays = this.add.graphics();
+        rays.lineStyle(5, 0xffb030, 1);
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          rays.lineBetween(Math.cos(a) * 30, Math.sin(a) * 30, Math.cos(a) * 46, Math.sin(a) * 46);
+        }
+        sun.add([this.add.image(0, 0, 'glow').setScale(7).setTint(0xff9a20).setBlendMode('ADD'), rays, this.add.circle(0, 0, 24, 0xffd24a), this.add.circle(-6, -6, 9, 0xfff6c0)]);
+        this.tweens.add({ targets: sun, scale: 1, duration: 280, ease: 'Back.Out' });
+        this.tweens.add({ targets: rays, angle: 360, duration: 900 });
+        this.time.delayedCall(360, () => {
+          const g = this.add.graphics().setDepth(167).setBlendMode('ADD');
+          const draw = (w: number) => {
+            g.clear();
+            g.lineStyle(w, 0xff9a20, 0.6).lineBetween(sx, sy, t.sprite.x, t.sprite.y);
+            g.lineStyle(w / 3, 0xfff6c0, 1).lineBetween(sx, sy, t.sprite.x, t.sprite.y);
+          };
+          draw(26);
+          this.time.addEvent({ delay: 50, repeat: 4, callback: () => draw(Phaser.Math.Between(18, 30)) });
+          this.time.delayedCall(260, () => g.destroy());
+          this.burst(t.sprite.x, t.sprite.y, 0xff7a2a, 30);
+          this.ring(t.sprite.x, t.sprite.y, 0xffb030, 120, 6);
+          this.cameras.main.shake(120, 0.008);
+          this.tweens.add({ targets: sun, scale: 0, alpha: 0, duration: 300, delay: 150, onComplete: () => sun.destroy() });
+          onHit();
+        });
+        break;
+      }
+      case 'flamestrike': {
+        // A circle marks each enemy, then a column of fire crashes down on it.
+        sfx('fire');
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const { x, y } = f.sprite;
+          const mark = this.add.ellipse(x, y + 46, 150, 40).setStrokeStyle(4, 0xff5a20).setDepth(5);
+          this.tweens.add({ targets: mark, alpha: 0.3, duration: 120, yoyo: true, repeat: 1 });
+          this.time.delayedCall(260 + i * 110, () => {
+            const col = this.add.rectangle(x, -20, 110, 10, 0xff7a20, 0.85).setOrigin(0.5, 0).setDepth(169).setBlendMode('ADD');
+            const core = this.add.rectangle(x, -20, 40, 10, 0xfff0a0, 1).setOrigin(0.5, 0).setDepth(170).setBlendMode('ADD');
+            this.tweens.add({
+              targets: [col, core],
+              height: y + 66,
+              duration: 140,
+              ease: 'Quad.In',
+              onComplete: () => {
+                this.burst(x, y + 30, 0xff5a20, 22);
+                this.burst(x, y, 0xffd24a, 10);
+                this.cameras.main.shake(100, 0.008);
+                this.tweens.add({ targets: [col, core, mark], alpha: 0, scaleX: 0.2, duration: 380, onComplete: () => { col.destroy(); core.destroy(); mark.destroy(); } });
+              },
+            });
+          });
+        });
+        this.time.delayedCall(420, onHit);
+        break;
+      }
+      case 'hammerthrow': {
+        // Throw a spinning golden hammer; it smashes the enemy and flies back.
+        const hammer = this.add.container(this.hero.x - 30, this.hero.y - 10).setDepth(168);
+        hammer.add(this.add.image(0, 0, 'glow').setScale(5).setTint(0xfff0a0).setBlendMode('ADD'));
+        hammer.add(this.add.rectangle(0, 18, 10, 52, 0x8a5a2a).setStrokeStyle(2, 0x3a2410));
+        hammer.add(this.add.rectangle(0, -10, 56, 30, 0xffd24a).setStrokeStyle(3, 0x7a5a10));
+        const trail = this.add.particles(0, 0, 'dot', { follow: hammer, speed: 20, lifespan: 300, scale: { start: 1.2, end: 0 }, tint: [0xffe066, 0xffffff], blendMode: 'ADD', frequency: 14 }).setDepth(167);
+        this.tweens.add({ targets: hammer, angle: -720, duration: 420 });
+        this.tweens.add({
+          targets: hammer,
+          x: t.sprite.x,
+          y: t.sprite.y,
+          duration: 420,
+          ease: 'Quad.In',
+          onComplete: () => {
+            sfx('boom');
+            this.holyCross(t.sprite.x, t.sprite.y, 150);
+            this.ring(t.sprite.x, t.sprite.y, 0xffe066, 170, 8);
+            this.burst(t.sprite.x, t.sprite.y, 0xffe066, 26);
+            this.cameras.main.shake(180, 0.014);
+            onHit();
+            this.tweens.add({ targets: hammer, angle: -1440, duration: 420 });
+            this.tweens.add({
+              targets: hammer,
+              x: this.hero.x - 30,
+              y: this.hero.y - 10,
+              duration: 420,
+              ease: 'Quad.Out',
+              onComplete: () => {
+                hammer.destroy();
+                trail.stop();
+                this.time.delayedCall(320, () => trail.destroy());
+              },
+            });
+          },
+        });
+        break;
+      }
+    }
   }
 
   // ------------------------------------------------------------ warrior moves
