@@ -491,25 +491,96 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
       case 'arrowstorm': {
-        const n = 26;
-        let landed = 0;
-        for (let i = 0; i < n; i++) {
-          const x = tx + Phaser.Math.Between(-80, 80);
-          const a = this.add.rectangle(x + 60, -40, 4, 34, 0xe8d8a0).setDepth(D).setRotation(-0.25);
-          this.tweens.add({
-            targets: a,
-            x,
-            y: ty + Phaser.Math.Between(-30, 30),
-            duration: 260,
-            delay: i * 28,
-            ease: 'Quad.In',
-            onComplete: () => {
-              this.burst(a.x, a.y, 0x9aff6a, 4, D);
-              a.destroy();
-              if (++landed === n) impact();
-            },
+        // The ranger leaps up and fires into the sky; a storm of glowing arrows
+        // rains on every enemy and leaves the ground bristling with arrows.
+        const hy = this.hero.y;
+        this.tweens.add({ targets: this.hero, y: hy - 110, duration: 260, ease: 'Quad.Out', yoyo: true, hold: 520 });
+        for (let k = 0; k < 3; k++) {
+          this.time.delayedCall(120 + k * 90, () => {
+            const p = this.bowTip();
+            this.shot(p.x, p.y, p.x - 60 - k * 50, -60, () => {}, { glow: pw.color, trail: pw.color, scale: 1.4, ms: 240 });
           });
         }
+        const foes = this.alive();
+        const n = 48;
+        let landed = 0;
+        const stuck: Phaser.GameObjects.Rectangle[] = [];
+        for (let i = 0; i < n; i++) {
+          const f = foes[i % foes.length];
+          const x = f.sprite.x + Phaser.Math.Between(-90, 90);
+          const y = f.sprite.y + Phaser.Math.Between(-40, 50);
+          this.time.delayedCall(480 + i * 24, () =>
+            this.shot(x + 110, -60, x, y, () => {
+              this.burst(x, y, pw.color, 4, D);
+              if (i % 3 === 0) {
+                const a = this.add.rectangle(x, y + 30, 4, 26, 0xe8d8a0).setRotation(-0.6).setDepth(D - 5);
+                stuck.push(a);
+              }
+              if (++landed === n) {
+                foes.forEach((g) => this.ring(g.sprite.x, g.sprite.y, pw.color, 180, 8, 520));
+                impact();
+                this.tweens.add({ targets: stuck, alpha: 0, duration: 500, delay: 700, onComplete: () => stuck.forEach((s) => s.destroy()) });
+              }
+            }, { glow: pw.color, trail: i % 2 ? pw.color : 0xffffff, ms: 300, ease: 'Quad.In' }),
+          );
+        }
+        break;
+      }
+      case 'wild': {
+        // A howl calls spirit wolves that charge through the enemy, then a spirit
+        // bear swipes with giant claws and vines burst from the ground.
+        for (let k = 0; k < 3; k++) this.time.delayedCall(k * 140, () => this.ring(this.hero.x, this.hero.y, pw.color, 240, 6, 600));
+        const wolves = 5;
+        for (let i = 0; i < wolves; i++) {
+          this.time.delayedCall(200 + i * 110, () => {
+            const y = ty + (i - 2) * 34;
+            const w = this.add.image(this.hero.x + 40, y, 'enemy_wolf').setScale(5.5).setFlipX(true).setTint(pw.color).setAlpha(0.85).setBlendMode('ADD').setDepth(D);
+            const trail = this.add.particles(0, 0, 'dot', { follow: w, speed: 30, lifespan: 400, scale: { start: 1.2, end: 0 }, tint: [pw.color, 0xffffff], blendMode: 'ADD', frequency: 12 }).setDepth(D - 1);
+            this.tweens.add({ targets: w, y: y - 18, duration: 90, yoyo: true, repeat: 3 });
+            this.tweens.add({
+              targets: w,
+              x: tx - 260,
+              duration: 620,
+              ease: 'Quad.In',
+              onUpdate: () => {
+                if (!w.getData('hit') && w.x < tx + 20) {
+                  w.setData('hit', true);
+                  this.slash(tx, y, pw.color);
+                  this.burst(tx, y, pw.color, 8, D);
+                }
+              },
+              onComplete: () => {
+                trail.stop();
+                this.time.delayedCall(420, () => trail.destroy());
+                this.tweens.add({ targets: w, alpha: 0, duration: 200, onComplete: () => w.destroy() });
+              },
+            });
+          });
+        }
+        this.time.delayedCall(1050, () => {
+          const bear = this.add.image(tx + 60, ty - 30, 'enemy_owlbear').setScale(9).setFlipX(true).setTint(pw.color).setAlpha(0).setBlendMode('ADD').setDepth(D);
+          this.tweens.add({ targets: bear, alpha: 0.75, y: ty - 50, duration: 260, ease: 'Quad.Out' });
+          this.time.delayedCall(300, () => {
+            const claws = this.add.graphics({ x: tx, y: ty }).setDepth(D + 2).setRotation(0.5);
+            for (let k = 0; k < 3; k++) {
+              claws.lineStyle(14, pw.color, 0.6).lineBetween(-30 + k * 30, -110, -30 + k * 30, 110);
+              claws.lineStyle(5, 0xffffff, 1).lineBetween(-30 + k * 30, -100, -30 + k * 30, 100);
+            }
+            claws.setScale(1, 0);
+            this.tweens.add({ targets: claws, scaleY: 1, duration: 120, ease: 'Quad.Out' });
+            this.tweens.add({ targets: claws, alpha: 0, duration: 400, delay: 300, onComplete: () => claws.destroy() });
+            this.tweens.add({ targets: bear, alpha: 0, duration: 400, delay: 200, onComplete: () => bear.destroy() });
+            const spikes: Phaser.GameObjects.Triangle[] = [];
+            for (let i = 0; i < 9; i++) {
+              const h = 70 + Math.random() * 60;
+              const sp = this.add.triangle(tx - 100 + i * 25, ty + 50, 0, h, 12, 0, 24, h, i % 2 ? 0x3a8a2a : 0x6ad04a).setOrigin(0.5, 1).setScale(1, 0).setDepth(D);
+              spikes.push(sp);
+              this.tweens.add({ targets: sp, scaleY: 1, duration: 160, delay: i * 30, ease: 'Back.Out' });
+            }
+            this.tweens.add({ targets: spikes, scaleY: 0, alpha: 0, duration: 400, delay: 800, onComplete: () => spikes.forEach((x) => x.destroy()) });
+            impact();
+          });
+        });
         break;
       }
       case 'whirlwind': {
@@ -1272,6 +1343,10 @@ export class BattleScene extends Phaser.Scene {
       this.paladinMove(sk.anim, aim, target, onHit);
       return;
     }
+    if (sk.anim === 'aimed' || sk.anim === 'multishot' || sk.anim === 'concuss' || sk.anim === 'venom' || sk.anim === 'rapid' || sk.anim === 'thornvolley') {
+      this.rangerMove(sk.anim, aim, target, onHit);
+      return;
+    }
     if (sk.melee) {
       this.tweens.add({
         targets: this.hero,
@@ -1865,6 +1940,208 @@ export class BattleScene extends Phaser.Scene {
                 this.goHome(320);
               },
             }),
+        });
+        break;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ ranger moves
+
+  /** Where arrows leave the ranger's bow. */
+  private bowTip() {
+    return { x: this.hero.x - 34, y: this.hero.y - 6 };
+  }
+
+  /** A flying arrow (shaft, head, feathers) from (x0, y0) to (x1, y1). */
+  private shot(
+    x0: number, y0: number, x1: number, y1: number, onDone: () => void,
+    o: { shaft?: number; head?: number; glow?: number; trail?: number; scale?: number; ms?: number; ease?: string; thorns?: boolean } = {},
+  ) {
+    const c = this.add.container(x0, y0).setDepth(162).setRotation(Phaser.Math.Angle.Between(x0, y0, x1, y1)).setScale(1.4 * (o.scale ?? 1));
+    if (o.glow !== undefined) c.add(this.add.image(0, 0, 'glow').setScale(3, 1.4).setTint(o.glow).setBlendMode('ADD'));
+    c.add(this.add.rectangle(-4, 0, 36, 4, o.shaft ?? 0xe8d8a0));
+    c.add(this.add.triangle(20, 0, 0, 0, 12, 6, 0, 12, o.head ?? 0xd0d0e0));
+    c.add(this.add.triangle(-20, -4, 0, 0, 10, 4, 0, 4, 0xd04a4a));
+    c.add(this.add.triangle(-20, 4, 0, 0, 10, 0, 0, 4, 0xd04a4a));
+    if (o.thorns) for (let k = 0; k < 3; k++) c.add(this.add.triangle(-12 + k * 9, -4, 0, 4, 3, 0, 6, 4, 0x3a8a2a));
+    const trail = o.trail === undefined ? null : this.add.particles(0, 0, 'dot', {
+      follow: c, speed: 20, lifespan: 320, scale: { start: 0.8, end: 0 }, tint: o.trail, blendMode: 'ADD', frequency: 14,
+    }).setDepth(161);
+    this.tweens.add({
+      targets: c,
+      x: x1,
+      y: y1,
+      duration: o.ms ?? 200,
+      ease: o.ease ?? 'Linear',
+      onComplete: () => {
+        c.destroy();
+        trail?.stop();
+        if (trail) this.time.delayedCall(360, () => trail.destroy());
+        onDone();
+      },
+    });
+  }
+
+  /** Pull the bowstring back, then let go. */
+  private drawBow(hold: number, then: () => void) {
+    this.tweens.add({ targets: this.hero, x: this.heroHome.x + 18, duration: hold, ease: 'Sine.Out', onComplete: () => {
+      then();
+      this.tweens.add({ targets: this.hero, x: this.heroHome.x, duration: 120, ease: 'Back.Out' });
+    } });
+  }
+
+  /** Little stars circling a stunned enemy's head. */
+  private dizzy(f: Foe) {
+    const stars = [0, 1, 2].map(() => this.add.star(f.sprite.x, f.sprite.y - 60, 5, 7, 16, 0xffe066).setStrokeStyle(2, 0xffffff).setDepth(171));
+    const spin = { a: 0 };
+    this.tweens.add({
+      targets: spin,
+      a: Math.PI * 4,
+      duration: 1100,
+      onUpdate: () => stars.forEach((s, i) => {
+        const a = spin.a + (i / 3) * Math.PI * 2;
+        s.setPosition(f.sprite.x + Math.cos(a) * 40, f.sprite.y - 42 + Math.sin(a) * 12).setAngle(spin.a * 60);
+      }),
+      onComplete: () => this.tweens.add({ targets: stars, alpha: 0, duration: 200, onComplete: () => stars.forEach((s) => s.destroy()) }),
+    });
+  }
+
+  private rangerMove(kind: 'aimed' | 'multishot' | 'concuss' | 'venom' | 'rapid' | 'thornvolley', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    const { x: tx, y: ty } = t.sprite;
+    switch (kind) {
+      case 'aimed': {
+        // A red target locks on, the bow glows, then one perfect glowing arrow.
+        const ret = this.add.container(tx, ty).setDepth(168).setScale(2.2).setAlpha(0);
+        const g = this.add.graphics();
+        g.lineStyle(4, 0xff4a4a, 1).strokeCircle(0, 0, 56).strokeCircle(0, 0, 8);
+        g.lineBetween(-76, 0, -30, 0).lineBetween(30, 0, 76, 0).lineBetween(0, -76, 0, -30).lineBetween(0, 30, 0, 76);
+        ret.add(g);
+        this.tweens.add({ targets: ret, scale: 1, alpha: 1, angle: 90, duration: 420, ease: 'Quad.Out' });
+        const b = this.bowTip();
+        const gleam = this.add.image(b.x, b.y, 'glow').setScale(0.5).setTint(0xffe066).setBlendMode('ADD').setDepth(163);
+        this.tweens.add({ targets: gleam, scale: 3, duration: 420 });
+        this.drawBow(440, () => {
+          gleam.destroy();
+          const p = this.bowTip();
+          const streak = this.add.graphics().setDepth(160).setBlendMode('ADD');
+          streak.lineStyle(10, 0xffe066, 0.5).lineBetween(p.x, p.y, tx, ty);
+          streak.lineStyle(3, 0xffffff, 1).lineBetween(p.x, p.y, tx, ty);
+          this.tweens.add({ targets: streak, alpha: 0, duration: 320, onComplete: () => streak.destroy() });
+          this.shot(p.x, p.y, tx, ty, () => {
+            this.ring(tx, ty, 0xffe066, 130, 7);
+            this.burst(tx, ty, 0xfff0a0, 24);
+            this.cameras.main.shake(140, 0.01);
+            this.tweens.add({ targets: ret, scale: 0.4, alpha: 0, duration: 300, onComplete: () => ret.destroy() });
+            onHit();
+          }, { glow: 0xffe066, trail: 0xfff0a0, scale: 1.4, ms: 110 });
+        });
+        break;
+      }
+      case 'multishot': {
+        // A fan of arrows: three for every enemy.
+        this.drawBow(200, () => {
+          const p = this.bowTip();
+          const total = foes.length * 3;
+          let landed = 0;
+          foes.forEach((f, i) => {
+            for (let k = 0; k < 3; k++) {
+              this.time.delayedCall(i * 50 + k * 45, () =>
+                this.shot(p.x, p.y + (k - 1) * 10, f.sprite.x + Phaser.Math.Between(-10, 10), f.sprite.y + (k - 1) * 22, () => {
+                  this.burst(f.sprite.x, f.sprite.y + (k - 1) * 22, 0xe8d8a0, 5);
+                  if (++landed === total) onHit();
+                }, { trail: 0xfff0c0, ms: 220 }),
+              );
+            }
+          });
+        });
+        break;
+      }
+      case 'concuss': {
+        // A heavy blue arrow that thuds in with a shockwave and dizzy stars.
+        this.drawBow(300, () => {
+          const p = this.bowTip();
+          this.shot(p.x, p.y, tx, ty, () => {
+            this.cameras.main.shake(200, 0.016);
+            this.ring(tx, ty, 0x8fd8ff, 150, 9);
+            this.time.delayedCall(90, () => this.ring(tx, ty, 0xffffff, 110, 5));
+            this.burst(tx, ty, 0x8fd8ff, 22);
+            this.dizzy(t);
+            onHit();
+          }, { shaft: 0x6a7a9a, head: 0x8fd8ff, glow: 0x6ab8ff, trail: 0x8fd8ff, scale: 1.7, ms: 240, ease: 'Quad.In' });
+        });
+        break;
+      }
+      case 'venom': {
+        // A dripping green arrow, then a bubbling poison cloud.
+        this.drawBow(220, () => {
+          const p = this.bowTip();
+          this.shot(p.x, p.y, tx, ty, () => {
+            for (let i = 0; i < 9; i++) {
+              const c = this.add.circle(tx + Phaser.Math.Between(-40, 40), ty + Phaser.Math.Between(-30, 30), Phaser.Math.Between(14, 26), i % 2 ? 0x5aa040 : 0x9ae04a, 0.55).setDepth(166);
+              this.tweens.add({ targets: c, scale: 2, y: c.y - 40, alpha: 0, duration: 800, delay: i * 40, onComplete: () => c.destroy() });
+            }
+            for (let i = 0; i < 12; i++) {
+              const d = this.add.circle(tx + Phaser.Math.Between(-50, 50), ty + 30, 4, 0xb8ff6a).setDepth(167);
+              this.tweens.add({ targets: d, y: ty - Phaser.Math.Between(60, 120), alpha: 0, duration: 700, delay: 100 + i * 50, onComplete: () => d.destroy() });
+            }
+            this.time.delayedCall(120, () => t.sprite.setTint(0x8ae04a));
+            this.time.delayedCall(800, () => t.sprite.clearTint());
+            onHit();
+          }, { shaft: 0x4a7a2a, head: 0x9ae04a, glow: 0x5ad04a, trail: 0x7ad04a, scale: 1.2, ms: 230 });
+        });
+        break;
+      }
+      case 'rapid': {
+        // Seven quick arrows, one after another.
+        const n = 7;
+        let landed = 0;
+        for (let i = 0; i < n; i++) {
+          this.time.delayedCall(i * 75, () => {
+            sfx('arrow');
+            this.tweens.add({ targets: this.hero, x: this.heroHome.x + 10, duration: 30, yoyo: true });
+            const p = this.bowTip();
+            this.shot(p.x, p.y + Phaser.Math.Between(-6, 6), tx + Phaser.Math.Between(-8, 8), ty + Phaser.Math.Between(-24, 24), () => {
+              this.burst(tx, ty, 0xfff0c0, 5);
+              this.tweens.add({ targets: t.sprite, x: t.home.x - 6, duration: 30, yoyo: true });
+              if (++landed === n) {
+                this.ring(tx, ty, 0xfff0c0, 110, 5);
+                onHit();
+              }
+            }, { trail: 0xfff0c0, ms: 150 });
+          });
+        }
+        break;
+      }
+      case 'thornvolley': {
+        // One glowing arrow into the sky, then thorny arrows rain down and vines sprout.
+        this.drawBow(220, () => {
+          const p = this.bowTip();
+          this.shot(p.x, p.y, p.x - 120, -40, () => {}, { glow: 0x7ad04a, trail: 0x9aff6a, scale: 1.3, ms: 260 });
+        });
+        const per = 6;
+        let landed = 0;
+        foes.forEach((f, i) => {
+          for (let k = 0; k < per; k++) {
+            this.time.delayedCall(520 + i * 70 + k * 55, () => {
+              const x = f.sprite.x + Phaser.Math.Between(-55, 55);
+              const y = f.sprite.y + Phaser.Math.Between(-30, 36);
+              this.shot(x + 70, -40, x, y, () => {
+                this.burst(x, y, 0x9aff6a, 5);
+                if (++landed === foes.length * per) onHit();
+              }, { shaft: 0x4a7a2a, head: 0x9ae04a, trail: 0x7ad04a, thorns: true, ms: 260, ease: 'Quad.In' });
+            });
+          }
+          this.time.delayedCall(780 + i * 70, () => {
+            for (let k = 0; k < 6; k++) {
+              const h = 40 + Math.random() * 40;
+              const sp = this.add.triangle(f.sprite.x - 50 + k * 20, f.sprite.y + 48, 0, h, 8, 0, 16, h, k % 2 ? 0x3a8a2a : 0x6ad04a).setOrigin(0.5, 1).setScale(1, 0).setDepth(12);
+              this.tweens.add({ targets: sp, scaleY: 1, duration: 160, delay: k * 40, ease: 'Back.Out' });
+              this.tweens.add({ targets: sp, scaleY: 0, alpha: 0, duration: 300, delay: 700, onComplete: () => sp.destroy() });
+            }
+          });
         });
         break;
       }

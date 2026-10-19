@@ -52,15 +52,15 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
   ],
   ranger: [
     s('shoot', 'Shoot', 1, 'damage', 1, 'arrow', 'Fire an arrow.'),
-    s('aimed1', 'Aimed Shot I', 3, 'damage', 1.4, 'arrow', 'Take careful aim.'),
-    s('multi1', 'Multi-Shot I', 5, 'aoe', 0.8, 'arrow', 'Arrows hit ALL enemies.'),
-    s('concuss1', 'Concussive Shot I', 7, 'stun', 1.2, 'arrow', 'A shot that stuns for a turn.'),
-    s('venom', 'Venom Shot', 9, 'damage', 1.9, 'nature', 'A poison arrow that hits hard.'),
-    s('multi2', 'Multi-Shot II', 11, 'aoe', 1.0, 'arrow', 'More arrows for ALL enemies.'),
-    s('rapid', 'Rapid Fire', 13, 'damage', 2.2, 'arrow', 'A super-fast volley.'),
-    s('concuss2', 'Concussive Shot II', 15, 'stun', 1.7, 'arrow', 'A heavy stunning shot.'),
-    s('thornvolley', 'Thorn Volley', 17, 'aoe', 1.3, 'nature', 'Thorny arrows rain on ALL enemies.'),
-    s('aimed3', 'Aimed Shot II', 19, 'damage', 2.8, 'arrow', 'The perfect shot.'),
+    s('aimed1', 'Aimed Shot I', 3, 'damage', 1.4, 'arrow', 'Take careful aim.', { anim: 'aimed' }),
+    s('multi1', 'Multi-Shot I', 5, 'aoe', 0.8, 'arrow', 'Arrows hit ALL enemies.', { anim: 'multishot' }),
+    s('concuss1', 'Concussive Shot I', 7, 'stun', 1.2, 'arrow', 'A shot that stuns for a turn.', { anim: 'concuss' }),
+    s('venom', 'Venom Shot', 9, 'damage', 1.9, 'nature', 'A poison arrow that hits hard.', { anim: 'venom' }),
+    s('multi2', 'Multi-Shot II', 11, 'aoe', 1.0, 'arrow', 'More arrows for ALL enemies.', { anim: 'multishot' }),
+    s('rapid', 'Rapid Fire', 13, 'damage', 2.2, 'arrow', 'A super-fast volley.', { anim: 'rapid' }),
+    s('concuss2', 'Concussive Shot II', 15, 'stun', 1.7, 'arrow', 'A heavy stunning shot.', { anim: 'concuss' }),
+    s('thornvolley', 'Thorn Volley', 17, 'aoe', 1.3, 'nature', 'Thorny arrows rain on ALL enemies.', { anim: 'thornvolley' }),
+    s('aimed3', 'Aimed Shot II', 19, 'damage', 2.8, 'arrow', 'The perfect shot.', { anim: 'aimed' }),
   ],
   paladin: [
     s('crusader', 'Crusader Strike', 1, 'damage', 1, 'holy', 'A strike blessed with light.', { melee: true, anim: 'crusader' }),
@@ -242,5 +242,7 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   if (fx === 'shadow' && cls.id === 'necromancer') return cls.power;
   const pw = SCHOOL_POWERS[fx]!;
   const name = CLASS_POWER_NAMES[cls.id]?.[fx];
+  // Rangers call spirit animals instead of plain vines.
+  if (cls.id === 'ranger' && fx === 'nature') return { ...pw, name: name!, style: 'wild' };
   return name ? { ...pw, name } : pw;
 }
