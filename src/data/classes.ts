@@ -36,10 +36,12 @@ export interface SkillDef {
     // ranger
     | 'aimed' | 'multishot' | 'concuss' | 'venom' | 'rapid' | 'thornvolley'
     // necromancer
-    | 'raise' | 'drain' | 'bonespikes' | 'chill' | 'gravefrost' | 'lance';
+    | 'raise' | 'drain' | 'bonespikes' | 'chill' | 'gravefrost' | 'lance'
+    // druid
+    | 'rejuv' | 'entangle' | 'thornstorm' | 'moonfire' | 'starsurge';
 }
 
-export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder' | 'wild' | 'tomb';
+export type PowerStyle = 'whirlwind' | 'meteor' | 'arrowstorm' | 'hammer' | 'bones' | 'vines' | 'infernal' | 'ice' | 'nova' | 'thunder' | 'wild' | 'tomb' | 'starfall';
 
 /** Super attack unlocked by answering 3 questions right in a row. */
 export interface PowerDef {

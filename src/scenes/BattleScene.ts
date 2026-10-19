@@ -820,19 +820,70 @@ export class BattleScene extends Phaser.Scene {
         break;
       }
       case 'vines': {
-        const spikes: Phaser.GameObjects.Triangle[] = [];
-        for (let i = 0; i < 9; i++) {
-          const x = tx - 100 + i * 25;
-          const h = 70 + Math.random() * 60;
-          const sp = this.add.triangle(x, ty + 50, 0, h, 12, 0, 24, h, i % 2 ? 0x3a8a2a : 0x6ad04a).setOrigin(0.5, 1).setScale(1, 0).setDepth(D);
-          spikes.push(sp);
-          this.tweens.add({ targets: sp, scaleY: 1, duration: 160, delay: i * 50, ease: 'Back.Out' });
+        // The ground shakes, giant thorny vines burst up around the enemy and
+        // coil around it, then a storm of leaves and flowers explodes out.
+        this.cameras.main.shake(700, 0.006);
+        const vines: Phaser.GameObjects.GameObject[] = [-80, -40, 0, 40, 80].map((dx, i) => this.growVine(tx + dx, ty + 60, 150 + (i % 2) * 40, 40, 1 + i * 0.2, 520, D, 12));
+        for (let i = 0; i < 11; i++) {
+          const x = tx - 125 + i * 25;
+          const h = 70 + Math.random() * 70;
+          const sp = this.add.triangle(x, ty + 60, 0, h, 12, 0, 24, h, i % 2 ? 0x3a8a2a : 0x6ad04a).setOrigin(0.5, 1).setScale(1, 0).setDepth(D + 1);
+          vines.push(sp);
+          this.tweens.add({ targets: sp, scaleY: 1, duration: 160, delay: 300 + i * 40, ease: 'Back.Out' });
         }
-        this.burst(tx, ty, 0x9aff6a, 30, D);
-        this.time.delayedCall(9 * 50 + 220, () => {
+        this.time.delayedCall(800, () => {
+          for (let i = 0; i < 26; i++) {
+            const l = this.leaf(tx, ty, [0x6ad04a, 0xb8ff6a, 0xff7ab8, 0xffe066][i % 4]).setDepth(D + 2);
+            const a = (i / 26) * Math.PI * 2;
+            this.tweens.add({ targets: l, x: tx + Math.cos(a) * 230, y: ty + Math.sin(a) * 160, angle: 720, alpha: 0, duration: 800, ease: 'Quad.Out', onComplete: () => l.destroy() });
+          }
           impact();
-          this.tweens.add({ targets: spikes, scaleY: 0, alpha: 0, duration: 400, delay: 300, onComplete: () => spikes.forEach((x) => x.destroy()) });
+          this.tweens.add({ targets: vines, alpha: 0, duration: 500, delay: 400, onComplete: () => vines.forEach((v) => v.destroy()) });
         });
+        break;
+      }
+      case 'starfall': {
+        // The sky turns to night, a big moon rises and stars rain on every enemy.
+        const sky = this.add.rectangle(0, 0, W, H, 0x0a0a30, 0).setOrigin(0).setDepth(D - 10);
+        this.tweens.add({ targets: sky, fillAlpha: 0.55, duration: 300 });
+        const twinkles: Phaser.GameObjects.Image[] = [];
+        for (let i = 0; i < 30; i++) {
+          const d = this.add.image(Phaser.Math.Between(20, W - 20), Phaser.Math.Between(20, 200), 'dot').setScale(Phaser.Math.FloatBetween(0.4, 1)).setTint(0xffffff).setAlpha(0).setDepth(D - 9);
+          twinkles.push(d);
+          this.tweens.add({ targets: d, alpha: 1, duration: 200, delay: i * 15, yoyo: true, repeat: 3 });
+        }
+        const moon = this.add.container(W - 150, 70).setDepth(D - 8).setAlpha(0);
+        moon.add([this.add.image(0, 0, 'glow').setScale(12).setTint(0x9ab8ff).setBlendMode('ADD'), this.add.circle(0, 0, 50, 0xf0f0ff), this.add.circle(-14, -10, 9, 0xd0d0e8), this.add.circle(16, 14, 6, 0xd0d0e8)]);
+        this.tweens.add({ targets: moon, alpha: 1, y: 90, duration: 400 });
+        const foes = this.alive();
+        const n = 24;
+        let landed = 0;
+        for (let i = 0; i < n; i++) {
+          const f = foes[i % foes.length];
+          const x = f.sprite.x + Phaser.Math.Between(-60, 60);
+          const y = f.sprite.y + Phaser.Math.Between(-30, 40);
+          const star = this.add.star(x + 220, -40, 5, 10, 24, i % 2 ? 0xffe066 : 0xffffff).setStrokeStyle(2, pw.color).setDepth(D);
+          const trail = this.add.particles(0, 0, 'dot', { follow: star, speed: 20, lifespan: 400, scale: { start: 1.5, end: 0 }, tint: [pw.color, 0xffe066], blendMode: 'ADD', frequency: 12 }).setDepth(D - 1);
+          this.tweens.add({
+            targets: star,
+            x,
+            y,
+            angle: 360,
+            duration: 380,
+            delay: 350 + i * 45,
+            ease: 'Quad.In',
+            onComplete: () => {
+              star.destroy();
+              trail.stop();
+              this.time.delayedCall(400, () => trail.destroy());
+              this.burst(x, y, 0xffe066, 8, D);
+              if (++landed === n) {
+                impact();
+                this.tweens.add({ targets: [sky, moon, ...twinkles], alpha: 0, duration: 500, delay: 300, onComplete: () => { sky.destroy(); moon.destroy(); twinkles.forEach((d) => d.destroy()); } });
+              }
+            },
+          });
+        }
         break;
       }
     }
@@ -873,7 +924,8 @@ export class BattleScene extends Phaser.Scene {
       case 'heal': {
         const s = derive(p);
         const amt = Math.round(s.maxHp * sk.power * (correct ? 1 : 0.5));
-        const pose = sk.anim === 'holylight' ? (done: () => void) => this.holyLight(done) : (done: () => void) => this.castPose(done);
+        const pose = (done: () => void) =>
+          sk.anim === 'holylight' ? this.holyLight(done) : sk.anim === 'rejuv' ? this.rejuvenate(done) : this.castPose(done);
         pose(() => {
           p.hp = Math.min(s.maxHp, p.hp + amt);
           this.heroHp.set(p.hp, s.maxHp);
@@ -1402,6 +1454,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (sk.anim === 'drain' || sk.anim === 'bonespikes' || sk.anim === 'chill' || sk.anim === 'gravefrost' || sk.anim === 'lance') {
       this.necroMove(sk.anim, aim, target, onHit);
+      return;
+    }
+    if (sk.anim === 'entangle' || sk.anim === 'thornstorm' || sk.anim === 'moonfire' || sk.anim === 'starsurge') {
+      this.druidMove(sk.anim, aim, target, onHit);
       return;
     }
     if (sk.melee) {
@@ -1997,6 +2053,204 @@ export class BattleScene extends Phaser.Scene {
                 this.goHome(320);
               },
             }),
+        });
+        break;
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ druid moves
+
+  /** A little green leaf. */
+  private leaf(x: number, y: number, color = 0x6ad04a) {
+    return this.add.ellipse(x, y, 16, 8, color).setStrokeStyle(1, 0x2a6a1a);
+  }
+
+  /** A vine that grows up around (x, y) in a spiral, with leaves on it. Returns the graphics to fade later. */
+  private growVine(x: number, y: number, h: number, r: number, turns: number, ms: number, depth: number, width = 7) {
+    const g = this.add.graphics().setDepth(depth);
+    const st = { k: 0 };
+    const pt = (k: number) => ({ x: x + Math.sin(k * Math.PI * 2 * turns) * r * (1 - k * 0.3), y: y - k * h });
+    this.tweens.add({
+      targets: st,
+      k: 1,
+      duration: ms,
+      ease: 'Sine.Out',
+      onUpdate: () => {
+        g.clear();
+        for (const [w, col] of [[width + 4, 0x1f4a14], [width, 0x4a9a2a]] as const) {
+          g.lineStyle(w, col, 1).beginPath();
+          const n = Math.max(1, Math.floor(40 * st.k));
+          for (let i = 0; i <= n; i++) {
+            const p = pt((i / 40));
+            if (i === 0) g.moveTo(p.x, p.y);
+            else g.lineTo(p.x, p.y);
+          }
+          g.strokePath();
+        }
+        g.fillStyle(0x7ad04a, 1);
+        for (let i = 4; i <= 40 * st.k; i += 6) {
+          const p = pt(i / 40);
+          g.fillEllipse(p.x + (i % 12 ? 9 : -9), p.y, 14, 7);
+        }
+      },
+    });
+    return g;
+  }
+
+  /** Rejuvenate: leaves swirl around the druid and flowers bloom at their feet. */
+  private rejuvenate(onDone: () => void) {
+    const { x, y } = this.hero;
+    for (let i = 0; i < 14; i++) {
+      const l = this.leaf(x, y, i % 3 ? 0x7ad04a : 0xb8ff6a).setDepth(12);
+      const st = { a: (i / 14) * Math.PI * 2 };
+      this.tweens.add({
+        targets: st,
+        a: st.a + Math.PI * 3,
+        duration: 900,
+        onUpdate: () => {
+          const k = (st.a - (i / 14) * Math.PI * 2) / (Math.PI * 3);
+          l.setPosition(x + Math.cos(st.a) * 70, y + 40 - k * 110 + Math.sin(st.a) * 18).setRotation(st.a);
+        },
+        onComplete: () => this.tweens.add({ targets: l, alpha: 0, duration: 200, onComplete: () => l.destroy() }),
+      });
+    }
+    for (let i = 0; i < 6; i++) {
+      const fx = x - 60 + i * 24;
+      const col = [0xff7ab8, 0xffe066, 0xffffff][i % 3];
+      const fl = this.add.container(fx, y + 48).setDepth(9).setScale(0);
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2;
+        fl.add(this.add.circle(Math.cos(a) * 6, Math.sin(a) * 6, 5, col));
+      }
+      fl.add(this.add.circle(0, 0, 4, 0xffb030));
+      this.tweens.add({ targets: fl, scale: 1, duration: 260, delay: 150 + i * 60, ease: 'Back.Out' });
+      this.tweens.add({ targets: fl, alpha: 0, duration: 300, delay: 1000, onComplete: () => fl.destroy() });
+    }
+    for (let i = 0; i < 3; i++) {
+      const r = this.add.ellipse(x, y + 40, 120, 30).setStrokeStyle(4, 0x7dff9a).setDepth(11);
+      this.tweens.add({ targets: r, y: y - 70, alpha: 0, scaleX: 0.5, duration: 700, delay: i * 140, onComplete: () => r.destroy() });
+    }
+    this.tweens.add({ targets: this.hero, y: this.heroHome.y - 12, duration: 320, yoyo: true, ease: 'Sine.InOut', onComplete: onDone });
+  }
+
+  /** A crescent moon shape, opening to the right. */
+  private crescent(r: number, color: number) {
+    const d = r * 0.8;
+    const h = Math.sqrt(r * r - (d * d) / 4);
+    const a0 = Math.atan2(h, d / 2);
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i <= 24; i++) {
+      const a = a0 + ((Math.PI * 2 - 2 * a0) * i) / 24;
+      pts.push({ x: Math.cos(a) * r, y: Math.sin(a) * r });
+    }
+    for (let i = 0; i <= 24; i++) {
+      const a = Math.PI + a0 - (2 * a0 * i) / 24;
+      pts.push({ x: d + Math.cos(a) * r, y: Math.sin(a) * r });
+    }
+    const g = this.add.graphics();
+    g.fillStyle(color, 1).fillPoints(pts, true);
+    return g;
+  }
+
+  private druidMove(kind: 'entangle' | 'thornstorm' | 'moonfire' | 'starsurge', aim: Foe, target: Foe | null, onHit: () => void) {
+    const foes = this.alive();
+    const t = target ?? aim;
+    const { x: tx, y: ty } = t.sprite;
+    switch (kind) {
+      case 'entangle': {
+        // Vines burst from the ground and wrap around the enemy, then squeeze.
+        this.castPose(() => {});
+        this.burst(tx, ty + 46, 0x7a5a2a, 12);
+        const vines = [-1, 1, 0].map((s, i) => this.growVine(tx + s * 30, ty + 50, 110, 46, 1.5 + i * 0.25, 420, t.sprite.depth + 1, 8));
+        this.time.delayedCall(440, () => {
+          this.tweens.add({ targets: t.sprite, scaleX: 4.4, duration: 90, yoyo: true, repeat: 1 });
+          this.burst(tx, ty, 0x9aff6a, 18);
+          onHit();
+        });
+        this.tweens.add({ targets: vines, alpha: 0, duration: 400, delay: 1100, onComplete: () => vines.forEach((v) => v.destroy()) });
+        break;
+      }
+      case 'thornstorm': {
+        // A whirlwind of thorns and leaves spins around every enemy.
+        this.castPose(() => {});
+        foes.forEach((f, i) => {
+          const bits: Phaser.GameObjects.Shape[] = [];
+          for (let k = 0; k < 12; k++) {
+            const b = k % 3 === 0 ? this.leaf(this.hero.x, this.hero.y) : this.add.triangle(this.hero.x, this.hero.y, 0, 0, 12, 4, 0, 8, 0x3a8a2a).setStrokeStyle(1, 0xb8ff6a);
+            bits.push(b.setDepth(166));
+          }
+          const st = { a: 0, k: 0 };
+          this.tweens.add({ targets: st, k: 1, duration: 300, delay: i * 80, ease: 'Quad.Out' });
+          this.tweens.add({
+            targets: st,
+            a: Math.PI * 6,
+            duration: 1000,
+            delay: i * 80,
+            onUpdate: () => bits.forEach((b, k) => {
+              const a = st.a + (k / bits.length) * Math.PI * 2;
+              const cx = this.hero.x + (f.sprite.x - this.hero.x) * st.k;
+              const cy = this.hero.y + (f.sprite.y - this.hero.y) * st.k;
+              b.setPosition(cx + Math.cos(a) * 60, cy + Math.sin(a) * 26 - (k % 4) * 14 + 20).setRotation(a + Math.PI / 2);
+            }),
+            onComplete: () => this.tweens.add({ targets: bits, alpha: 0, duration: 200, onComplete: () => bits.forEach((b) => b.destroy()) }),
+          });
+          this.time.delayedCall(350 + i * 80, () => this.burst(f.sprite.x, f.sprite.y, 0x9aff6a, 10));
+        });
+        this.time.delayedCall(380, onHit);
+        break;
+      }
+      case 'moonfire': {
+        // A crescent moon rises above the enemy and pours down a silver beam.
+        this.castPose(() => {});
+        const mx = tx;
+        const my = ty - 190;
+        const moon = this.add.container(mx, my).setDepth(168).setAlpha(0).setScale(0.4);
+        moon.add([
+          this.add.image(0, 0, 'glow').setScale(8).setTint(0x9ab8ff).setBlendMode('ADD'),
+          this.crescent(34, 0xf0f0ff),
+        ]);
+        this.tweens.add({ targets: moon, alpha: 1, scale: 1, duration: 380, ease: 'Back.Out' });
+        this.time.delayedCall(420, () => {
+          const beam = this.add.rectangle(tx, ty + 46, 80, 240, 0xd0d8ff, 0.7).setOrigin(0.5, 1).setDepth(167).setBlendMode('ADD');
+          const core = this.add.rectangle(tx, ty + 46, 26, 240, 0xffffff, 1).setOrigin(0.5, 1).setDepth(168).setBlendMode('ADD');
+          this.tweens.add({ targets: [beam, core], scaleX: 0, alpha: 0, duration: 500, delay: 100, onComplete: () => { beam.destroy(); core.destroy(); } });
+          this.ring(tx, ty + 30, 0xd0d8ff, 120, 6);
+          this.burst(tx, ty, 0xd0a0ff, 24);
+          this.tweens.add({ targets: moon, alpha: 0, duration: 400, delay: 250, onComplete: () => moon.destroy() });
+          onHit();
+        });
+        break;
+      }
+      case 'starsurge': {
+        // Shooting stars streak down onto every enemy.
+        this.castPose(() => {});
+        let landed = 0;
+        const per = 3;
+        foes.forEach((f, i) => {
+          for (let k = 0; k < per; k++) {
+            const x = f.sprite.x + Phaser.Math.Between(-30, 30);
+            const y = f.sprite.y + Phaser.Math.Between(-20, 20);
+            const star = this.add.star(x + 180, -40, 5, 9, 20, k % 2 ? 0xffe066 : 0xffffff).setStrokeStyle(2, 0xd0a0ff).setDepth(168);
+            const trail = this.add.particles(0, 0, 'dot', { follow: star, speed: 20, lifespan: 380, scale: { start: 1.3, end: 0 }, tint: [0xd0a0ff, 0xffe066], blendMode: 'ADD', frequency: 10 }).setDepth(167);
+            this.tweens.add({
+              targets: star,
+              x,
+              y,
+              angle: 360,
+              duration: 380,
+              delay: 150 + i * 110 + k * 90,
+              ease: 'Quad.In',
+              onComplete: () => {
+                star.destroy();
+                trail.stop();
+                this.time.delayedCall(400, () => trail.destroy());
+                this.burst(x, y, 0xffe066, 10);
+                this.ring(x, y, 0xd0a0ff, 70, 4, 300);
+                if (++landed === foes.length * per) onHit();
+              },
+            });
+          }
         });
         break;
       }

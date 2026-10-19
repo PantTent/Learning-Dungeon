@@ -88,15 +88,15 @@ export const SPELL_LISTS: Record<string, SkillDef[]> = {
   ],
   druid: [
     s('wrath', 'Wrath', 1, 'damage', 1, 'nature', 'A blast of nature energy.'),
-    s('rejuv1', 'Rejuvenate I', 3, 'heal', 0.35, 'heal', 'Heal yourself with nature.'),
-    s('entangle1', 'Entangle I', 5, 'stun', 1.2, 'nature', 'Vines hold an enemy for a turn.'),
-    s('thorns1', 'Thorn Storm I', 7, 'aoe', 0.9, 'nature', 'Thorns hit ALL enemies.'),
-    s('moonfire1', 'Moonfire', 9, 'damage', 1.8, 'arcane', 'A beam of moonlight.'),
-    s('rejuv2', 'Rejuvenate II', 11, 'heal', 0.55, 'heal', 'A stronger heal.'),
-    s('thorns2', 'Thorn Storm II', 13, 'aoe', 1.15, 'nature', 'A bigger thorn storm.'),
-    s('entangle2', 'Entangle II', 15, 'stun', 1.7, 'nature', 'Huge vines that crush and hold.'),
-    s('starsurge', 'Starsurge', 17, 'aoe', 1.3, 'arcane', 'Falling stars hit ALL enemies.'),
-    s('rejuv3', 'Rejuvenate III', 19, 'heal', 0.75, 'heal', 'A huge heal from the forest.'),
+    s('rejuv1', 'Rejuvenate I', 3, 'heal', 0.35, 'heal', 'Heal yourself with nature.', { anim: 'rejuv' }),
+    s('entangle1', 'Entangle I', 5, 'stun', 1.2, 'nature', 'Vines hold an enemy for a turn.', { anim: 'entangle' }),
+    s('thorns1', 'Thorn Storm I', 7, 'aoe', 0.9, 'nature', 'Thorns hit ALL enemies.', { anim: 'thornstorm' }),
+    s('moonfire1', 'Moonfire', 9, 'damage', 1.8, 'arcane', 'A beam of moonlight.', { anim: 'moonfire' }),
+    s('rejuv2', 'Rejuvenate II', 11, 'heal', 0.55, 'heal', 'A stronger heal.', { anim: 'rejuv' }),
+    s('thorns2', 'Thorn Storm II', 13, 'aoe', 1.15, 'nature', 'A bigger thorn storm.', { anim: 'thornstorm' }),
+    s('entangle2', 'Entangle II', 15, 'stun', 1.7, 'nature', 'Huge vines that crush and hold.', { anim: 'entangle' }),
+    s('starsurge', 'Starsurge', 17, 'aoe', 1.3, 'arcane', 'Falling stars hit ALL enemies.', { anim: 'starsurge' }),
+    s('rejuv3', 'Rejuvenate III', 19, 'heal', 0.75, 'heal', 'A huge heal from the forest.', { anim: 'rejuv' }),
   ],
   demonologist: [
     s('felbolt', 'Fel Bolt', 1, 'damage', 1, 'fel', 'A bolt of green fire.'),
@@ -244,6 +244,8 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   const name = CLASS_POWER_NAMES[cls.id]?.[fx];
   // Rangers call spirit animals instead of plain vines.
   if (cls.id === 'ranger' && fx === 'nature') return { ...pw, name: name!, style: 'wild' };
+  // Druids call down a night sky full of stars.
+  if (cls.id === 'druid' && fx === 'arcane') return { ...pw, name: name!, style: 'starfall' };
   // Necromancers lock the enemy in a tomb of ice.
   if (cls.id === 'necromancer' && fx === 'frost') return { ...pw, name: name!, style: 'tomb' };
   return name ? { ...pw, name } : pw;
