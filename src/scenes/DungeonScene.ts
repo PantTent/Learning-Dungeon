@@ -25,6 +25,29 @@ export interface DungeonData {
   fromBattle?: { result: 'victory' | 'defeat' | 'fled' | 'bossFail'; monsterId?: number };
 }
 
+const STICK_KEY = 'ld_joystick';
+/** Where the on-screen joystick sits (screen pixels). */
+const STICK = { x: 110, y: H - 150, r: 66 };
+
+/** Is the on-screen joystick shown? (On unless turned off.) */
+function stickOn(): boolean {
+  try {
+    return localStorage.getItem(STICK_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function setStickOn(on: boolean) {
+  try {
+    localStorage.setItem(STICK_KEY, on ? 'on' : 'off');
+  } catch {
+    // Private mode: the choice just isn't remembered.
+  }
+}
+
+const stickLabel = () => (stickOn() ? tr('Joystick: ON') : tr('Joystick: OFF'));
+
 export class DungeonScene extends Phaser.Scene {
   private world!: World;
   private player!: Phaser.GameObjects.Image;
@@ -37,6 +60,9 @@ export class DungeonScene extends Phaser.Scene {
   private hud!: { hp: Bar; mp: Bar; xp: Bar; xpBig: Bar; xpLeft: Phaser.GameObjects.Text; xpRight: Phaser.GameObjects.Text; info: Phaser.GameObjects.Text; gold: Phaser.GameObjects.Text; pots: Phaser.GameObjects.Text; today: Phaser.GameObjects.Text };
   private marker!: Phaser.GameObjects.Rectangle;
   private keys?: Record<string, Phaser.Input.Keyboard.Key>;
+  /** Direction held on the on-screen joystick (0, 0 = not pushed). */
+  private stick = { dx: 0, dy: 0 };
+  private stickParts: Phaser.GameObjects.GameObject[] = [];
 
   constructor() {
     super('Dungeon');
@@ -362,7 +388,66 @@ export class DungeonScene extends Phaser.Scene {
       this.scene.start('Title');
     }, 0x3a3450).label.setFontSize(getLang() === 'fr' ? 13 : 15);
     soundButton(this, bx, 326).setScrollFactor(0).setDepth(1000);
+    const stickBtn = mk(384, '', () => {
+      setStickOn(!stickOn());
+      stickBtn.label.setText(stickLabel());
+      this.buildStick();
+    }, 0x2e4a5a);
+    stickBtn.label.setText(stickLabel()).setFontSize(15);
+    this.buildStick();
     this.refreshHud(false);
+  }
+
+  /** On-screen joystick (bottom left): drag the knob to walk, like the arrow keys. */
+  private buildStick() {
+    this.stickParts.forEach((o) => o.destroy());
+    this.stickParts = [];
+    this.stick = { dx: 0, dy: 0 };
+    if (!stickOn()) return;
+    const cx = STICK.x;
+    const cy = STICK.y;
+    const R = STICK.r;
+    const base = this.add.circle(cx, cy, R, 0x1d1730, 0.55).setStrokeStyle(4, 0xffffff, 0.5);
+    const arrows = [[0, -1], [0, 1], [-1, 0], [1, 0]].map(([x, y]) =>
+      this.add.triangle(cx + x * (R - 16), cy + y * (R - 16), 0, 10, 8, 0, 16, 10, 0xffffff, 0.6).setRotation(Math.atan2(y, x) + Math.PI / 2),
+    );
+    const knob = this.add.circle(cx, cy, 28, 0x7fd3ff, 0.85).setStrokeStyle(3, 0xffffff);
+    const zone = this.add.zone(cx, cy, R * 2 + 40, R * 2 + 40).setInteractive();
+    this.stickParts = [base, ...arrows, knob, zone];
+    this.stickParts.forEach((o) => (o as Phaser.GameObjects.Shape).setScrollFactor(0).setDepth(1000));
+    let held: number | null = null;
+    const move = (ptr: Phaser.Input.Pointer) => {
+      if (held !== ptr.id) return;
+      let x = ptr.x - cx;
+      let y = ptr.y - cy;
+      const d = Math.hypot(x, y);
+      if (d > R) {
+        x = (x / d) * R;
+        y = (y / d) * R;
+      }
+      knob.setPosition(cx + x, cy + y);
+      // Walking is on a grid, so pick the stronger direction.
+      this.stick = d < 18 ? { dx: 0, dy: 0 } : Math.abs(x) > Math.abs(y) ? { dx: Math.sign(x), dy: 0 } : { dx: 0, dy: Math.sign(y) };
+    };
+    const release = (ptr: Phaser.Input.Pointer) => {
+      if (held !== ptr.id) return;
+      held = null;
+      this.stick = { dx: 0, dy: 0 };
+      knob.setPosition(cx, cy);
+    };
+    zone.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
+      held = ptr.id;
+      this.path = [];
+      move(ptr);
+    });
+    this.input.on('pointermove', move);
+    this.input.on('pointerup', release);
+    this.input.on('pointerupoutside', release);
+    zone.once('destroy', () => {
+      this.input.off('pointermove', move);
+      this.input.off('pointerup', release);
+      this.input.off('pointerupoutside', release);
+    });
   }
 
   refreshHud(animate = true) {
@@ -448,6 +533,8 @@ export class DungeonScene extends Phaser.Scene {
   private setupInput() {
     this.input.on('pointerup', (ptr: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       if (this.busy || over.length) return;
+      // A drag that started on the joystick isn't a tap on the map.
+      if (stickOn() && Math.hypot(ptr.downX - STICK.x, ptr.downY - STICK.y) < STICK.r + 20) return;
       const tx = Math.floor(ptr.worldX / TS);
       const ty = Math.floor(ptr.worldY / TS);
       this.tapTile({ x: tx, y: ty });
@@ -520,14 +607,16 @@ export class DungeonScene extends Phaser.Scene {
 
   update(time: number) {
     this.drawDarkness(time);
-    if (this.busy || this.moving || !this.keys) return;
-    const k = this.keys;
+    if (this.busy || this.moving) return;
+    const up = { isDown: false } as Phaser.Input.Keyboard.Key;
+    const k = this.keys ?? { LEFT: up, A: up, RIGHT: up, D: up, UP: up, W: up, DOWN: up, S: up };
     let dx = 0;
     let dy = 0;
     if (k.LEFT.isDown || k.A.isDown) dx = -1;
     else if (k.RIGHT.isDown || k.D.isDown) dx = 1;
     else if (k.UP.isDown || k.W.isDown) dy = -1;
     else if (k.DOWN.isDown || k.S.isDown) dy = 1;
+    else ({ dx, dy } = this.stick);
     if (dx || dy) {
       const n = { x: this.world.player.x + dx, y: this.world.player.y + dy };
       if (this.isObstacle(n)) {

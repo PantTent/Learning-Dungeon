@@ -22,6 +22,8 @@ export const FR_DUNGEON: Record<string, string> = {
 
   // ---- Map signs and messages
   Heal: 'Soins',
+  'Joystick: ON': 'Manette : OUI',
+  'Joystick: OFF': 'Manette : NON',
   Shop: 'Boutique',
   Travel: 'Voyage',
   'To {place}': 'Vers {place}',
