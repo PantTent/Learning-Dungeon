@@ -14,6 +14,8 @@ export const FR_BATTLE: Record<string, string> = {
   'New spell at level {level}: {spell}': 'Nouveau sort au niveau {level} : {spell}',
   'Potions ({n})': 'Potions ({n})',
   Run: 'Fuir',
+  Leave: 'Partir',
+  'Practice done!': 'Entraînement fini!',
   Back: 'Retour',
   '{spell}: tap a monster to target it!': '{spell} : touche un monstre pour le viser!',
 

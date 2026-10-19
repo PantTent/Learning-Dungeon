@@ -12,6 +12,8 @@ export interface EnemyDef {
 }
 
 export const ENEMIES: Record<string, EnemyDef> = {
+  // Developer mode only: never attacks, never dies (not in any area's list).
+  dummy: { id: 'dummy', name: 'Training Dummy', sprite: 'enemy_dummy', hp: 1, atk: 0, armor: 0, verb: 'wobbles at' },
   slime: { id: 'slime', name: 'Moss Slime', sprite: 'enemy_slime', hp: 0.8, atk: 0.8, armor: 0.5, verb: 'splats' },
   rat: { id: 'rat', name: 'Cave Rat', sprite: 'enemy_rat', hp: 0.7, atk: 0.9, armor: 0.5, verb: 'bites' },
   bat: { id: 'bat', name: 'Gloom Bat', sprite: 'enemy_bat', hp: 0.65, atk: 1, armor: 0.3, verb: 'swoops at' },

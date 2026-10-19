@@ -4,6 +4,7 @@ import { fullGame } from '../hub/ownership';
 import { fullGamePrompt } from '../ui/unlockPrompt';
 import { AREAS, areaOf, campPlace, placeOf, type AreaDef, type Place } from '../data/areas';
 import { FLOOR, findPath, type Pt } from '../data/mapgen';
+import { makeEnemy } from '../data/enemies';
 import { makeItem, RARITY } from '../data/items';
 import { classOf, current, derive, saveProfile, xpToNext, LEVEL_CAP, BAG_SIZE } from '../state/profile';
 import { enterFloor, respawnOne, worldState, type World, type WorldMonster } from '../state/world';
@@ -54,7 +55,8 @@ export class DungeonScene extends Phaser.Scene {
       worldState.world = enterFloor(data.floor, p.level);
     } else if (data.fromBattle?.result === 'defeat' || !worldState.world) {
       // Knocked out (or just starting): wake up at the camp of the current area.
-      const area = worldState.world ? placeOf(worldState.world.floor).area : placeOf(p.maxFloor).area;
+      // Developer heroes have every place unlocked but still start in Area 1.
+      const area = worldState.world ? placeOf(worldState.world.floor).area : p.dev ? 0 : placeOf(p.maxFloor).area;
       worldState.world = enterFloor(campPlace(area), p.level);
       if (data.fromBattle?.result === 'defeat') {
         const s = derive(p);
@@ -270,6 +272,11 @@ export class DungeonScene extends Phaser.Scene {
       this.label(map.camp.fountain, tr('Heal'));
       this.label(map.camp.merchant, tr('Shop'));
       this.label(map.camp.fire, tr('Travel'));
+      if (this.hasDummy()) {
+        const d = at(map.camp.dummy, 'enemy_dummy', 10);
+        this.tweens.add({ targets: d, angle: { from: -3, to: 3 }, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+        this.label(map.camp.dummy, tr('Training Dummy'));
+      }
     }
 
     if (map.boss) {
@@ -452,6 +459,7 @@ export class DungeonScene extends Phaser.Scene {
     const c = this.world.map.camp;
     const m = this.world.map;
     if (c && [c.fire, c.fountain, c.merchant].some((o) => o.x === pt.x && o.y === pt.y)) return true;
+    if (c && this.hasDummy() && c.dummy.x === pt.x && c.dummy.y === pt.y) return true;
     if (m.boss && Math.abs(m.boss.x - pt.x) <= 1 && Math.abs(m.boss.y - pt.y) <= 1) return true;
     if (m.chests.some((ch) => ch.x === pt.x && ch.y === pt.y)) return true;
     return false;
@@ -614,6 +622,10 @@ export class DungeonScene extends Phaser.Scene {
       this.openOverlay('Shop');
     } else if (c && pt.x === c.fire.x && pt.y === c.fire.y) {
       this.openOverlay('Travel');
+    } else if (c && this.hasDummy() && pt.x === c.dummy.x && pt.y === c.dummy.y) {
+      this.busy = true;
+      this.path = [];
+      this.time.delayedCall(150, () => this.scene.start('Battle', { dummy: true, group: [makeEnemy('dummy', p.level)] }));
     } else if (m.boss && Math.abs(m.boss.x - pt.x) <= 1 && Math.abs(m.boss.y - pt.y) <= 1) {
       this.startBoss();
     } else {
@@ -710,6 +722,11 @@ export class DungeonScene extends Phaser.Scene {
     if (!mon) return false;
     this.startBattle(mon);
     return true;
+  }
+
+  /** Developer heroes get a training dummy in the very first camp. */
+  private hasDummy(): boolean {
+    return !!current().dev && this.world.floor === campPlace(0);
   }
 
   private startBattle(mon: WorldMonster) {

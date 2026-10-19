@@ -48,6 +48,8 @@ interface BattleData {
   bossArea?: number;
   /** Place index of the boss lair, to return to after the fight. */
   lair?: number;
+  /** Developer training dummy: it never attacks and never dies. */
+  dummy?: boolean;
 }
 
 interface Foe {
@@ -315,7 +317,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.isBoss) {
       const pots = POTIONS.reduce((n, d) => n + (p.potions[d.id] ?? 0), 0);
       c.add(button(this, 530, H - 98, 110, bh, tr('Potions ({n})', { n: pots }), () => this.usePotion(), { size: 16, color: 0x8a2a3a }).setEnabled(pots > 0));
-      c.add(button(this, 530, H - 44, 110, 40, tr('Run'), () => this.run(), { size: 17, color: 0x3a3450 }));
+      c.add(button(this, 530, H - 44, 110, 40, this.data0.dummy ? tr('Leave') : tr('Run'), () => this.run(), { size: 17, color: 0x3a3450 }));
     }
   }
 
@@ -1170,6 +1172,7 @@ export class BattleScene extends Phaser.Scene {
         return this.time.delayedCall(250, () => this.playerTurn());
       }
       const f = foes[i++];
+      if (this.data0.dummy) return next();
       if (f.e.stunned) {
         f.e.stunned = false;
         this.say(tr("{name} is stunned and can't attack!", { name: tr(f.e.def.name) }));
@@ -1271,7 +1274,7 @@ export class BattleScene extends Phaser.Scene {
 
   private run() {
     this.closeMenu();
-    this.say(tr('You ran away safely!'));
+    this.say(this.data0.dummy ? tr('Practice done!') : tr('You ran away safely!'));
     this.tweens.add({ targets: this.hero, x: W + 100, duration: 500, ease: 'Quad.In' });
     this.time.delayedCall(700, () => this.exit('fled'));
   }
@@ -1654,6 +1657,10 @@ export class BattleScene extends Phaser.Scene {
     sfx(r.crit ? 'crit' : 'hit');
     f.e.hp = Math.max(0, f.e.hp - r.dmg);
     f.bar.set(f.e.hp, f.e.maxHp);
+    if (this.data0.dummy) {
+      f.e.hp = f.e.maxHp;
+      this.time.delayedCall(450, () => f.bar.set(f.e.hp, f.e.maxHp));
+    }
     this.flash(f.sprite, 0xffffff);
     this.burst(f.sprite.x, f.sprite.y, FX_COLOR[fx], r.crit ? 26 : 14);
     this.tweens.add({ targets: f.sprite, x: f.home.x - 12, duration: 50, yoyo: true, repeat: 2 });

@@ -277,3 +277,23 @@ def boss():
     return c.rows()
 
 SPRITES['boss_goblin_king'] = boss()
+
+# Training dummy for developer mode: a straw sack on a post with a target.
+SPRITES['enemy_dummy'] = [
+    ".....pppppp.....",
+    "....pOkpOkpp....",
+    "....ppOppOpp....",
+    "....pppppppp....",
+    ".....pkkkkp.....",
+    "..oo..oOOo..oo..",
+    ".oOOOOOOOOOOOOo.",
+    ".YyYy.YYYY.yYyY.",
+    ".....YqqqqY.....",
+    "....YqHHHHqY....",
+    "....YqHRRHqY....",
+    "....YqHRRHqY....",
+    "....YqHHHHqY....",
+    ".....YqqqqY.....",
+    ".......oO.......",
+    ".....OOOOOO.....",
+]

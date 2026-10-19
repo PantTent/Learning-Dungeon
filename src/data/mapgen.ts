@@ -25,7 +25,7 @@ export interface DungeonMap {
   exit: Pt;
   chests: Pt[];
   spawns: Pt[];
-  camp?: { fire: Pt; fountain: Pt; merchant: Pt };
+  camp?: { fire: Pt; fountain: Pt; merchant: Pt; dummy: Pt };
   boss?: Pt;
   /** Lairs only: magic portal to the next area (shown once the boss is beaten). */
   portal?: Pt;
@@ -143,6 +143,7 @@ export function generateFloor(hasCamp: boolean): DungeonMap {
       fire: { x: start.x, y: start.y - 1 },
       fountain: { x: rooms[0].x + 1, y: rooms[0].y + 1 },
       merchant: { x: rooms[0].x + rooms[0].w - 2, y: rooms[0].y + 1 },
+      dummy: { x: rooms[0].x + rooms[0].w - 2, y: rooms[0].y + rooms[0].h - 2 },
     };
     map.start = { x: start.x, y: start.y + 1 };
   }

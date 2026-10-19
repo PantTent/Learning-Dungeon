@@ -224,6 +224,7 @@ export const FR_DATA: Record<string, string> = {
 
   // ----- Monsters (verbs fit "{name} {verb} ...", 3rd person) -----
   'Moss Slime': 'Gelée de mousse',
+  'Training Dummy': "Mannequin d'entraînement",
   'Cave Rat': 'Rat des cavernes',
   'Gloom Bat': 'Chauve-souris sombre',
   Grumpshroom: 'Champi-grognon',
@@ -240,6 +241,7 @@ export const FR_DATA: Record<string, string> = {
   'Leaf Bandit': 'Bandit des feuilles',
   'Moss Golem': 'Golem de mousse',
   splats: 'éclabousse',
+  'wobbles at': 'vacille vers',
   bites: 'mord',
   'swoops at': 'fond sur',
   headbutts: 'percute',
