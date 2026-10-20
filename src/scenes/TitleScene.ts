@@ -4,7 +4,7 @@ import { AREAS } from '../data/areas';
 import { getClass } from '../data/classes';
 import { setLang, tr } from '../i18n';
 import { deleteProfile, loadProfiles, session, type Profile } from '../state/profile';
-import { C, H, W, button, langButton, panel, soundButton, sprite, txt } from '../ui/widgets';
+import { C, H, W, button, langButton, unitsButton, panel, soundButton, sprite, txt } from '../ui/widgets';
 import { parentGate } from '../ui/parentGate';
 
 export const MAX_PROFILES = 3;
@@ -41,6 +41,7 @@ export class TitleScene extends Phaser.Scene {
     menuBackground(this);
     soundButton(this, W - 76, 30, 130, 40);
     langButton(this, 96, 30, 172, 40, () => this.scene.restart());
+    unitsButton(this, 96, 76, 172, 36);
     const title = txt(this, W / 2, 62, 'LEARNING DUNGEON', 56, '#ffd24a').setOrigin(0.5);
     title.setStroke('#5a2a00', 10);
     this.tweens.add({ targets: title, y: 70, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });

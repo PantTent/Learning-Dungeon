@@ -40,6 +40,31 @@ export function setLang(l: Lang): void {
   }
 }
 
+/** Measuring units in the questions: inches and miles, or centimeters and kilometers. */
+export type Units = 'imperial' | 'metric';
+const UNITS_KEY = 'learning-dungeon.units';
+let units: Units | null = null;
+try {
+  const saved = globalThis.localStorage?.getItem(UNITS_KEY);
+  if (saved === 'imperial' || saved === 'metric') units = saved;
+} catch {
+  /* storage blocked */
+}
+
+/** Until someone picks, English uses US units and French uses metric (Quebec). */
+export function getUnits(): Units {
+  return units ?? (lang === 'fr' ? 'metric' : 'imperial');
+}
+
+export function setUnits(u: Units): void {
+  units = u;
+  try {
+    globalThis.localStorage?.setItem(UNITS_KEY, u);
+  } catch {
+    /* storage blocked */
+  }
+}
+
 export function speechLang(): string {
   return LANGS.find((l) => l.id === lang)!.speech;
 }

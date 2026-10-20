@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { cycleSoundMode, sfx, soundModeLabel } from '../audio/audio';
-import { LANGS, fmtNum, getLang, setLang, tr } from '../i18n';
+import { LANGS, fmtNum, getLang, getUnits, setLang, setUnits, tr } from '../i18n';
 
 export const W = 960;
 export const H = 540;
@@ -183,6 +183,16 @@ export function sprite(scene: Phaser.Scene, x: number, y: number, key: string, s
 /** Button that cycles Sound ON -> Music OFF -> Sound OFF. */
 export function soundButton(scene: Phaser.Scene, x: number, y: number, w = 120, h = 50): Button {
   const b = button(scene, x, y, w, h, soundModeLabel(), () => b.label.setText(soundModeLabel(cycleSoundMode())), { size: 15, color: 0x2e4a5a });
+  return b;
+}
+
+/** "Units: inches & miles" / "Units: cm & km" toggle for measuring questions. */
+export function unitsButton(scene: Phaser.Scene, x: number, y: number, w: number, h: number): Button {
+  const label = () => (getUnits() === 'imperial' ? tr('Units: inches & miles') : tr('Units: cm & km'));
+  const b = button(scene, x, y, w, h, label(), () => {
+    setUnits(getUnits() === 'imperial' ? 'metric' : 'imperial');
+    b.label.setText(label());
+  }, { size: 14, color: 0x2e5a7a });
   return b;
 }
 

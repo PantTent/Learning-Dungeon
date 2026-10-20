@@ -4,6 +4,7 @@
 import type { StatKey } from '../data/classes';
 import { BASE_NAME, materialTier, PREFIX, RARITY, SUFFIX, type BaseType, type Item } from '../data/items';
 import { getLang } from './index';
+import { SETS } from '../data/sets';
 
 type Gender = 'm' | 'f';
 interface Noun {
@@ -143,6 +144,8 @@ function frenchName(item: Item): string {
   const base = item.base;
   const n = NOUN[base] ?? { word: BASE_NAME[base] ?? '?', g: 'm' };
   const en = item.name ?? '';
+  const set = item.set ? SETS.find((s) => s.id === item.set) : undefined;
+  if (set) return `${n.word} ${set.fr}`;
 
   // Starter gear: "Old Sword" -> "Vieille épée".
   if (en === `Old ${BASE_NAME[base]}`) {

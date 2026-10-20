@@ -7,7 +7,7 @@
 // recompute the answer from it.
 import type { Difficulty, Question } from './types';
 import { chance, pick, ri, shuffle } from '../util/rng';
-import { L, fmtNum } from '../i18n';
+import { L, fmtNum, getUnits } from '../i18n';
 
 export const EARLY_TOPICS: Record<string, { en: string; fr: string }> = {
   'e-count': { en: 'Counting (before, after, between)', fr: 'Compter (avant, après, entre)' },
@@ -163,6 +163,106 @@ const UNIT_ITEMS: { en: string; fr: string; unit: 'cm' | 'm' | 'km' }[] = [
   { en: 'a trip to Quebec City', fr: "d'un voyage jusqu'à Québec", unit: 'km' },
   { en: 'the St. Lawrence River', fr: 'du fleuve Saint-Laurent', unit: 'km' },
 ];
+
+/** US units: inches, feet and miles. */
+const UNIT_ITEMS_US: { en: string; fr: string; unit: 'inches' | 'feet' | 'miles' }[] = [
+  { en: 'a pencil', fr: "d'un crayon", unit: 'inches' },
+  { en: 'a book', fr: "d'un livre", unit: 'inches' },
+  { en: 'a mitten', fr: "d'une mitaine", unit: 'inches' },
+  { en: 'an eraser', fr: "d'une gomme à effacer", unit: 'inches' },
+  { en: 'a school bus', fr: "d'un autobus scolaire", unit: 'feet' },
+  { en: 'a classroom', fr: "d'une classe", unit: 'feet' },
+  { en: 'a swimming pool', fr: "d'une piscine", unit: 'feet' },
+  { en: 'a basketball court', fr: "d'un terrain de basketball", unit: 'feet' },
+  { en: 'the road to Boston', fr: "de la route jusqu'à Boston", unit: 'miles' },
+  { en: 'a trip to New York City', fr: "d'un voyage jusqu'à New York", unit: 'miles' },
+  { en: 'the Mississippi River', fr: 'du fleuve Mississippi', unit: 'miles' },
+];
+const US_UNIT_FR = { inches: 'pouces', feet: 'pieds', miles: 'milles' } as const;
+
+/** e-measure with inches, feet, yards and miles. */
+function measureUS(d: number): EarlyQ {
+  const forms = d === 2 ? ['ftin', 'unit', 'unit', 'long', 'short', 'diff'] : ['unit', 'ydft', 'kft', 'add', 'add', 'diff'];
+  const t = pick(forms);
+  const inch = L('inches', 'pouces');
+  if (t === 'ftin')
+    return num(
+      'us-ftin',
+      L('How many inches are in 1 foot?', 'Combien de pouces y a-t-il dans 1 pied?'),
+      12,
+      L('1 foot = 12 inches. A ruler is 1 foot long and has 12 inch marks.', '1 pied = 12 pouces. Une règle mesure 1 pied et a 12 marques de pouces.'),
+      L('A ruler is one foot long. Count its inch marks, one by one, all the way to the end.', 'Une règle mesure un pied. Compte ses marques de pouces une par une, jusqu’au bout.'),
+    );
+  if (t === 'ydft')
+    return num(
+      'us-ydft',
+      L('How many feet are in 1 yard?', 'Combien de pieds y a-t-il dans 1 verge?'),
+      3,
+      L('1 yard = 3 feet. A yardstick is as long as 3 rulers.', '1 verge = 3 pieds. Une verge est aussi longue que 3 règles.'),
+      L('A yardstick is a long measuring stick. How many 1-foot rulers fit along it, end to end?', 'Une verge est un long bâton pour mesurer. Combien de règles de 1 pied peux-tu placer bout à bout dessus?'),
+    );
+  if (t === 'kft') {
+    const k = ri(2, 6);
+    return num(
+      `us-kft:${k}`,
+      L(`How many inches are in ${k} feet?`, `Combien de pouces y a-t-il dans ${k} pieds?`),
+      12 * k,
+      L(`Each foot is 12 inches. ${k} × 12 = ${12 * k} inches.`, `Chaque pied vaut 12 pouces. ${k} × 12 = ${12 * k} pouces.`),
+      L('One foot is twelve inches. Count by twelves, once for each foot.', 'Un pied vaut douze pouces. Compte par douze, une fois pour chaque pied.'),
+    );
+  }
+  if (t === 'unit') {
+    const i = ri(0, UNIT_ITEMS_US.length - 1);
+    const it = UNIT_ITEMS_US[i];
+    const name = L(it.unit, US_UNIT_FR[it.unit]);
+    const why = it.unit === 'inches' ? L('it is small', "c'est petit") : it.unit === 'feet' ? L('it is big, like a room', "c'est grand, comme une pièce") : L('it is a very long way', "c'est très long");
+    return choice(
+      `us-unit:${i}`,
+      L(`Which unit would you use to measure the length of ${it.en}?`, `Quelle unité utiliserais-tu pour mesurer la longueur ${it.fr}?`),
+      name,
+      (['inches', 'feet', 'miles'] as const).map((u) => L(u, US_UNIT_FR[u])),
+      L(`Use ${name}: ${why}.`, `On utilise les ${name} : ${why}.`),
+      L('Think about the size. Is it small enough to hold in your hand, as big as a room, or a long trip by car? Pick the unit that fits.', 'Pense à la taille. Est-ce assez petit pour tenir dans ta main, grand comme une pièce, ou un long voyage en auto?'),
+    );
+  }
+  const a = ri(5, d === 2 ? 60 : 95);
+  let b = ri(3, d === 2 ? 60 : 95);
+  while (b === a) b = ri(3, 60);
+  if (t === 'long' || t === 'short') {
+    const long = t === 'long';
+    const ans = long ? Math.max(a, b) : Math.min(a, b);
+    const other = long ? Math.min(a, b) : Math.max(a, b);
+    return choice(
+      `us-${t}:${a},${b}`,
+      long ? L(`Which is longer: ${a} inches or ${b} inches?`, `Lequel est le plus long : ${a} pouces ou ${b} pouces?`) : L(`Which is shorter: ${a} inches or ${b} inches?`, `Lequel est le plus court : ${a} pouces ou ${b} pouces?`),
+      `${ans} ${inch}`,
+      [`${other} ${inch}`],
+      long
+        ? L(`${ans} inches is longer, because ${ans} is more than ${other}.`, `${ans} pouces, c'est plus long, car ${ans} est plus grand que ${other}.`)
+        : L(`${ans} inches is shorter, because ${ans} is less than ${other}.`, `${ans} pouces, c'est plus court, car ${ans} est plus petit que ${other}.`),
+      L('Both are in inches, so just compare the numbers. A bigger number means a longer length.', 'Les deux sont en pouces : compare seulement les nombres. Un plus grand nombre veut dire plus long.'),
+    );
+  }
+  if (t === 'add') {
+    const p = pick(PEOPLE);
+    return num(
+      `us-add:${a},${b}`,
+      L(`${nm(p)} puts a ${a} inch stick end to end with a ${b} inch stick. How long is it in all, in inches?`, `${nm(p)} place un bâton de ${a} pouces au bout d'un bâton de ${b} pouces. Quelle est la longueur totale, en pouces?`),
+      a + b,
+      L(`${a} + ${b} = ${a + b}. It is ${a + b} inches long.`, `${a} + ${b} = ${a + b}. Ça mesure ${a + b} pouces.`),
+      L('End to end means one after the other, so add the two lengths together.', 'Bout à bout veut dire l’un après l’autre : additionne les deux longueurs.'),
+    );
+  }
+  const hi = Math.max(a, b);
+  const lo = Math.min(a, b);
+  return num(
+    `us-diff:${hi},${lo}`,
+    L(`A ribbon is ${hi} inches long. A string is ${lo} inches long. How many inches longer is the ribbon?`, `Un ruban mesure ${hi} pouces. Une ficelle mesure ${lo} pouces. De combien de pouces le ruban est-il plus long?`),
+    hi - lo,
+    L(`${hi} ${MINUS} ${lo} = ${hi - lo}. The ribbon is ${hi - lo} inches longer.`, `${hi} ${MINUS} ${lo} = ${hi - lo}. Le ruban est plus long de ${hi - lo} pouces.`),
+    L('To find how much longer, take the short length away from the long length. Or count up from the short one.', 'Pour savoir de combien c’est plus long, enlève la petite longueur de la grande. Ou compte à partir de la petite.'),
+  );
+}
 
 const FOODS = [
   { en: 'a pizza', fr: 'une pizza' },
@@ -945,6 +1045,7 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
   'e-measure': {
     levels: [2, 3],
     gen: (d) => {
+      if (getUnits() === 'imperial') return measureUS(d);
       const forms = d === 2 ? ['cmm', 'unit', 'unit', 'long', 'short', 'diff'] : ['unit', 'kmm', 'mcm', 'add', 'add', 'diff'];
       const t = pick(forms);
       if (t === 'cmm')

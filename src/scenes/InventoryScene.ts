@@ -3,13 +3,15 @@ import { sfx } from '../audio/audio';
 import { openSellMenu } from '../ui/sellMenu';
 import type { StatKey } from '../data/classes';
 import {
-  canUse, ICON, isTwoHanded, itemScore, RARITY, SLOT_LABEL, slotsFor, STAT_LABEL, weaponLabel,
+  canUse, ICON, isTwoHanded, itemColor, itemCss, itemScore, RARITY, SET_CSS, SLOT_LABEL, slotsFor, STAT_LABEL, weaponLabel,
   type Item, type Slot,
 } from '../data/items';
 import { BAG_SIZE, classOf, current, derive, equip, saveProfile, unequip } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
 import { fmtNum, tr } from '../i18n';
 import { itemName } from '../i18n/itemNames';
+import { setCounts, setOf } from '../data/sets';
+import { setBonusLines, setName } from '../ui/setText';
 
 const BOX = 58;
 
@@ -95,7 +97,7 @@ export class InventoryScene extends Phaser.Scene {
       const it = p.bag[i];
       const g = this.add.graphics();
       g.fillStyle(0x0f0b1a, 1).fillRoundedRect(x, y, cell - 6, cell - 6, 6);
-      g.lineStyle(2, it ? RARITY[it.rarity].color : 0x3a3054, 1).strokeRoundedRect(x, y, cell - 6, cell - 6, 6);
+      g.lineStyle(2, it ? itemColor(it) : 0x3a3054, 1).strokeRoundedRect(x, y, cell - 6, cell - 6, 6);
       c.add(g);
       if (!it) continue;
       const icon = this.add.image(x + (cell - 6) / 2, y + (cell - 6) / 2, ICON[it.base]).setScale(3);
@@ -129,7 +131,7 @@ export class InventoryScene extends Phaser.Scene {
     const blocked = slot === 'offhand' && p.equipped.mainhand && isTwoHanded(p.equipped.mainhand.base);
     const g = this.add.graphics();
     g.fillStyle(0x0f0b1a, 1).fillRoundedRect(x, y, BOX, BOX, 8);
-    g.lineStyle(3, it ? RARITY[it.rarity].color : 0x4a3e66, 1).strokeRoundedRect(x, y, BOX, BOX, 8);
+    g.lineStyle(3, it ? itemColor(it) : 0x4a3e66, 1).strokeRoundedRect(x, y, BOX, BOX, 8);
     c.add(g);
     if (it) c.add(this.add.image(x + BOX / 2, y + BOX / 2, ICON[it.base]).setScale(3));
     else c.add(this.add.image(x + BOX / 2, y + BOX / 2, SLOT_ICON[slot]).setScale(3).setAlpha(blocked ? 0.35 : 0.18));
@@ -173,11 +175,11 @@ export class InventoryScene extends Phaser.Scene {
      */
     const col = (x: number, item: Item, title: string, against: Item | null): number => {
       body.add(txt(this, x, 0, title, 15, C.dim));
-      const name = txt(this, x + 60, 24, itemName(item), 21, RARITY[item.rarity].css, { wordWrap: { width: colW - 60 } });
+      const name = txt(this, x + 60, 24, itemName(item), 21, itemCss(item), { wordWrap: { width: colW - 60 } });
       body.add(name);
       body.add(this.add.image(x + 24, 24 + Math.max(name.height, 44) / 2, ICON[item.base]).setScale(3));
       let y = 24 + Math.max(name.height, 44) + 14;
-      body.add(txt(this, x, y, tr('{rarity} {type}   (item level {n})', { rarity: tr(RARITY[item.rarity].name), type: tr(weaponLabel(item.base)), n: item.ilvl }), 17, C.dim));
+      body.add(txt(this, x, y, tr('{rarity} {type}   (item level {n})', { rarity: item.set ? tr('Set') : tr(RARITY[item.rarity].name), type: tr(weaponLabel(item.base)), n: item.ilvl }), 17, C.dim));
       y += 28;
 
       const mine = this.values(item);
@@ -205,6 +207,17 @@ export class InventoryScene extends Phaser.Scene {
           }
         }
         y += 26;
+      }
+      // Set pieces: how many are worn, and which bonuses are on.
+      const set = setOf(item);
+      if (set) {
+        const worn = setCounts(p.equipped).get(set.id) ?? 0;
+        body.add(txt(this, x, y + 4, tr('{set}: {n}/{total} worn', { set: setName(set), n: worn, total: set.pieces.length }), 16, SET_CSS));
+        y += 28;
+        for (const line of setBonusLines(set)) {
+          body.add(txt(this, x + 10, y, line.text, 15, worn >= line.pieces ? C.good : C.dim, { wordWrap: { width: colW - 10 } }));
+          y += 22;
+        }
       }
       return y;
     };
@@ -265,7 +278,7 @@ export class InventoryScene extends Phaser.Scene {
     const bh = 50;
     const ph = 18 + bottom + 12 + bh + 18;
     const py = Math.max(10, H / 2 - ph / 2);
-    c.add(panel(this, px, py, pw, ph, 0x1d1730, RARITY[it.rarity].color));
+    c.add(panel(this, px, py, pw, ph, 0x1d1730, itemColor(it)));
     c.add(this.add.rectangle(px, py, pw, ph, 0, 0).setOrigin(0).setInteractive());
     body.y = py + 18;
     c.add(body);

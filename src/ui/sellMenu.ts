@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/audio';
-import { canUse, itemScore, RARITY, slotsFor, type Item, type Rarity } from '../data/items';
+import { canUse, itemCss, itemScore, RARITY, slotsFor, type Item, type Rarity } from '../data/items';
 import { classOf, current, saveProfile } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from './widgets';
 import { fmtNum, tr } from '../i18n';
@@ -85,7 +85,7 @@ export function openSellMenu(scene: Phaser.Scene, onDone: () => void) {
     d.add(scene.add.rectangle(0, 0, W, H, 0x000000, 0.6).setOrigin(0).setInteractive());
     d.add(panel(scene, W / 2 - 280, H / 2 - 110, 560, 220, 0x1d1730, 0xff8a6b));
     d.add(txt(scene, W / 2, H / 2 - 70, o.items.length === 1 ? tr('Sell 1 item for {gold} gold?', { gold: fmtNum(gold) }) : tr('Sell {n} items for {gold} gold?', { n: o.items.length, gold: fmtNum(gold) }), 24).setOrigin(0.5));
-    d.add(txt(scene, W / 2, H / 2 - 30, tr('Including: {item}', { item: itemName(best) }), 17, RARITY[best.rarity].css).setOrigin(0.5));
+    d.add(txt(scene, W / 2, H / 2 - 30, tr('Including: {item}', { item: itemName(best) }), 17, itemCss(best)).setOrigin(0.5));
     d.add(button(scene, W / 2 - 110, H / 2 + 50, 180, 56, tr('Yes, sell'), () => {
       d.destroy();
       sell(o.items, gold);

@@ -51,6 +51,39 @@ export interface EnemyInstance {
   xp: number;
   gold: number;
   stunned: boolean;
+  /** Rare spawn tier: 1 = Rare, 2 = Elite, 3 = Legendary (missing = normal). */
+  rare?: RareTier;
+}
+
+export type RareTier = 1 | 2 | 3;
+
+/**
+ * Rare spawns can appear when a monster comes back after being beaten.
+ * They are tougher and give more XP, gold and better loot.
+ */
+export const RARE_TIERS: Record<RareTier, { name: string; color: number; css: string; chance: number; hp: number; atk: number; xp: number; gold: number }> = {
+  1: { name: 'Rare', color: 0x3d8bff, css: '#6aa8ff', chance: 0.15, hp: 1.4, atk: 1.1, xp: 1.75, gold: 2.5 },
+  2: { name: 'Elite', color: 0xb24dff, css: '#c98aff', chance: 0.1, hp: 1.8, atk: 1.2, xp: 2.5, gold: 4 },
+  3: { name: 'Legendary', color: 0xff9a1f, css: '#ffb24a', chance: 0.05, hp: 2.3, atk: 1.3, xp: 4, gold: 6 },
+};
+
+/** Roll a rare tier for a respawn: 5% Legendary, 10% Elite, 15% Rare. */
+export function rollRareTier(r = Math.random()): RareTier | undefined {
+  // Work in whole percents so 5 + 10 is exactly 15.
+  const pct = r * 100;
+  let edge = 0;
+  for (const t of [3, 2, 1] as RareTier[]) {
+    edge += Math.round(RARE_TIERS[t].chance * 100);
+    if (pct < edge) return t;
+  }
+  return undefined;
+}
+
+/** Turn a normal monster into a rare spawn of the given tier. */
+export function makeRare(e: EnemyInstance, tier: RareTier): EnemyInstance {
+  const t = RARE_TIERS[tier];
+  const maxHp = Math.round(e.maxHp * t.hp);
+  return { ...e, rare: tier, maxHp, hp: maxHp, atk: Math.round(e.atk * t.atk), xp: Math.round(e.xp * t.xp), gold: Math.round(e.gold * t.gold) };
 }
 
 /**

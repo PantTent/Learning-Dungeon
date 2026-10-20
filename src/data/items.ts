@@ -46,6 +46,20 @@ export interface Item {
   armor?: number;
   stats: Partial<Record<StatKey, number>>;
   value: number;
+  /** Set id (see sets.ts) for set pieces. */
+  set?: string;
+}
+
+/** Set pieces (see sets.ts) have their own color. */
+export const SET_COLOR = 0x2ee6c8;
+export const SET_CSS = '#3ef0d0';
+
+/** Display color of an item. */
+export function itemColor(item: Item): number {
+  return item.set ? SET_COLOR : RARITY[item.rarity].color;
+}
+export function itemCss(item: Item): string {
+  return item.set ? SET_CSS : RARITY[item.rarity].css;
 }
 
 export const BASE_NAME: Record<BaseType, string> = {

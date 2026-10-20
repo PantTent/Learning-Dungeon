@@ -85,6 +85,29 @@ export function distances(m: { w: number; h: number; tiles: number[][] }, from: 
   return d;
 }
 
+/**
+ * True if every floor tile (except the `solid` ones) can be walked to from
+ * `from`. Solid tiles are keyed y * w + x.
+ */
+export function allReachable(m: { w: number; h: number; tiles: number[][] }, from: Pt, solid: Set<number>): boolean {
+  const seen = new Set<number>([from.y * m.w + from.x]);
+  const q: Pt[] = [from];
+  while (q.length) {
+    const p = q.shift()!;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = p.x + dx;
+      const ny = p.y + dy;
+      const k = ny * m.w + nx;
+      if (nx < 0 || ny < 0 || nx >= m.w || ny >= m.h || seen.has(k) || solid.has(k) || m.tiles[ny][nx] !== FLOOR) continue;
+      seen.add(k);
+      q.push({ x: nx, y: ny });
+    }
+  }
+  let floor = 0;
+  m.tiles.forEach((row, y) => row.forEach((t, x) => t === FLOOR && !solid.has(y * m.w + x) && floor++));
+  return seen.size === floor;
+}
+
 /** A random floor. The first floor of each area has a camp in its first room. */
 export function generateFloor(hasCamp: boolean): DungeonMap {
   const w = 46;
@@ -151,9 +174,22 @@ export function generateFloor(hasCamp: boolean): DungeonMap {
   // Chests and monster spawns in the other rooms.
   const others = shuffle(rooms.filter((r) => r !== rooms[0]));
   const chestCount = ri(1, 2);
+  // Chests are solid, so a chest must never block a doorway or corridor:
+  // every floor tile has to stay reachable with it in place.
+  const solid = new Set<number>([map.exit, ...(map.camp ? [map.camp.fire, map.camp.fountain, map.camp.merchant, map.camp.dummy] : [])].map((p) => p.y * w + p.x));
   for (let i = 0; i < chestCount && i < others.length; i++) {
     const r = others[i];
-    map.chests.push({ x: r.x + ri(0, r.w - 1), y: r.y + r.h - 1 });
+    for (let tries = 0; tries < 20; tries++) {
+      const c = { x: r.x + ri(0, r.w - 1), y: r.y + r.h - 1 - (tries > 10 ? ri(0, r.h - 1) : 0) };
+      const k = c.y * w + c.x;
+      if (tiles[c.y][c.x] !== FLOOR || solid.has(k) || (c.x === map.start.x && c.y === map.start.y)) continue;
+      solid.add(k);
+      if (allReachable(map, map.start, solid)) {
+        map.chests.push(c);
+        break;
+      }
+      solid.delete(k);
+    }
   }
   for (const r of others) {
     for (let k = 0; k < 3; k++) map.spawns.push({ x: r.x + ri(1, r.w - 2), y: r.y + ri(1, r.h - 2) });
@@ -183,6 +219,16 @@ export function generateLair(): DungeonMap {
 }
 
 /** Shortest path (excluding start) using BFS, or null. */
+/** Straight steps first so paths prefer clean lines, then diagonals. */
+const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+/** A diagonal step is allowed only when both side tiles are open (no squeezing past corners). */
+export function canCut(m: DungeonMap, p: Pt, dx: number, dy: number, blocked: (p: Pt) => boolean): boolean {
+  const a = { x: p.x + dx, y: p.y };
+  const b = { x: p.x, y: p.y + dy };
+  return m.tiles[a.y]?.[a.x] === FLOOR && m.tiles[b.y]?.[b.x] === FLOOR && !blocked(a) && !blocked(b);
+}
+
 export function findPath(m: DungeonMap, from: Pt, to: Pt, blocked: (p: Pt) => boolean): Pt[] | null {
   if (to.x < 0 || to.y < 0 || to.x >= m.w || to.y >= m.h || m.tiles[to.y][to.x] !== FLOOR) return null;
   const prev = new Map<number, number>();
@@ -192,11 +238,12 @@ export function findPath(m: DungeonMap, from: Pt, to: Pt, blocked: (p: Pt) => bo
   while (q.length) {
     const p = q.shift()!;
     if (p.x === to.x && p.y === to.y) break;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dx, dy] of STEPS) {
       const n = { x: p.x + dx, y: p.y + dy };
       if (n.x < 0 || n.y < 0 || n.x >= m.w || n.y >= m.h) continue;
       if (m.tiles[n.y][n.x] !== FLOOR || prev.has(key(n))) continue;
       if (blocked(n) && !(n.x === to.x && n.y === to.y)) continue;
+      if (dx && dy && !canCut(m, p, dx, dy, blocked)) continue;
       prev.set(key(n), key(p));
       q.push(n);
     }

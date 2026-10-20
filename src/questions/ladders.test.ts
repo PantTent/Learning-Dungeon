@@ -75,3 +75,30 @@ describe('skill ladders', () => {
     expect(Array.from({ length: 30 }, () => e.next().difficulty).every((d) => d === 1)).toBe(true);
   });
 });
+
+describe('adapting to the child', () => {
+  it('a weak group stays on grade 1 adding & subtracting until the child is ready', () => {
+    const stats = newLearningStats();
+    stats.ladder = { 'add-sub': 0 };
+    const settings = { ...defaultLearningSettings('en'), grade: 4 as Grade, groups: ['add-sub'], mathPercent: 100 };
+    const e = new QuestionEngine(stats, settings);
+    const steps = ladderFor('add-sub', 'en');
+    const onStep = () => Math.floor(stats.ladder!['add-sub']);
+    // About 2 in 3 right is not enough to move up.
+    for (let i = 0; i < 60; i++) {
+      stats.retry = [];
+      const q = e.next();
+      expect(steps[0].topics.concat(steps[1].topics)).toContain(q.topic);
+      e.record(q, i % 3 !== 0);
+    }
+    expect(onStep()).toBe(0);
+    expect(groupReport(stats, settings, 'add-sub').grade).toBe(1);
+    // Getting them right moves the questions up the ladder, step by step.
+    for (let i = 0; i < 30; i++) {
+      stats.retry = [];
+      e.record(e.next(), true);
+    }
+    expect(onStep()).toBeGreaterThanOrEqual(3);
+    expect(groupReport(stats, settings, 'add-sub').grade).toBeGreaterThanOrEqual(3);
+  });
+});

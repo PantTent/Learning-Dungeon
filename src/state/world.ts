@@ -1,4 +1,4 @@
-import { makeGroup, type EnemyInstance } from '../data/enemies';
+import { makeEnemy, makeGroup, makeRare, rollRareTier, type EnemyInstance } from '../data/enemies';
 import { generateFloor, generateLair, type DungeonMap, type Pt } from '../data/mapgen';
 import { placeOf } from '../data/areas';
 import { pick } from '../util/rng';
@@ -21,7 +21,12 @@ export interface World {
   monsters: WorldMonster[];
   openedChests: Set<string>;
   player: Pt;
+  /** When (Date.now() ms) beaten monsters come back. */
+  respawns: number[];
 }
+
+/** Beaten monsters come back after this long. */
+export const RESPAWN_MS = 2 * 60 * 1000;
 
 let nextId = 1;
 
@@ -38,15 +43,23 @@ export function enterFloor(index: number, heroLevel: number): World {
       monsters.push({ id: nextId++, pos, group: makeGroup(def, heroLevel) });
     }
   }
-  return { floor: place.index, map, monsters, openedChests: new Set(), player: { ...map.start } };
+  return { floor: place.index, map, monsters, openedChests: new Set(), player: { ...map.start }, respawns: [] };
 }
 
-export function respawnOne(w: World, heroLevel: number): void {
+/**
+ * Bring one monster back on a random spawn spot away from the hero. Respawns
+ * can be rare spawns (a single, tougher monster with better rewards).
+ * Returns false if there was no good spot this time.
+ */
+export function respawnOne(w: World, heroLevel: number, tier = rollRareTier()): boolean {
   const def = placeOf(w.floor).floor;
-  if (!def || w.map.spawns.length === 0) return;
+  if (!def || w.map.spawns.length === 0) return false;
   const pos = pick(w.map.spawns);
-  if (Math.abs(pos.x - w.player.x) + Math.abs(pos.y - w.player.y) < 8) return;
-  w.monsters.push({ id: nextId++, pos: { ...pos }, group: makeGroup(def, heroLevel) });
+  if (Math.abs(pos.x - w.player.x) + Math.abs(pos.y - w.player.y) < 8) return false;
+  if (w.monsters.some((m) => m.pos.x === pos.x && m.pos.y === pos.y)) return false;
+  const group = tier ? [makeRare(makeEnemy(pick(def.enemies), def.levels[1]), tier)] : makeGroup(def, heroLevel);
+  w.monsters.push({ id: nextId++, pos: { ...pos }, group });
+  return true;
 }
 
 export const worldState: { world: World | null } = { world: null };

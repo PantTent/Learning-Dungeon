@@ -112,9 +112,13 @@ export interface GroupReport {
 
 /** How many recent answers per group decide its strength. */
 export const RECENT = 20;
-/** Ladder moves: right answers climb a quarter step, wrong ones drop almost half. */
-const CLIMB = 0.25;
-const DROP = 0.45;
+/**
+ * Ladder moves: right answers climb a fifth of a step, wrong ones drop half a
+ * step. So a group only moves up when about 3 in 4 answers are right, and
+ * stays on easier questions until then.
+ */
+const CLIMB = 0.2;
+const DROP = 0.5;
 
 function today(): string {
   const d = new Date();

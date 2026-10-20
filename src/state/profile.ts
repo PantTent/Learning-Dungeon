@@ -1,6 +1,7 @@
 import { getClass, growthPerLevel, type ClassDef, type StatKey } from '../data/classes';
 import { isTwoHanded, makeItem, slotsFor, starterItem, type BaseType, type Item, type Slot } from '../data/items';
 import { AREAS, PLACES } from '../data/areas';
+import { activeSetBonus } from '../data/sets';
 import {
   defaultLearningSettings,
   newLearningStats,
@@ -181,14 +182,18 @@ export function derive(p: Profile): DerivedStats {
   }
   // Dexterity raises crit chance: +1% per 4 Dexterity.
   s.crit += Math.floor(s.agi / 4);
+  // Set bonuses (3, 4 and 5 pieces of the same set).
+  const set = activeSetBonus(p.equipped);
+  s.crit += set.crit;
+  s.armor = Math.round(s.armor * (1 + set.armorPct / 100));
   const primary = s[cls.primary];
   return {
     ...s,
-    maxHp: Math.round(30 + s.sta * 5 + p.level * 6),
-    maxMp: Math.round(14 + p.level * 2 + (cls.primary === 'int' ? s.int * 0.8 : s.int * 0.4 + 6)),
+    maxHp: Math.round((30 + s.sta * 5 + p.level * 6) * (1 + set.hpPct / 100)),
+    maxMp: Math.round((14 + p.level * 2 + (cls.primary === 'int' ? s.int * 0.8 : s.int * 0.4 + 6)) * (1 + set.mpPct / 100)),
     // One-handed weapons hit harder per swing so sword-and-shield heroes keep up
     // with two-handed staves and bows (the off-hand adds defense, not damage).
-    power: ((weaponDmg[0] + weaponDmg[1]) / 2) * (p.equipped.mainhand && !isTwoHanded(p.equipped.mainhand.base) ? 1.5 : 1) + primary * 0.9 + p.level,
+    power: (((weaponDmg[0] + weaponDmg[1]) / 2) * (p.equipped.mainhand && !isTwoHanded(p.equipped.mainhand.base) ? 1.5 : 1) + primary * 0.9 + p.level) * (1 + set.powerPct / 100),
     weaponDmg,
   };
 }

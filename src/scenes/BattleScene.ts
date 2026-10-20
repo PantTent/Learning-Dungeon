@@ -1,19 +1,20 @@
 import Phaser from 'phaser';
-import { CLASSES, type Fx, type PowerDef, type SkillDef } from '../data/classes';
-import { makeEnemy, xpFor, type EnemyInstance } from '../data/enemies';
+import { CLASSES, type ClassDef, type Fx, type PowerDef, type SkillDef } from '../data/classes';
+import { makeEnemy, RARE_TIERS, xpFor, type EnemyInstance, type RareTier } from '../data/enemies';
 import { AREAS, areaOf, type AreaDef } from '../data/areas';
 import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
 import { MAX_CHOSEN, activePower, chosenFamilies, chosenSpells, familyOf, petHealthShare } from '../data/spells';
 import { spellLabel } from '../ui/spellText';
-import { ICON, makeItem, RARITY, STAT_LABEL, type Item } from '../data/items';
+import { ICON, itemColor, itemCss, makeItem, RARITY, STAT_LABEL, type Item, type Rarity } from '../data/items';
+import { makeSetItem } from '../data/sets';
 import { QuestionEngine } from '../questions/engine';
 import { BAG_SIZE, classOf, current, derive, gainXp, LEVEL_CAP, manaRegen, saveProfile } from '../state/profile';
 import { worldState } from '../state/world';
 import { QuestionPanel } from '../ui/QuestionPanel';
 import { playMusic, sfx, stopMusic, type Sfx } from '../audio/audio';
 import { Bar, C, H, W, button, panel, txt } from '../ui/widgets';
-import { chance, rf, ri } from '../util/rng';
+import { chance, rf, ri, weighted } from '../util/rng';
 import { fmtNum, getLang, tr } from '../i18n';
 import { itemName } from '../i18n/itemNames';
 
@@ -39,6 +40,21 @@ function fitLabel(b: { label: Phaser.GameObjects.Text }, w: number, h: number, s
     sz--;
     b.label.setFontSize(sz);
   }
+}
+
+/**
+ * Loot from rare spawns: better odds than normal monsters, but still a roll.
+ * Legendary rare spawns can drop set pieces.
+ */
+function rareLoot(tier: RareTier, ilvl: number, cls: ClassDef): Item[] {
+  if (tier === 3 && chance(0.25)) return [makeSetItem(ilvl, cls)];
+  const odds: Record<RareTier, [number, Partial<Record<Rarity, number>>]> = {
+    1: [0.6, { uncommon: 50, rare: 40, epic: 10 }],
+    2: [0.85, { uncommon: 20, rare: 55, epic: 23, legendary: 2 }],
+    3: [1, { rare: 35, epic: 50, legendary: 15 }],
+  };
+  const [p, w] = odds[tier];
+  return chance(p) ? [makeItem(ilvl, { cls, rarity: weighted(w as Record<Rarity, number>) })] : [];
 }
 
 interface BattleData {
@@ -229,9 +245,17 @@ export class BattleScene extends Phaser.Scene {
       const x = xs[i] ?? 220;
       const y = ys[i];
       this.add.ellipse(x, y + 40, 64, 14, 0x000000, 0.35).setDepth(1);
-      const sprite = this.add.image(x, y, e.def.sprite).setScale(5).setDepth(10 + i);
-      this.tweens.add({ targets: sprite, scaleY: 5 * 0.93, scaleX: 5 * 1.04, duration: 450 + i * 70, yoyo: true, repeat: -1 });
-      const name = txt(this, x, y - 66, tr('{name} Lv{level}', { name: tr(e.def.name), level: e.level }), 15).setOrigin(0.5).setDepth(20);
+      // Rare spawns are a bit bigger, glow in their tier color and show their tier.
+      const rare = e.rare ? RARE_TIERS[e.rare] : undefined;
+      const sc = rare ? 5.8 : 5;
+      if (rare) {
+        const aura = this.add.image(x, y, 'glow').setScale(9).setTint(rare.color).setBlendMode('ADD').setAlpha(0.55).setDepth(2);
+        this.tweens.add({ targets: aura, alpha: 0.9, scale: 10, duration: 700, yoyo: true, repeat: -1 });
+        txt(this, x, y - 86, `${'\u2605'.repeat(e.rare!)} ${tr(rare.name).toUpperCase()}`, 15, rare.css).setOrigin(0.5).setDepth(20).setStroke('#120a1c', 4);
+      }
+      const sprite = this.add.image(x, y, e.def.sprite).setScale(sc).setDepth(10 + i);
+      this.tweens.add({ targets: sprite, scaleY: sc * 0.93, scaleX: sc * 1.04, duration: 450 + i * 70, yoyo: true, repeat: -1 });
+      const name = txt(this, x, y - 66, tr('{name} Lv{level}', { name: tr(e.def.name), level: e.level }), 15, rare?.css ?? C.text).setOrigin(0.5).setDepth(20);
       const bar = new Bar(this, x - 55, y - 54, 110, 10, C.hp, false).setDepth(20);
       bar.set(e.hp, e.maxHp, false);
       const foe: Foe = { e, sprite, bar, name, home: { x, y } };
@@ -1297,7 +1321,8 @@ export class BattleScene extends Phaser.Scene {
       this.earnedXp += this.isBoss ? f.e.xp : xpFor(f.e, p.level);
       if (!this.isBoss && f.e.level < p.level - 1) this.lowLevelXp = true;
       this.earnedGold += f.e.gold;
-      if (!this.isBoss && chance(0.35)) loot.push(makeItem(Math.min(20, f.e.level), { cls }));
+      if (f.e.rare) loot.push(...rareLoot(f.e.rare, Math.min(20, f.e.level), cls));
+      else if (!this.isBoss && chance(0.35)) loot.push(makeItem(Math.min(20, f.e.level), { cls }));
       // Potions drop too: stronger ones from higher-level monsters.
       if (!this.isBoss && chance(0.22)) this.potionLoot.push(this.randomPotion(f.e.level));
     }
@@ -1496,10 +1521,11 @@ export class BattleScene extends Phaser.Scene {
         const iy = y + i * 46;
         const g = this.add.graphics();
         g.fillStyle(0x0f0b1a, 1).fillRoundedRect(W / 2 - 220, iy, 40, 40, 6);
-        g.lineStyle(3, r.color, 1).strokeRoundedRect(W / 2 - 220, iy, 40, 40, 6);
+        g.lineStyle(3, itemColor(it), 1).strokeRoundedRect(W / 2 - 220, iy, 40, 40, 6);
         c.add(g);
         c.add(this.add.image(W / 2 - 200, iy + 20, ICON[it.base]).setScale(2));
-        c.add(txt(this, W / 2 - 168, iy + 8, `${itemName(it)}  (${tr(r.name)})`, 19, r.css));
+        c.add(txt(this, W / 2 - 168, iy + 8, `${itemName(it)}  (${it.set ? tr('Set') : tr(r.name)})`, 19, itemCss(it)));
+        if (it.set) this.burst(W / 2 - 200, iy + 20, itemColor(it), 30, 4100);
         if (r.rank >= 3) this.burst(W / 2 - 200, iy + 20, r.color, 20, 4100);
       });
       y += loot.length * 46;

@@ -7,7 +7,7 @@ import { getLang, tr } from '../i18n';
 import { isDevCode } from '../state/profile';
 import { openKeyboard } from '../ui/keyboard';
 import { parentGate } from '../ui/parentGate';
-import { C, H, W, button, langButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
+import { C, H, W, button, langButton, unitsButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
 import { androidBrowser, APK_URL } from '../util/platform';
 import { openTransferPanel } from '../ui/transferPanel';
@@ -26,6 +26,7 @@ export class HubScene extends Phaser.Scene {
     this.own = loadOwnership();
     soundButton(this, W - 76, 30, 130, 40);
     langButton(this, 96, 30, 172, 40, () => this.scene.restart());
+    unitsButton(this, 96, 76, 172, 36);
     const title = txt(this, W / 2, 70, tr('Pick a game!'), 44, '#ffd24a').setOrigin(0.5);
     title.setStroke('#5a2a00', 8);
     txt(this, W / 2, 112, tr('Every game is free to try!'), 19, C.dim).setOrigin(0.5);

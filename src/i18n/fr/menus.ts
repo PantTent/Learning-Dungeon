@@ -1,6 +1,8 @@
 // French text for menus (keys are the exact English strings passed to tr()).
 // The space before each ":" is a non-breaking space, so a colon never wraps onto its own line.
 export const FR_MENUS: Record<string, string> = {
+  'Units: inches & miles': 'Unités : pouces et milles',
+  'Units: cm & km': 'Unités : cm et km',
   // Sound / language buttons (every screen)
   'Sound: ON': 'Son : oui',
   'Music: OFF': 'Musique : non',

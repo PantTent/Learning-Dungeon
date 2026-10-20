@@ -5,6 +5,7 @@
 import { EARLY_GENERATORS, makeEarlyQuestion } from './mathEarly';
 import type { Difficulty, Question } from './types';
 import { pick, ri, shuffle } from '../util/rng';
+import { getUnits } from '../i18n';
 
 export const MATH_TOPICS: Record<string, string> = {
   'times-table': 'Times tables (focus practice)',
@@ -754,27 +755,26 @@ const GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }> = {
   'measurement': {
     levels: [1, 2],
     gen: (d) => {
+      // Time works everywhere; lengths, weights and volumes follow the chosen units.
+      const us = getUnits() === 'imperial';
       const conv: [string, string, number][] =
         d === 1
           ? [
-              ['feet', 'inches', 12],
-              ['yards', 'feet', 3],
               ['hours', 'minutes', 60],
               ['minutes', 'seconds', 60],
-              ['meters', 'centimeters', 100],
+              ...((us
+                ? [['feet', 'inches', 12], ['yards', 'feet', 3], ['weeks', 'days', 7]]
+                : [['meters', 'centimeters', 100], ['centimeters', 'millimeters', 10], ['weeks', 'days', 7]]) as [string, string, number][]),
             ]
           : [
-              ['kilograms', 'grams', 1000],
-              ['liters', 'milliliters', 1000],
-              ['pounds', 'ounces', 16],
-              ['gallons', 'quarts', 4],
-              ['kilometers', 'meters', 1000],
               ['days', 'hours', 24],
-              ['yards', 'inches', 36],
+              ...((us
+                ? [['pounds', 'ounces', 16], ['gallons', 'quarts', 4], ['quarts', 'cups', 4], ['yards', 'inches', 36], ['gallons', 'pints', 8]]
+                : [['kilograms', 'grams', 1000], ['liters', 'milliliters', 1000], ['kilometers', 'meters', 1000], ['meters', 'millimeters', 1000]]) as [string, string, number][]),
             ];
       const [big, small, f] = pick(conv);
       const n = ri(2, d === 1 ? 6 : 9);
-      const one = big === 'feet' ? 'foot' : big.replace(/s$/, '');
+      const one = big === 'feet' ? 'foot' : big === 'inches' ? 'inch' : big.replace(/s$/, '');
       return num(
         `${n} ${big} = ? ${small}`,
         n * f,
@@ -789,27 +789,28 @@ const GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }> = {
     gen: (d) => {
       const l = ri(3, d === 1 ? 9 : 15);
       const w = ri(2, d === 1 ? 8 : 12);
+      const [u, units, sq] = getUnits() === 'imperial' ? ['ft', 'feet', 'square feet'] : ['m', 'meters', 'square meters'];
       if (d === 3) {
         const area = l * w;
         return num(
-          `A rectangle has an area of ${area} square feet. One side is ${w} feet. How long is the other side?`,
+          `A rectangle has an area of ${area} ${sq}. One side is ${w} ${units}. How long is the other side?`,
           l,
-          `Area = length x width, so ${area} / ${w} = ${l} feet.`,
+          `Area = length x width, so ${area} / ${w} = ${l} ${units}.`,
           `Area = length x width. You know the area and one side, so ask: ${w} times WHAT equals ${area}? That's a division problem.`,
         );
       }
       if (Math.random() < 0.5) {
         return num(
-          `A rectangle is ${l} m long and ${w} m wide. What is its AREA in square meters?`,
+          `A rectangle is ${l} ${u} long and ${w} ${u} wide. What is its AREA in ${sq}?`,
           l * w,
-          `Area = length x width = ${l} x ${w} = ${l * w} square meters.`,
+          `Area = length x width = ${l} x ${w} = ${l * w} ${sq}.`,
           'AREA is how many squares cover the inside of the shape. For a rectangle, multiply the length by the width.',
         );
       }
       return num(
-        `A rectangle is ${l} m long and ${w} m wide. What is its PERIMETER in meters?`,
+        `A rectangle is ${l} ${u} long and ${w} ${u} wide. What is its PERIMETER in ${units}?`,
         2 * (l + w),
-        `Perimeter = all the sides added: ${l} + ${w} + ${l} + ${w} = ${2 * (l + w)} meters.`,
+        `Perimeter = all the sides added: ${l} + ${w} + ${l} + ${w} = ${2 * (l + w)} ${units}.`,
         'PERIMETER is the distance all the way AROUND the outside. A rectangle has 4 sides: two long ones and two short ones. Add all four.',
       );
     },
@@ -821,10 +822,11 @@ const GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }> = {
       const l = ri(2, d === 2 ? 6 : 12);
       const w = ri(2, d === 2 ? 5 : 9);
       const h = ri(2, d === 2 ? 4 : 8);
+      const [u, cubic] = getUnits() === 'imperial' ? ['in.', 'cubic inches'] : ['cm', 'cubic cm'];
       return num(
-        `A box is ${l} cm long, ${w} cm wide and ${h} cm tall. What is its VOLUME in cubic cm?`,
+        `A box is ${l} ${u} long, ${w} ${u} wide and ${h} ${u} tall. What is its VOLUME in ${cubic}?`,
         l * w * h,
-        `Volume = length x width x height = ${l} x ${w} x ${h} = ${l * w * h} cubic cm.`,
+        `Volume = length x width x height = ${l} x ${w} x ${h} = ${l * w * h} ${cubic}.`,
         `Volume is how many little cubes fit inside. Find how many cubes cover the bottom (${l} x ${w}), then multiply by how many layers tall it is (${h}).`,
       );
     },

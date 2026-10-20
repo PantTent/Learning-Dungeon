@@ -3,11 +3,11 @@ import { FREE_LIMITS } from '../hub/games';
 import { fullGame } from '../hub/ownership';
 import { fullGamePrompt } from '../ui/unlockPrompt';
 import { AREAS, areaOf, campPlace, placeOf, type AreaDef, type Place } from '../data/areas';
-import { FLOOR, findPath, type Pt } from '../data/mapgen';
-import { makeEnemy } from '../data/enemies';
-import { makeItem, RARITY } from '../data/items';
+import { FLOOR, canCut, findPath, type Pt } from '../data/mapgen';
+import { makeEnemy, RARE_TIERS } from '../data/enemies';
+import { itemCss, makeItem } from '../data/items';
 import { classOf, current, derive, saveProfile, xpToNext, LEVEL_CAP, BAG_SIZE } from '../state/profile';
-import { enterFloor, respawnOne, worldState, type World, type WorldMonster } from '../state/world';
+import { enterFloor, respawnOne, worldState, RESPAWN_MS, type World, type WorldMonster } from '../state/world';
 import { Bar, C, H, W, button, panel, soundButton, toast, txt } from '../ui/widgets';
 import { playMusic, sfx } from '../audio/audio';
 import { POTIONS, countPotions, tierForLevel } from '../data/potions';
@@ -92,8 +92,8 @@ export class DungeonScene extends Phaser.Scene {
     }
     this.world = worldState.world!;
     if (data.fromBattle?.result === 'victory' && data.fromBattle.monsterId) {
+      if (this.world.monsters.some((m) => m.id === data.fromBattle!.monsterId)) this.world.respawns.push(Date.now() + RESPAWN_MS);
       this.world.monsters = this.world.monsters.filter((m) => m.id !== data.fromBattle!.monsterId);
-      if (Math.random() < 0.5) respawnOne(this.world, p.level);
     }
     if (data.fromBattle) this.graceUntil = this.time.now + 2000;
     if (this.world.floor > p.maxFloor) p.maxFloor = this.world.floor;
@@ -145,13 +145,8 @@ export class DungeonScene extends Phaser.Scene {
     this.setupInput();
 
     this.time.addEvent({ delay: 850, loop: true, callback: () => this.moveMonsters() });
-    // Slowly bring monsters back so floors never run dry (bosses and monsters can be farmed).
-    this.time.addEvent({ delay: 25000, loop: true, callback: () => {
-      if (this.world.monsters.length < (this.place().floor?.monsters ?? 0)) {
-        respawnOne(this.world, current().level);
-        this.drawMonsters();
-      }
-    } });
+    // Beaten monsters come back 2 minutes later (sometimes as a rare spawn!).
+    this.time.addEvent({ delay: 2000, loop: true, callback: () => this.respawnDue() });
 
     if (data.floor !== undefined || !data.fromBattle) this.showFloorBanner();
     if (data.fromBattle?.result === 'defeat') this.dialog([tr('You were knocked out!'), tr('You wake up safe at camp, fully healed. Keep trying - every question makes you smarter!')]);
@@ -318,22 +313,53 @@ export class DungeonScene extends Phaser.Scene {
     txt(this, pt.x * TS + TS / 2, pt.y * TS - 8, s, 14, '#ffe9a0').setOrigin(0.5, 1).setDepth(30);
   }
 
+  private respawnDue() {
+    const now = Date.now();
+    const w = this.world;
+    const due = w.respawns.filter((t) => t <= now);
+    if (!due.length || this.busy) return;
+    w.respawns = w.respawns.filter((t) => t > now);
+    let added = false;
+    for (let i = 0; i < due.length; i++) {
+      // No free spot right now (e.g. the hero is standing close): try again soon.
+      if (respawnOne(w, current().level)) added = true;
+      else w.respawns.push(now + 5000);
+    }
+    if (!added) return;
+    const fresh = w.monsters[w.monsters.length - 1];
+    this.drawMonsters();
+    const tier = fresh.group[0].rare;
+    if (tier) toast(this, tr('A {tier} monster appeared on this floor!', { tier: tr(RARE_TIERS[tier].name) }), RARE_TIERS[tier].css);
+  }
+
   private drawMonsters() {
     const alive = new Set(this.world.monsters.map((m) => m.id));
     for (const [id, s] of this.monsterSprites) {
       if (!alive.has(id)) {
+        (s.getData('badge') as Phaser.GameObjects.Text | undefined)?.destroy();
+        (s.getData('aura') as Phaser.GameObjects.Image | undefined)?.destroy();
         s.destroy();
         this.monsterSprites.delete(id);
       }
     }
     for (const m of this.world.monsters) {
       if (this.monsterSprites.has(m.id)) continue;
-      const s = this.add.image(m.pos.x * TS + TS / 2, m.pos.y * TS + TS / 2, m.group[0].def.sprite).setScale(S).setDepth(18);
-      this.tweens.add({ targets: s, scaleY: S * 0.92, duration: 400 + (m.id % 5) * 60, yoyo: true, repeat: -1 });
+      const sc = m.group[0].rare ? S * 1.15 : S;
+      const s = this.add.image(m.pos.x * TS + TS / 2, m.pos.y * TS + TS / 2, m.group[0].def.sprite).setScale(sc).setDepth(18);
+      this.tweens.add({ targets: s, scaleY: sc * 0.92, duration: 400 + (m.id % 5) * 60, yoyo: true, repeat: -1 });
       this.monsterSprites.set(m.id, s);
       if (m.group.length > 1) {
         const badge = txt(this, 0, 0, `x${m.group.length}`, 14, '#ffd24a').setDepth(19);
         s.setData('badge', badge);
+      }
+      // Rare spawns glow in their tier's color and wear 1-3 stars.
+      const tier = m.group[0].rare;
+      if (tier) {
+        const t = RARE_TIERS[tier];
+        const aura = this.add.image(s.x, s.y, 'glow').setScale(5).setTint(t.color).setBlendMode('ADD').setAlpha(0.6).setDepth(17);
+        this.tweens.add({ targets: aura, alpha: 0.95, scale: 6, duration: 600, yoyo: true, repeat: -1 });
+        s.setData('aura', aura);
+        s.setData('badge', txt(this, 0, 0, '\u2605'.repeat(tier), 14, t.css).setOrigin(0.5, 1).setDepth(19).setStroke('#120a1c', 4));
       }
     }
     this.syncBadges();
@@ -342,7 +368,11 @@ export class DungeonScene extends Phaser.Scene {
   private syncBadges() {
     for (const s of this.monsterSprites.values()) {
       const b = s.getData('badge') as Phaser.GameObjects.Text | undefined;
-      b?.setPosition(s.x + 12, s.y - 30);
+      const aura = s.getData('aura') as Phaser.GameObjects.Image | undefined;
+      if (aura) {
+        aura.setPosition(s.x, s.y);
+        b?.setPosition(s.x, s.y - 26);
+      } else b?.setPosition(s.x + 12, s.y - 30);
     }
   }
 
@@ -426,8 +456,13 @@ export class DungeonScene extends Phaser.Scene {
         y = (y / d) * R;
       }
       knob.setPosition(cx + x, cy + y);
-      // Walking is on a grid, so pick the stronger direction.
-      this.stick = d < 18 ? { dx: 0, dy: 0 } : Math.abs(x) > Math.abs(y) ? { dx: Math.sign(x), dy: 0 } : { dx: 0, dy: Math.sign(y) };
+      // Eight directions: split the circle into slices of 45 degrees.
+      if (d < 18) this.stick = { dx: 0, dy: 0 };
+      else {
+        const slice = Math.round(Math.atan2(y, x) / (Math.PI / 4));
+        const a = slice * (Math.PI / 4);
+        this.stick = { dx: Math.round(Math.cos(a)), dy: Math.round(Math.sin(a)) };
+      }
     };
     const release = (ptr: Phaser.Input.Pointer) => {
       if (held !== ptr.id) return;
@@ -614,9 +649,20 @@ export class DungeonScene extends Phaser.Scene {
     let dy = 0;
     if (k.LEFT.isDown || k.A.isDown) dx = -1;
     else if (k.RIGHT.isDown || k.D.isDown) dx = 1;
-    else if (k.UP.isDown || k.W.isDown) dy = -1;
+    if (k.UP.isDown || k.W.isDown) dy = -1;
     else if (k.DOWN.isDown || k.S.isDown) dy = 1;
-    else ({ dx, dy } = this.stick);
+    if (!dx && !dy) ({ dx, dy } = this.stick);
+    if (dx && dy) {
+      // Diagonal: only when it doesn't squeeze past a wall corner; otherwise slide along the wall.
+      const at = this.world.player;
+      const blocked = (q: Pt) => this.isObstacle(q);
+      if (!canCut(this.world.map, at, dx, dy, blocked)) {
+        const open = (x: number, y: number) => this.world.map.tiles[y]?.[x] === FLOOR && !this.isObstacle({ x, y });
+        if (open(at.x + dx, at.y)) dy = 0;
+        else if (open(at.x, at.y + dy)) dx = 0;
+        else return;
+      }
+    }
     if (dx || dy) {
       const n = { x: this.world.player.x + dx, y: this.world.player.y + dy };
       if (this.isObstacle(n)) {
@@ -746,7 +792,7 @@ export class DungeonScene extends Phaser.Scene {
     p.gold += gold;
     saveProfile(p);
     this.refreshHud();
-    toast(this, tr('Treasure! {item} and {gold} gold', { item: itemName(item), gold }), RARITY[item.rarity].css);
+    toast(this, tr('Treasure! {item} and {gold} gold', { item: itemName(item), gold }), itemCss(item));
   }
 
   private useExit() {
