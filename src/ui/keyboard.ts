@@ -5,7 +5,16 @@ import { getLang, tr } from '../i18n';
 import { button, panel, txt, W } from './widgets';
 
 /** Big friendly on-screen keyboard (hero name or secret code). */
-export function openKeyboard(scene: Phaser.Scene, title: string, initial: string, nameCase: boolean, onDone: (value: string) => void, randomNames: string[] = []) {
+export function openKeyboard(
+  scene: Phaser.Scene,
+  title: string,
+  initial: string,
+  nameCase: boolean,
+  onDone: (value: string) => void,
+  randomNames: string[] = [],
+  opts: { maxLen?: number; accents?: boolean } = {},
+) {
+  const maxLen = opts.maxLen ?? 12;
   const c = scene.add.container(0, 0).setDepth(500);
   c.add(scene.add.rectangle(0, 0, W, 540, 0x000000, 0.75).setOrigin(0).setInteractive());
   c.add(panel(scene, 40, 20, W - 80, 500, 0x1d1730, 0x7fd3ff));
@@ -22,13 +31,13 @@ export function openKeyboard(scene: Phaser.Scene, title: string, initial: string
   const type = (k: string) => {
     if (k === 'DEL') name = name.slice(0, -1);
     else if (k === 'SPACE') {
-      if (name.length && name.length < 12 && !name.endsWith(' ')) name += ' ';
-    } else if (name.length < 12) name += nameCase && (name.length === 0 || name.endsWith(' ')) ? k.toUpperCase() : k.toLowerCase();
+      if (name.length && name.length < maxLen && !name.endsWith(' ')) name += ' ';
+    } else if (name.length < maxLen) name += nameCase && (name.length === 0 || name.endsWith(' ')) ? k.toUpperCase() : k.toLowerCase();
     refresh();
   };
   const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
   // French names often have accents (Léa, Zoé, François).
-  if (nameCase && getLang() === 'fr') rows.push('ÉÈÊËÀÂÇÏÎÔ');
+  if ((nameCase || opts.accents) && getLang() === 'fr') rows.push('ÉÈÊËÀÂÇÏÎÔ');
   const kw = 70;
   const kh = 60;
   rows.forEach((row, r) => {

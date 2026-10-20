@@ -4,10 +4,47 @@ import { defaultGrade, gradeLabel, gradesFor, groupsForGrade, topicGroups, type 
 import { groupReport, type Strength } from '../questions/engine';
 import { ladderFor, ladderGrades } from '../questions/ladders';
 import { parentGate } from '../ui/parentGate';
+import { openKeyboard } from '../ui/keyboard';
+import { parseWordList } from '../questions/spelling';
 import { tr } from '../i18n';
 import { current, saveProfile } from '../state/profile';
 import { C, W, H, button, panel, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
+
+/**
+ * A plain text box over the game for pasting a whole list at once (e.g. the
+ * teacher's email). One word per line, or commas between words.
+ */
+function pasteList(initial: string, onSave: (text: string) => void) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;font-family:sans-serif';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1d1730;border:3px solid #d07a3a;border-radius:12px;padding:16px;width:min(560px,92vw);color:#fff';
+  const title = document.createElement('div');
+  title.textContent = tr('Paste or type the words, one per line (or with commas):');
+  title.style.cssText = 'margin-bottom:8px;font-size:16px';
+  const area = document.createElement('textarea');
+  area.value = initial;
+  area.style.cssText = 'width:100%;height:min(260px,45vh);font-size:18px;box-sizing:border-box;border-radius:8px;padding:8px';
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:10px;justify-content:flex-end;margin-top:10px';
+  const btn = (label: string, color: string, fn: () => void) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = `background:${color};color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:17px`;
+    b.onclick = fn;
+    row.appendChild(b);
+  };
+  btn(tr('Cancel'), '#3a3450', () => wrap.remove());
+  btn(tr('Save'), '#2f9a4a', () => {
+    wrap.remove();
+    onSave(area.value);
+  });
+  box.append(title, area, row);
+  wrap.appendChild(box);
+  document.body.appendChild(wrap);
+  area.focus();
+}
 
 /** Badge text and color for a group's strength. */
 function strengthBadge(st: Strength): { label: string; color: string } {
@@ -128,6 +165,56 @@ export class PracticeScene extends Phaser.Scene {
       c.add(button(this, x + 16 + bw / 2, 434, bw, 40, m.length ? tr('x tables: {list}', { list: m.join(', ') }) : tr('x tables: all'), () => this.focusPicker('multiply'), { size: 15, color: 0x5a3a8a }));
       c.add(button(this, x + 32 + bw * 1.5, 434, bw, 40, d.length ? tr('/ facts: {list}', { list: d.join(', ') }) : tr('/ facts: all'), () => this.focusPicker('divide'), { size: 15, color: 0x5a3a8a }));
     }
+    // Spelling tests: the grade's words, or this week's list from school.
+    if (!isMath) {
+      const own = s.spellWords ?? [];
+      c.add(button(this, x + colW / 2, 434, colW - 32, 40, own.length ? tr('Spelling words: my list ({n})', { n: own.length }) : tr('Spelling words: grade list'), () => this.spellingWords(), { size: 15, color: 0x8a5a2a }));
+    }
+  }
+
+  /** Grown-ups (or kids) can type in this week's spelling test words. */
+  private spellingWords() {
+    const p = current();
+    const s = p.settings;
+    const group = s.lang === 'fr' ? 'fr-dictee' : 'spell';
+    const c = this.add.container(0, 0).setDepth(100);
+    const save = (words: string[]) => {
+      s.spellWords = words;
+      // Adding words turns the spelling test on.
+      if (words.length && !s.groups.includes(group)) s.groups.push(group);
+      saveProfile(p);
+      redraw();
+    };
+    const redraw = () => {
+      c.removeAll(true);
+      const words = s.spellWords ?? [];
+      c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.8).setOrigin(0).setInteractive());
+      c.add(panel(this, 30, 16, W - 60, H - 32, 0x1d1730, 0xd07a3a));
+      c.add(txt(this, W / 2, 44, tr('Spelling words for {name}', { name: p.name }), 26, '#ffd24a').setOrigin(0.5));
+      c.add(txt(this, W / 2, 76, words.length
+        ? tr('These words come up in spelling questions. Tap a word to take it off.')
+        : tr("No list yet, so spelling uses words for the child's grade. Add this week's words from school!"), 15, C.dim, { align: 'center', wordWrap: { width: W - 120 } }).setOrigin(0.5));
+      const cols = 5;
+      const cw = (W - 100) / cols;
+      words.forEach((w, i) => {
+        const x = 50 + (i % cols) * cw + cw / 2;
+        const y = 118 + Math.floor(i / cols) * 34;
+        if (y > H - 110) return;
+        c.add(button(this, x, y, cw - 8, 30, `${w}  \u2715`, () => save(words.filter((o) => o !== w)), { size: 15, color: 0x3d3266 }));
+      });
+      if (words.length > 40) c.add(txt(this, W / 2, H - 98, tr('(+{n} more)', { n: words.length - 40 }), 14, C.dim).setOrigin(0.5));
+      const by = H - 56;
+      c.add(button(this, 150, by, 200, 48, tr('Add a word'), () =>
+        openKeyboard(this, tr('Type a spelling word'), '', false, (v) => save(parseWordList([...words, v].join('\n'))), [], { maxLen: 20, accents: true }),
+      { size: 18, color: 0x2e5a7a }));
+      c.add(button(this, 370, by, 210, 48, tr('Paste a list'), () => pasteList(words.join('\n'), (text) => save(parseWordList(text))), { size: 18, color: 0x2e5a7a }));
+      c.add(button(this, 580, by, 180, 48, tr('Clear list'), () => save([]), { size: 18, color: 0x8a3a3a }).setEnabled(words.length > 0));
+      c.add(button(this, W - 130, by, 170, 48, tr('Done'), () => {
+        c.destroy();
+        this.draw();
+      }, { size: 22, color: 0x2f9a4a }));
+    };
+    redraw();
   }
 
   /**

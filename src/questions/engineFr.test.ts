@@ -1,5 +1,5 @@
 import { defaultLearningSettings, newLearningStats, QuestionEngine, upgradeSettings } from './engine';
-import { GRADES_FR, mathTopicsForGrade, TOPIC_GROUPS_FR } from './curriculum';
+import { GRADES_FR, mathTopicsForGrade, SPELLING_GROUPS, TOPIC_GROUPS_FR } from './curriculum';
 import { READING_BANK_FR } from './readingBankFr';
 import { EARLY_GENERATORS } from './mathEarly';
 import { topicLabel } from './labels';
@@ -11,7 +11,7 @@ describe('French questions', () => {
   it('every French group topic exists', () => {
     const reading = new Set(READING_BANK_FR.map((b) => b.topic));
     for (const g of TOPIC_GROUPS_FR) {
-      for (const t of g.topics) expect(g.subject === 'math' ? !!EARLY_GENERATORS[t] : reading.has(t), t).toBe(true);
+      for (const t of g.topics) expect(g.subject === 'math' ? !!EARLY_GENERATORS[t] : SPELLING_GROUPS.includes(g.id) || reading.has(t), t).toBe(true);
     }
     for (const grade of GRADES_FR) for (const t of mathTopicsForGrade(grade, 'fr')) expect(EARLY_GENERATORS[t], t).toBeTruthy();
   });

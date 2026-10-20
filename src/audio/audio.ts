@@ -44,9 +44,22 @@ function ensure(): AudioContext | null {
   return ctx;
 }
 
+/** True while a spelling word is being read out (music plays at a quarter volume). */
+let ducked = false;
+
+/** Turn the music down to 25% (e.g. while a word is read out loud), or back up. */
+export function duckMusic(on: boolean) {
+  if (ducked === on) return;
+  ducked = on;
+  if (!ctx) return;
+  const target = (mode === 'all' ? 0.55 : 0) * (on ? 0.25 : 1);
+  musicBus.gain.setValueAtTime(musicBus.gain.value, ctx.currentTime);
+  musicBus.gain.linearRampToValueAtTime(target, ctx.currentTime + 0.25);
+}
+
 function applyMode() {
   if (!ctx) return;
-  musicBus.gain.value = mode === 'all' ? 0.55 : 0;
+  musicBus.gain.value = (mode === 'all' ? 0.55 : 0) * (ducked ? 0.25 : 1);
   sfxBus.gain.value = mode === 'off' ? 0 : 0.9;
 }
 

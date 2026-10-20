@@ -1,25 +1,53 @@
 import Phaser from 'phaser';
 import type { Question } from '../questions/types';
 import { isCorrect, teacherHelp } from '../questions/engine';
-import { sfx } from '../audio/audio';
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
+import { duckMusic, sfx } from '../audio/audio';
+import { inApp } from '../util/platform';
 import { topicLabel } from '../questions/labels';
 import { fmtNum, getLang, speechLang, tr } from '../i18n';
 import { C, H, W, button, panel, txt } from './widgets';
+import { PaperPanel } from './paperPanel';
 
 const debugHook: { q?: Question; choicePos: { x: number; y: number }[] } = { choicePos: [] };
 (window as unknown as { __ld: typeof debugHook }).__ld = debugHook;
 
-export function speak(text: string) {
+let speechToken = 0;
+
+/**
+ * Read text out loud. With `duck`, the music goes down to a quarter while
+ * the voice speaks, then comes back. The Android app has no browser voice,
+ * so it uses the phone's own text-to-speech.
+ */
+export function speak(text: string, duck = false) {
+  const token = ++speechToken;
+  const up = () => duck && token === speechToken && duckMusic(false);
+  if (duck) {
+    duckMusic(true);
+    // If the device never says it finished, bring the music back anyway.
+    setTimeout(up, 1500 + text.length * 180);
+  }
+  const words = speechText(text);
+  if (inApp()) {
+    void TextToSpeech.stop()
+      .catch(() => undefined)
+      .then(() => TextToSpeech.speak({ text: words, lang: speechLang(), rate: duck ? 0.8 : 0.95 }))
+      .then(up, up);
+    return;
+  }
   try {
     const synth = window.speechSynthesis;
-    if (!synth) return;
+    if (!synth) return up();
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(speechText(text));
+    const u = new SpeechSynthesisUtterance(words);
     u.lang = speechLang();
-    u.rate = 0.92;
+    u.rate = duck ? 0.8 : 0.92;
+    u.onend = up;
+    u.onerror = up;
     synth.speak(u);
   } catch {
     /* Speech not available on this device. */
+    up();
   }
 }
 
@@ -55,6 +83,7 @@ export class QuestionPanel {
   private typed = '';
   private display?: Phaser.GameObjects.Text;
   private answered = false;
+  private paper?: PaperPanel;
 
   constructor(
     private scene: Phaser.Scene,
@@ -68,6 +97,7 @@ export class QuestionPanel {
     },
   ) {
     this.root = scene.add.container(0, 0).setDepth(3000).setScrollFactor(0);
+    this.root.once('destroy', () => this.paper?.close());
     this.build();
     // Exposed for automated play-testing.
     debugHook.q = q;
@@ -86,6 +116,10 @@ export class QuestionPanel {
     // Missed questions come back on purpose; say so, so it doesn't feel like a glitch.
     if (q.isRetry) root.add(txt(scene, W / 2 + 60, 32, tr("Let's try this one again!"), 16, '#ffb36b').setOrigin(0.5, 0));
 
+    if (q.input === 'text') {
+      this.buildSpelling();
+      return;
+    }
     const isNumber = q.input === 'number';
     const promptW = isNumber ? 470 : W - 270;
     const long = q.prompt.length > 170;
@@ -108,6 +142,57 @@ export class QuestionPanel {
 
     if (isNumber) this.buildNumberPad();
     else this.buildChoices(Math.max(prompt.y + prompt.height + 24, long ? 300 : 230));
+  }
+
+  /**
+   * Spelling test: the word is read out loud (music turned down), the child
+   * types it on a letter keyboard. "Say it again" repeats the word.
+   */
+  private buildSpelling() {
+    const { scene, root, q } = this;
+    const word = q.say ?? q.answer;
+    const sayIt = () => speak(word, true);
+    root.add(txt(scene, 64, 66, q.prompt, 28, C.text, { wordWrap: { width: 600, useAdvancedWrap: true } }));
+    root.add(button(scene, W - 150, 84, 210, 52, tr('Say it again'), sayIt, { size: 20, color: 0x2e5a7a }));
+    root.add(button(scene, W - 150, 146, 210, 52, tr('I need a teacher!'), () => this.showTeacher(), { size: 17, color: 0x7a4ab0 }));
+    scene.time.delayedCall(350, sayIt);
+
+    root.add(panel(scene, 110, 176, 560, 64, 0x0f0b1a, 0x7fd3ff));
+    this.display = txt(scene, 390, 208, '?', 38, '#ffffff').setOrigin(0.5);
+    root.add(this.display);
+
+    const rows = ['qwertyuiop', 'asdfghjkl', "zxcvbnm'"];
+    if (getLang() === 'fr') rows.push('éèêàâçîôûë');
+    const kw = 70;
+    const kh = 56;
+    rows.forEach((row, r) => {
+      const x0 = 70 + (r === 1 ? 38 : r === 2 ? 76 : 0) + kw / 2;
+      [...row].forEach((ch, i) =>
+        root.add(button(scene, x0 + i * (kw + 6), 290 + r * (kh + 8), kw, kh, ch, () => this.letter(ch), { size: 26 })),
+      );
+    });
+    const right = 70 + 76 + 8 * (kw + 6);
+    root.add(button(scene, right + 52, 290 + 2 * (kh + 8), 110, kh, tr('DEL'), () => this.letter('DEL'), { size: 20, color: 0x8a3a3a }));
+    root.add(button(scene, W - 120, 220, 150, 64, tr('GO'), () => this.letter('GO'), { size: 28, color: 0x2f9a4a }));
+
+    const onKey = (e: KeyboardEvent) => {
+      if (this.answered) return;
+      if (/^[\p{L}'-]$/u.test(e.key)) this.letter(e.key.toLowerCase());
+      else if (e.key === 'Backspace') this.letter('DEL');
+      else if (e.key === 'Enter') this.letter('GO');
+    };
+    scene.input.keyboard?.on('keydown', onKey);
+    this.root.once('destroy', () => scene.input.keyboard?.off('keydown', onKey));
+  }
+
+  private letter(k: string) {
+    if (this.answered) return;
+    if (k === 'DEL') this.typed = this.typed.slice(0, -1);
+    else if (k === 'GO') {
+      if (this.typed.trim().length) this.submit(this.typed);
+      return;
+    } else if (this.typed.length < 24) this.typed += k;
+    this.display?.setText(this.typed.length ? this.typed : '?');
   }
 
   /** Explains how to think about the question, without giving the answer. */
@@ -138,6 +223,14 @@ export class QuestionPanel {
     root.add(panel(scene, 70, 380, 420, 70, 0x0f0b1a, 0x7fd3ff));
     this.display = txt(scene, 280, 415, '?', 40, '#ffffff').setOrigin(0.5);
     root.add(this.display);
+    // Scrap paper for working it out in columns.
+    root.add(button(scene, 280, 486, 220, 44, tr('Use Paper'), () => {
+      if (this.answered) return;
+      this.paper = new PaperPanel(scene, this.q, (ans) => {
+        this.typed = ans.slice(0, 9);
+        this.display?.setText(fmtNum(Number(this.typed)));
+      });
+    }, { size: 19, color: 0x7a6a3a }));
 
     const keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'DEL', '0', 'GO'];
     const kx = 560;
@@ -158,7 +251,8 @@ export class QuestionPanel {
 
     // Physical keyboard support (handy on tablets with keyboards and for testing).
     const onKey = (e: KeyboardEvent) => {
-      if (this.answered) return;
+      // The scrap paper has its own keys while it's open.
+      if (this.answered || (this.paper && !this.paper.destroyed)) return;
       if (/^[0-9]$/.test(e.key)) this.key(e.key);
       else if (e.key === 'Backspace') this.key('DEL');
       else if (e.key === 'Enter') this.key('GO');

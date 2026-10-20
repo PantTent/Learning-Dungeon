@@ -249,7 +249,7 @@ export class BattleScene extends Phaser.Scene {
       const rare = e.rare ? RARE_TIERS[e.rare] : undefined;
       const sc = rare ? 5.8 : 5;
       if (rare) {
-        const aura = this.add.image(x, y, 'glow').setScale(9).setTint(rare.color).setBlendMode('ADD').setAlpha(0.55).setDepth(2);
+        const aura = this.add.image(x, y, 'glow').setScale(9).setTint(rare.color).setBlendMode('ADD').setAlpha(0.55).setDepth(9);
         this.tweens.add({ targets: aura, alpha: 0.9, scale: 10, duration: 700, yoyo: true, repeat: -1 });
         txt(this, x, y - 86, `${'\u2605'.repeat(e.rare!)} ${tr(rare.name).toUpperCase()}`, 15, rare.css).setOrigin(0.5).setDepth(20).setStroke('#120a1c', 4);
       }

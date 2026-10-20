@@ -14,8 +14,11 @@ export interface Question {
   /**
    * 'number' = child types the answer on a number pad.
    * 'choice' = child taps one of `choices`.
+   * 'text' = child types a word (spelling tests).
    */
-  input: 'number' | 'choice';
+  input: 'number' | 'choice' | 'text';
+  /** Read out loud when the question opens, instead of the prompt (the word to spell). */
+  say?: string;
   /** Always a string. For 'number' questions it is the digits only, e.g. "322". */
   answer: string;
   /** For 'choice' questions: 2-4 options, one of which equals `answer`. */

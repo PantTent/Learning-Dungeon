@@ -51,6 +51,7 @@ export const TOPIC_GROUPS: TopicGroup[] = [
   { id: 'figurative', subject: 'reading', label: 'Figurative Language', topics: ['figurative'] },
   { id: 'grammar', subject: 'reading', label: 'Grammar & Spelling', topics: ['homophones', 'grammar', 'spelling'] },
   { id: 'comprehension', subject: 'reading', label: 'Reading Passages', topics: ['comprehension'] },
+  { id: 'spell', subject: 'reading', label: 'Spelling Test', topics: ['spell-words'] },
 ];
 
 /** Topic groups for the French (Quebec) questions. */
@@ -66,7 +67,11 @@ export const TOPIC_GROUPS_FR: TopicGroup[] = [
   { id: 'fr-ortho', subject: 'reading', label: 'Orthographe et homophones', topics: ['fr-orthographe', 'fr-homophones'] },
   { id: 'fr-grammaire', subject: 'reading', label: 'Grammaire', topics: ['fr-grammaire'] },
   { id: 'fr-lecture', subject: 'reading', label: 'Lecture', topics: ['fr-lecture'] },
+  { id: 'fr-dictee', subject: 'reading', label: 'Dictée', topics: ['fr-dictee'] },
 ];
+
+/** Spelling-test groups (the word is read out loud and typed). Off until chosen. */
+export const SPELLING_GROUPS = ['spell', 'fr-dictee'];
 
 export function topicGroups(lang: Lang = getLang()): TopicGroup[] {
   return lang === 'fr' ? TOPIC_GROUPS_FR : TOPIC_GROUPS;

@@ -8,5 +8,7 @@ import { getLang } from '../i18n';
 export function topicLabel(topic: string): string {
   const early = EARLY_TOPICS[topic];
   if (early) return getLang() === 'fr' ? early.fr : early.en;
+  if (topic === 'spell-words') return 'Spelling Test';
+  if (topic === 'fr-dictee') return 'Dictée';
   return MATH_TOPICS[topic] ?? READING_TOPICS[topic] ?? READING_TOPICS_FR[topic] ?? topic;
 }

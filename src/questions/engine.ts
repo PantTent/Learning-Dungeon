@@ -2,7 +2,8 @@
 // and bringing missed questions back a few turns later for another try.
 import type { Difficulty, Question, Subject } from './types';
 import { makeMathQuestion } from './math';
-import { allGroupIds, defaultGrade, fitGrade, gradeBand, mathTopicsForGrade, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
+import { allGroupIds, defaultGrade, fitGrade, gradeBand, mathTopicsForGrade, SPELLING_GROUPS, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
+import { spellOut, spellWords } from './spelling';
 import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
@@ -46,6 +47,8 @@ export interface LearningSettings {
   lang: Lang;
   /** Parent-pinned grade for a group (missing = automatic). */
   levels?: Record<string, Grade>;
+  /** The child's own spelling list (e.g. this week's test). Empty = grade words. */
+  spellWords?: string[];
 }
 
 export function newLearningStats(): LearningStats {
@@ -61,7 +64,9 @@ export function newLearningStats(): LearningStats {
 }
 
 export function defaultLearningSettings(lang: Lang = 'en'): LearningSettings {
-  return { mathPercent: 60, readAloud: false, grade: defaultGrade(lang), groups: [...allGroupIds(lang)], focus: { multiply: [], divide: [] }, lang };
+  // Spelling tests are picked on purpose (they need sound), so they start off.
+  const groups = allGroupIds(lang).filter((g) => !SPELLING_GROUPS.includes(g));
+  return { mathPercent: 60, readAloud: false, grade: defaultGrade(lang), groups, focus: { multiply: [], divide: [] }, lang };
 }
 
 /** Fill in settings added after a save was created. */
@@ -78,6 +83,7 @@ export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings 
     focus: { multiply: s.focus?.multiply ?? [], divide: s.focus?.divide ?? [] },
     lang,
     levels: s.levels ?? {},
+    spellWords: s.spellWords ?? [],
   };
 }
 
@@ -127,7 +133,7 @@ function today(): string {
 
 /** Normalize a typed answer so "1,200" and " 1200 " both match "1200". */
 export function normalize(ans: string): string {
-  return ans.trim().toLowerCase().replace(/[,\u00a0\u202f]/g, '').replace(/\s+/g, ' ');
+  return ans.trim().toLowerCase().replace(/[,\u00a0\u202f]/g, '').replace(/[’`]/g, "'").replace(/\s+/g, ' ');
 }
 
 export function isCorrect(q: Question, given: string): boolean {
@@ -238,7 +244,33 @@ export class QuestionEngine {
       if (focus) return this.mathQuestion(focus.topic, step.d, focus.factors);
       return this.mathQuestion(pick(step.topics), step.d);
     }
+    if (SPELLING_GROUPS.includes(groupId)) return this.spellingQuestion(step);
     return this.readingQuestion(step.d, new Set(step.topics));
+  }
+
+  /** "Listen and spell the word": from the child's own list, or the grade list for this step. */
+  private spellingQuestion(step: Step): Question {
+    const lang = this.settings.lang;
+    const own = this.settings.spellWords ?? [];
+    const words = own.length ? own : spellWords(lang, step.g);
+    const recent = new Set(this.stats.recent.slice(-Math.min(30, Math.floor(words.length * 0.7))));
+    const fresh = words.filter((w) => !recent.has(`sp:${w}`));
+    const word = pick(fresh.length ? fresh : words);
+    const fr = lang === 'fr';
+    return {
+      id: `sp:${word}`,
+      subject: 'reading',
+      topic: fr ? 'fr-dictee' : 'spell-words',
+      difficulty: step.d,
+      prompt: fr ? 'Écoute bien, puis écris le mot que tu entends.' : 'Listen, then spell the word you hear.',
+      say: word,
+      input: 'text',
+      answer: word,
+      explanation: fr ? `« ${word} » s'écrit ${spellOut(word)}.` : `"${word}" is spelled ${spellOut(word)}.`,
+      teach: fr
+        ? 'Dis le mot lentement dans ta tête et écoute chaque son. Coupe les longs mots en syllabes et écris une syllabe à la fois. Attention aux accents, aux lettres muettes et aux lettres doubles!'
+        : 'Say the word slowly in your head and listen for each sound. Break long words into syllables and spell one part at a time. Watch for silent letters, double letters and tricky endings.',
+    };
   }
 
   private mathQuestion(topic: string, d: Difficulty, factors?: number[]): Question {

@@ -82,6 +82,12 @@ const EN_MATH: Record<string, Step[]> = {
   ],
 };
 
+/** Spelling tests: word lists from grade 1 up, in both languages. */
+const SPELLING: Record<string, Step[]> = {
+  spell: [st('spell-1', 1, 1), st('spell-2', 1, 2), st('spell-3', 1, 3), st('spell-4', 2, 4), st('spell-5', 3, 5)],
+  'fr-dictee': [st('dictee-1', 1, 1), st('dictee-2', 2, 2), st('dictee-3', 3, 3)],
+};
+
 function hasReading(lang: Lang, topic: string, d: Difficulty): boolean {
   const bank = lang === 'fr' ? READING_BANK_FR : READING_BANK;
   return bank.some((b) => b.topic === topic && b.difficulty === d);
@@ -106,7 +112,7 @@ export function ladderFor(groupId: string, lang: Lang): Step[] {
   const key = `${lang}:${groupId}`;
   let steps = cache.get(key);
   if (!steps) {
-    steps = (lang === 'en' && EN_MATH[groupId]) || generic(groupId, lang);
+    steps = SPELLING[groupId] ?? ((lang === 'en' && EN_MATH[groupId]) || generic(groupId, lang));
     cache.set(key, steps);
   }
   return steps;

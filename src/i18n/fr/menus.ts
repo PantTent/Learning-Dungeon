@@ -1,6 +1,18 @@
 // French text for menus (keys are the exact English strings passed to tr()).
 // The space before each ":" is a non-breaking space, so a colon never wraps onto its own line.
 export const FR_MENUS: Record<string, string> = {
+  'Spelling words: my list ({n})': 'Mots de dictée : ma liste ({n})',
+  'Spelling words: grade list': 'Mots de dictée : liste de l’année',
+  'Spelling words for {name}': 'Mots de dictée pour {name}',
+  'These words come up in spelling questions. Tap a word to take it off.': 'Ces mots reviennent dans les dictées. Touche un mot pour l’enlever.',
+  "No list yet, so spelling uses words for the child's grade. Add this week's words from school!": 'Pas encore de liste : la dictée utilise des mots de l’année scolaire. Ajoute les mots de la semaine de l’école!',
+  '(+{n} more)': '(+{n} autres)',
+  'Add a word': 'Ajouter un mot',
+  Save: 'Enregistrer',
+  'Type a spelling word': 'Écris un mot de dictée',
+  'Paste a list': 'Coller une liste',
+  'Clear list': 'Vider la liste',
+  'Paste or type the words, one per line (or with commas):': 'Colle ou écris les mots, un par ligne (ou avec des virgules) :',
   'Units: inches & miles': 'Unités : pouces et milles',
   'Units: cm & km': 'Unités : cm et km',
   // Sound / language buttons (every screen)
