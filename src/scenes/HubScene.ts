@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { GAMES, unlockPrice, type GameInfo } from '../hub/games';
 import { comingSoon } from '../ui/unlockPrompt';
-import { hasFullGame, loadOwnership, saveOwnership, type Ownership } from '../hub/ownership';
+import { hasFullGame, isUnlockCode, loadOwnership, saveOwnership, unlockEverything, type Ownership } from '../hub/ownership';
 import { getLang, tr } from '../i18n';
 import { isDevCode } from '../state/profile';
 import { openKeyboard } from '../ui/keyboard';
@@ -91,11 +91,16 @@ export class HubScene extends Phaser.Scene {
     parentGate(this, () => comingSoon(this));
   }
 
-  /** The developer code unlocks every game. */
+  /** The unlock code opens every full game; the developer code does that and more. */
   private enterCode() {
     openKeyboard(this, tr('Type a secret code'), '', false, (code) => {
       if (!code.trim()) return;
-      if (isDevCode(code)) {
+      if (isUnlockCode(code)) {
+        unlockEverything(this.own);
+        sfx('levelup');
+        toast(this, tr('Every game is fully unlocked!'), C.good);
+        this.time.delayedCall(900, () => this.scene.restart());
+      } else if (isDevCode(code)) {
         this.own.devAll = true;
         saveOwnership(this.own);
         toast(this, tr('Developer mode ON! Every game is unlocked.'), C.good);

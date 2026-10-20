@@ -22,6 +22,7 @@ export const FR_HUB: Record<string, string> = {
   'Sorry, that part is for grown-ups!': 'Désolé, cette partie est réservée aux adultes!',
   DEL: 'EFF.',
   Cancel: 'Annuler',
+  'Every game is fully unlocked!': 'Tous les jeux sont débloqués au complet!',
   Parents: 'Parents',
   'All games': 'Tous les jeux',
   Play: 'Jouer',

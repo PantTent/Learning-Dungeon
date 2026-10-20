@@ -8,6 +8,7 @@ import { defaultGrade, gradeLabel, gradesFor, type Grade } from '../questions/cu
 import { tr } from '../i18n';
 import { menuBackground } from './TitleScene';
 import { openKeyboard } from '../ui/keyboard';
+import { isUnlockCode, loadOwnership, unlockEverything } from '../hub/ownership';
 
 const NAMES = ['Max', 'Nova', 'Rex', 'Luna', 'Finn', 'Zara', 'Leo', 'Ivy', 'Kai', 'Milo', 'Ash', 'Sky'];
 
@@ -74,6 +75,12 @@ export class CreateScene extends Phaser.Scene {
     this.codeButton = button(this, W - 60, 30, 96, 36, codeLabel(), () =>
       openKeyboard(this, tr('Type a secret code'), '', false, (code) => {
         if (!code.trim()) return;
+        // The family unlock code opens the full games; the hero stays a normal hero.
+        if (isUnlockCode(code)) {
+          unlockEverything(loadOwnership());
+          toast(this, tr('Every game is fully unlocked!'), C.good);
+          return;
+        }
         this.devMode = isDevCode(code);
         this.codeButton?.label.setText(codeLabel());
         toast(this, this.devMode ? tr('Developer mode ON! Everything is unlocked.') : tr('That code does not work.'), this.devMode ? C.good : C.bad);

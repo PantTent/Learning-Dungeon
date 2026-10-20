@@ -61,6 +61,19 @@ export function fullGame(id: string): boolean {
   return hasFullGame(loadOwnership(), id);
 }
 
+/**
+ * The family unlock code: every game's full version, like buying the
+ * bundle, with no developer extras (stored lightly scrambled).
+ */
+export function isUnlockCode(code: string): boolean {
+  return btoa(code.trim().toLowerCase()) === 'cmNhZg==';
+}
+
+/** Unlock every game on this device. */
+export function unlockEverything(o: Ownership): void {
+  unlockGame(o, ALL_GAMES);
+}
+
 /** Record an unlock (called after a successful purchase). */
 export function unlockGame(o: Ownership, id: string): void {
   if (!o.bought.includes(id)) o.bought.push(id);
