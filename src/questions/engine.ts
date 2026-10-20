@@ -7,6 +7,7 @@ import { spellOut, spellWords } from './spelling';
 import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
+import { READING_BANK_EARLY } from './readingBankEarly';
 import { getLang, type Lang as LangT } from '../i18n';
 import { clamp, pick, shuffle } from '../util/rng';
 import { gradeRange, ladderFor, type Step } from './ladders';
@@ -171,6 +172,8 @@ export function groupReport(stats: LearningStats, settings: LearningSettings, gr
 }
 
 export class QuestionEngine {
+  private lastWasRetry = false;
+
   constructor(
     private stats: LearningStats,
     private settings: LearningSettings,
@@ -205,7 +208,9 @@ export class QuestionEngine {
   next(): Question {
     // Re-ask a missed question when it's due (if its group is still chosen).
     this.stats.retry = this.stats.retry.filter((r) => this.allowed(r.q));
-    const due = this.stats.retry.findIndex((r) => r.due <= this.stats.totalAsked);
+    // At most every other question is a retry, so new questions keep coming too.
+    const due = this.lastWasRetry ? -1 : this.stats.retry.findIndex((r) => r.due <= this.stats.totalAsked);
+    this.lastWasRetry = due >= 0;
     if (due >= 0) {
       const [r] = this.stats.retry.splice(due, 1);
       return { ...r.q, isRetry: true };
@@ -254,7 +259,7 @@ export class QuestionEngine {
       return this.mathQuestion(pick(step.topics), step.d);
     }
     if (SPELLING_GROUPS.includes(groupId)) return this.spellingQuestion(step);
-    return this.readingQuestion(step.d, new Set(step.topics));
+    return this.readingQuestion(step.d, new Set(step.topics), step.early);
   }
 
   /** "Listen and spell the word": from the child's own list, or the grade list for this step. */
@@ -290,9 +295,9 @@ export class QuestionEngine {
     return makeMathQuestion(topic, d, factors);
   }
 
-  private readingQuestion(d: Difficulty, topics: Set<string>): Question {
+  private readingQuestion(d: Difficulty, topics: Set<string>, early = false): Question {
     const recent = new Set(this.stats.recent);
-    const { bank, prefix } = readingBank(this.settings.lang);
+    const { bank, prefix } = early ? { bank: READING_BANK_EARLY, prefix: 're' } : readingBank(this.settings.lang);
     const all = bank.map((item, i) => ({ item, i })).filter((x) => topics.has(x.item.topic));
     const id = (x: { i: number }) => `${prefix}:${x.i}`;
     let pool = all.filter((x) => x.item.difficulty === d && !recent.has(id(x)));

@@ -7,6 +7,7 @@ import type { Lang } from '../i18n';
 import { mathTopicLevels } from './math';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR } from './readingBankFr';
+import { READING_BANK_EARLY } from './readingBankEarly';
 import { topicGroups, type Grade } from './curriculum';
 import type { Difficulty } from './types';
 
@@ -16,6 +17,8 @@ export interface Step {
   d: Difficulty;
   /** School grade this step belongs to. */
   g: Grade;
+  /** English reading for grades 1-2 (its own question set). */
+  early?: boolean;
 }
 
 const st = (topics: string | string[], d: Difficulty, g: Grade): Step => ({ topics: typeof topics === 'string' ? [topics] : topics, d, g });
@@ -102,6 +105,13 @@ function generic(groupId: string, lang: Lang): Step[] {
   const group = topicGroups(lang).find((g) => g.id === groupId);
   if (!group) return [];
   const steps: Step[] = [];
+  // English reading starts with the grade 1 and 2 set, then grades 3-5.
+  if (lang === 'en' && group.subject === 'reading') {
+    for (const g of [1, 2] as Grade[]) {
+      const topics = group.topics.filter((t) => READING_BANK_EARLY.some((b) => b.topic === t && b.difficulty === g));
+      if (topics.length) steps.push({ topics, d: g as Difficulty, g, early: true });
+    }
+  }
   for (const d of [1, 2, 3] as Difficulty[]) {
     const topics = group.topics.filter((t) => (group.subject === 'math' ? mathTopicLevels(t).includes(d) : hasReading(lang, t, d)));
     // In French the difficulty is the school year; English reading spans grades 3-5.

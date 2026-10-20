@@ -91,13 +91,18 @@ describe('skill ladders', () => {
   it('reading groups climb by difficulty too', () => {
     const settings = { ...defaultLearningSettings(), grade: 3 as Grade, mathPercent: 0, groups: allGroupIds('en') };
     const e = new QuestionEngine(newLearningStats(), settings);
-    for (let i = 0; i < 200; i++) {
+    // (Each group needs 10 misses per grade it drops.)
+    for (let i = 0; i < 600; i++) {
       const q = e.next();
       expect(q.subject).toBe('reading');
       e.record(q, false);
     }
     (e as unknown as { stats: { retry: unknown[] } }).stats.retry = [];
-    expect(Array.from({ length: 30 }, () => e.next().difficulty).every((d) => d === 1)).toBe(true);
+    // Every group is down at its easiest grade (grade 1 for most, grade 2 for figurative language).
+    for (let i = 0; i < 30; i++) {
+      const q = e.next();
+      expect(q.difficulty, q.group).toBe(ladderFor(q.group!, 'en')[0].d);
+    }
   });
 });
 
