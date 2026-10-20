@@ -4,6 +4,7 @@ import type { Difficulty, Question, Subject } from './types';
 import { makeMathQuestion } from './math';
 import { allGroupIds, defaultGrade, fitGrade, gradeBand, mathTopicsForGrade, SPELLING_GROUPS, topicGroups, TOPIC_LESSONS, type Grade } from './curriculum';
 import { spellOut, spellWords } from './spelling';
+import { sizedQuestion, type GroupOptions } from './custom';
 import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
@@ -54,6 +55,8 @@ export interface LearningSettings {
   levels?: Record<string, Grade>;
   /** The child's own spelling list (e.g. this week's test). Empty = grade words. */
   spellWords?: string[];
+  /** Grown-up choices per topic group: question types, number sizes (see custom.ts). */
+  options?: Record<string, GroupOptions>;
 }
 
 export function newLearningStats(): LearningStats {
@@ -89,6 +92,7 @@ export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings 
     lang,
     levels: s.levels ?? {},
     spellWords: s.spellWords ?? [],
+    options: s.options ?? {},
   };
 }
 
@@ -250,16 +254,50 @@ export class QuestionEngine {
 
   private questionFor(groupId: string, subject: Subject): Question {
     const { steps, grade } = gradeState(this.stats, this.settings, groupId);
+    const opts = this.settings.options?.[groupId];
+    // Picked number sizes: only those, never harder.
+    if (subject === 'math') {
+      const sized = this.sizedQuestion(groupId);
+      if (sized) return sized;
+    }
+    // Picked question types: only steps that have them, as close to the group's grade as possible.
+    const want = new Set(opts?.topics ?? []);
+    let pool = steps;
+    if (want.size) {
+      const has = steps.filter((st) => st.topics.some((t) => want.has(t)));
+      if (has.length) {
+        const best = Math.min(...has.map((st) => Math.abs(st.g - grade) + (st.g > grade ? 0.5 : 0)));
+        pool = has.filter((st) => Math.abs(st.g - grade) + (st.g > grade ? 0.5 : 0) === best);
+      }
+    }
     // Any step of the group's current grade.
-    const here = steps.filter((st) => st.g === grade);
-    const step: Step = pick(here.length ? here : steps);
+    const here = want.size ? pool : pool.filter((st) => st.g === grade);
+    const step: Step = pick(here.length ? here : pool);
+    const topics = want.size && step.topics.some((t) => want.has(t)) ? step.topics.filter((t) => want.has(t)) : step.topics;
     if (subject === 'math') {
       const focus = this.focusTopic(groupId);
-      if (focus) return this.mathQuestion(focus.topic, step.d, focus.factors);
-      return this.mathQuestion(pick(step.topics), step.d);
+      if (focus && !want.size) return this.mathQuestion(focus.topic, step.d, focus.factors);
+      return this.mathQuestion(pick(topics), step.d);
     }
     if (SPELLING_GROUPS.includes(groupId)) return this.spellingQuestion(step);
-    return this.readingQuestion(step.d, new Set(step.topics), step.early);
+    return this.readingQuestion(step.d, new Set(topics), step.early);
+  }
+
+  /** Times tables picked for a group (the 1-digit number, or the divisor). */
+  private tables(groupId: string): number[] {
+    const { multiply, divide } = this.settings.focus;
+    return groupId === 'divide' ? divide : groupId === 'multiply' || groupId === 'fr-mult' ? multiply : [];
+  }
+
+  private sizedQuestion(groupId: string): Question | undefined {
+    const opts = this.settings.options?.[groupId];
+    for (let tries = 0; tries < 20; tries++) {
+      const q = sizedQuestion(groupId, opts, this.tables(groupId));
+      if (!q) return undefined;
+      const full: Question = { ...q, id: `c:${q.prompt}`, subject: 'math', difficulty: 2 };
+      if (!this.stats.recent.includes(full.id) || tries === 19) return full;
+    }
+    return undefined;
   }
 
   /** "Listen and spell the word": from the child's own list, or the grade list for this step. */

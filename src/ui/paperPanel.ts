@@ -35,6 +35,8 @@ export class PaperPanel {
   private work: Box[][];
   private struck = new Set<string>();
   private sel: { row: Box[]; i: number } | null = null;
+  /** Which way typing moves along a row (1 = to the right). */
+  private dir: 1 | -1 = -1;
 
   constructor(
     private scene: Phaser.Scene,
@@ -61,8 +63,9 @@ export class PaperPanel {
     this.select(this.answerRow(), this.cols - 1);
   }
 
+  /** The answer is the lowest row with something written in it. */
   private answerRow(): Box[] {
-    return this.work[this.work.length - 1];
+    return [...this.work].reverse().find((r) => r.some((b) => b.value)) ?? this.work[this.work.length - 1];
   }
 
   /** Cell size and where column i sits (numbers line up on the right). */
@@ -208,7 +211,15 @@ export class PaperPanel {
     root.once('destroy', () => scene.input.keyboard?.off('keydown', onKey));
   }
 
+  /**
+   * Pick a box. Typing then moves on by itself: starting in the ones column
+   * (far right) of an answer row fills right to left, like column math;
+   * starting anywhere else fills left to right, so a known answer can be
+   * typed straight out.
+   */
   private select(row: Box[], i: number) {
+    const writing = row === this.topRow || row === this.bottomRow;
+    this.dir = !writing && i === this.cols - 1 ? -1 : 1;
     this.sel = { row, i };
     this.draw();
   }
@@ -221,20 +232,19 @@ export class PaperPanel {
     else if (k === 'CLR') box.value = '';
     else if (box.value.length < box.max) {
       box.value += k;
-      // One digit per box: numbers are written left to right, answers right to left.
-      const writing = sel.row === this.topRow || sel.row === this.bottomRow;
-      if (box.max === 1) {
-        if (writing && sel.i < this.cols - 1) this.sel = { row: sel.row, i: sel.i + 1 };
-        else if (!writing && sel.i > 0) this.sel = { row: sel.row, i: sel.i - 1 };
-      }
+      // One digit per box: move on to the next box in the typing direction.
+      const next = sel.i + this.dir;
+      if (box.max === 1 && next >= 0 && next < this.cols) this.sel = { row: sel.row, i: next };
     }
     this.draw();
   }
 
+  /** A new row goes under the rows already written (nothing has to be copied). */
   private addRow() {
     if (this.work.length >= 4) return;
-    this.work.splice(this.work.length - 1, 0, Array.from({ length: this.cols }, () => ({ value: '', max: 1 })));
-    this.draw();
+    const row = Array.from({ length: this.cols }, () => ({ value: '', max: 1 }));
+    this.work.push(row);
+    this.select(row, this.cols - 1);
   }
 
   /** The answer row as a number: empty boxes on the left are ignored, gaps count as 0. */
