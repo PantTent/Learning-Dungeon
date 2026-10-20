@@ -5,8 +5,8 @@ import type { Difficulty, Subject } from './types';
 import { getLang, type Lang } from '../i18n';
 
 export type Grade = 1 | 2 | 3 | 4 | 5;
-/** English questions follow Massachusetts grades 3-5. */
-export const GRADES: Grade[] = [3, 4, 5];
+/** English questions follow Massachusetts grades 1-5. */
+export const GRADES: Grade[] = [1, 2, 3, 4, 5];
 /** French questions follow the Quebec curriculum, 1re to 3e annee. */
 export const GRADES_FR: Grade[] = [1, 2, 3];
 
@@ -37,14 +37,14 @@ export interface TopicGroup {
 }
 
 export const TOPIC_GROUPS: TopicGroup[] = [
-  { id: 'multiply', subject: 'math', label: 'Multiplying', topics: ['mult-facts', 'mult-2x1', 'mult-big', 'mult-2x2', 'mult-3x2'] },
-  { id: 'divide', subject: 'math', label: 'Dividing', topics: ['div-facts', 'div-remainder', 'div-long', 'div-2digit'] },
-  { id: 'add-sub', subject: 'math', label: 'Adding & Subtracting', topics: ['add-sub'] },
-  { id: 'numbers', subject: 'math', label: 'Place Value & Number Sense', topics: ['place-value', 'rounding', 'compare', 'factors', 'patterns', 'order-ops'] },
-  { id: 'fractions', subject: 'math', label: 'Fractions', topics: ['fractions-equiv', 'fractions-compare', 'fractions-add', 'fractions-unlike', 'fractions-mult'] },
+  { id: 'multiply', subject: 'math', label: 'Multiplying', topics: ['mult-facts', 'mult-2x1', 'mult-big', 'mult-2x2', 'mult-3x2', 'e-doubles', 'e-mult'] },
+  { id: 'divide', subject: 'math', label: 'Dividing', topics: ['div-facts', 'div-remainder', 'div-long', 'div-2digit', 'e-div'] },
+  { id: 'add-sub', subject: 'math', label: 'Adding & Subtracting', topics: ['add-sub', 'e-add', 'e-sub', 'e-missing'] },
+  { id: 'numbers', subject: 'math', label: 'Place Value & Number Sense', topics: ['place-value', 'rounding', 'compare', 'factors', 'patterns', 'order-ops', 'e-count', 'e-compare', 'e-place', 'e-skip'] },
+  { id: 'fractions', subject: 'math', label: 'Fractions', topics: ['fractions-equiv', 'fractions-compare', 'fractions-add', 'fractions-unlike', 'fractions-mult', 'e-fractions'] },
   { id: 'decimals', subject: 'math', label: 'Decimals', topics: ['decimals', 'decimal-ops'] },
-  { id: 'measure', subject: 'math', label: 'Measurement & Shapes', topics: ['measurement', 'area-perimeter', 'volume', 'angles'] },
-  { id: 'word', subject: 'math', label: 'Word Problems', topics: ['word-problems'] },
+  { id: 'measure', subject: 'math', label: 'Measurement & Shapes', topics: ['measurement', 'area-perimeter', 'volume', 'angles', 'e-measure', 'e-time', 'e-shapes'] },
+  { id: 'word', subject: 'math', label: 'Word Problems', topics: ['word-problems', 'e-word'] },
   { id: 'vocab', subject: 'reading', label: 'Vocabulary', topics: ['synonyms', 'antonyms', 'vocabulary'] },
   { id: 'word-parts', subject: 'reading', label: 'Word Parts & Roots', topics: ['prefixes-suffixes', 'roots'] },
   { id: 'context', subject: 'reading', label: 'Context Clues', topics: ['context-clues'] },
@@ -86,6 +86,11 @@ export function allGroupIds(lang: Lang = getLang()): string[] {
 
 /** Math topics taught in each grade (Massachusetts frameworks). */
 const MATH_BY_GRADE: Partial<Record<Grade, string[]>> = {
+  1: ['e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-shapes', 'e-word'],
+  2: [
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-mult', 'e-time', 'e-shapes',
+    'e-fractions', 'e-measure', 'e-word',
+  ],
   3: ['mult-facts', 'mult-2x1', 'div-facts', 'add-sub', 'place-value', 'rounding', 'compare', 'patterns', 'fractions-equiv', 'measurement', 'area-perimeter', 'word-problems'],
   4: [
     'mult-facts', 'mult-2x1', 'mult-big', 'mult-2x2', 'div-facts', 'div-remainder', 'div-long', 'add-sub', 'place-value', 'rounding',
@@ -114,6 +119,8 @@ const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
 
 /** Difficulty range for each grade (1 = warm-up, 3 = stretch). */
 export const GRADE_BAND: Partial<Record<Grade, [Difficulty, Difficulty]>> = {
+  1: [1, 1],
+  2: [1, 2],
   3: [1, 2],
   4: [1, 3],
   5: [2, 3],

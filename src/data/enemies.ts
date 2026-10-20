@@ -59,12 +59,16 @@ export type RareTier = 1 | 2 | 3;
 
 /**
  * Rare spawns can appear when a monster comes back after being beaten.
- * They are tougher and give more XP, gold and better loot.
+ * The rarer they are, the tougher: higher level, more health, harder hits
+ * and more armor. They give more XP, gold and better loot.
  */
-export const RARE_TIERS: Record<RareTier, { name: string; color: number; css: string; chance: number; hp: number; atk: number; xp: number; gold: number }> = {
-  1: { name: 'Rare', color: 0x3d8bff, css: '#6aa8ff', chance: 0.15, hp: 1.4, atk: 1.1, xp: 1.75, gold: 2.5 },
-  2: { name: 'Elite', color: 0xb24dff, css: '#c98aff', chance: 0.1, hp: 1.8, atk: 1.2, xp: 2.5, gold: 4 },
-  3: { name: 'Legendary', color: 0xff9a1f, css: '#ffb24a', chance: 0.05, hp: 2.3, atk: 1.3, xp: 4, gold: 6 },
+export const RARE_TIERS: Record<
+  RareTier,
+  { name: string; color: number; css: string; chance: number; levels: number; hp: number; atk: number; armor: number; xp: number; gold: number }
+> = {
+  1: { name: 'Rare', color: 0x3d8bff, css: '#6aa8ff', chance: 0.15, levels: 1, hp: 1.5, atk: 1.15, armor: 1.2, xp: 1.75, gold: 2.5 },
+  2: { name: 'Elite', color: 0xb24dff, css: '#c98aff', chance: 0.1, levels: 2, hp: 2.1, atk: 1.35, armor: 1.4, xp: 2.5, gold: 4 },
+  3: { name: 'Legendary', color: 0xff9a1f, css: '#ffb24a', chance: 0.05, levels: 3, hp: 2.8, atk: 1.6, armor: 1.6, xp: 4, gold: 6 },
 };
 
 /** Roll a rare tier for a respawn: 5% Legendary, 10% Elite, 15% Rare. */
@@ -82,8 +86,18 @@ export function rollRareTier(r = Math.random()): RareTier | undefined {
 /** Turn a normal monster into a rare spawn of the given tier. */
 export function makeRare(e: EnemyInstance, tier: RareTier): EnemyInstance {
   const t = RARE_TIERS[tier];
-  const maxHp = Math.round(e.maxHp * t.hp);
-  return { ...e, rare: tier, maxHp, hp: maxHp, atk: Math.round(e.atk * t.atk), xp: Math.round(e.xp * t.xp), gold: Math.round(e.gold * t.gold) };
+  const up = makeEnemy(e.def.id, Math.min(20, e.level + t.levels));
+  const maxHp = Math.round(up.maxHp * t.hp);
+  return {
+    ...up,
+    rare: tier,
+    maxHp,
+    hp: maxHp,
+    atk: Math.round(up.atk * t.atk),
+    armor: Math.round(up.armor * t.armor),
+    xp: Math.round(up.xp * t.xp),
+    gold: Math.round(up.gold * t.gold),
+  };
 }
 
 /**

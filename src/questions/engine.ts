@@ -9,7 +9,7 @@ import { READING_BANK } from './readingBank';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
 import { getLang, type Lang as LangT } from '../i18n';
 import { clamp, pick, shuffle } from '../util/rng';
-import { ladderFor, ladderRange, type Step } from './ladders';
+import { gradeRange, ladderFor, type Step } from './ladders';
 
 export interface TopicStat {
   asked: number;
@@ -27,8 +27,12 @@ export interface LearningStats {
   totalCorrect: number;
   /** Per-day totals, key "YYYY-MM-DD". */
   days: Record<string, TopicStat>;
-  /** Position on each group's skill ladder (see ladders.ts). */
+  /** Old saves: position on each group's ladder (now `gradeAt`). */
   ladder?: Record<string, number>;
+  /** The grade each topic group is on now (see ladders.ts). */
+  gradeAt?: Record<string, Grade>;
+  /** Answers since the group last changed grade (1 = right), newest last. */
+  sinceMove?: Record<string, number[]>;
   /** Last answers per group (1 = right, 0 = wrong), newest last. */
   recentByGroup?: Record<string, number[]>;
 }
@@ -119,12 +123,14 @@ export interface GroupReport {
 /** How many recent answers per group decide its strength. */
 export const RECENT = 20;
 /**
- * Ladder moves: right answers climb a fifth of a step, wrong ones drop half a
- * step. So a group only moves up when about 3 in 4 answers are right, and
- * stays on easier questions until then.
+ * Moving between grades, by percent right since the last move:
+ * under 75% (after at least 10 answers) drops a grade, and 95% or more over
+ * the last 20 answers moves up a grade.
  */
-const CLIMB = 0.2;
-const DROP = 0.5;
+export const DROP_BELOW = 0.75;
+export const DROP_AFTER = 10;
+export const CLIMB_AT = 0.95;
+export const CLIMB_AFTER = 20;
 
 function today(): string {
   const d = new Date();
@@ -140,14 +146,19 @@ export function isCorrect(q: Question, given: string): boolean {
   return normalize(given) === normalize(q.answer);
 }
 
-/** Where a group's ladder is, and its range for this grade / pinned level. */
-function ladderState(stats: LearningStats, settings: LearningSettings, groupId: string) {
+/** The grade a group is on now, and the grades it can move between. */
+function gradeState(stats: LearningStats, settings: LearningSettings, groupId: string) {
   const steps = ladderFor(groupId, settings.lang);
   const pinned = settings.levels?.[groupId];
-  const range = ladderRange(steps, settings.grade, pinned);
-  const saved = stats.ladder?.[groupId];
-  const pos = clamp(saved ?? range.start, range.min, range.max + 0.99);
-  return { steps, range, pos, pinned };
+  const range = gradeRange(steps, settings.grade, pinned);
+  // Old saves kept a step number instead of a grade.
+  const old = stats.ladder?.[groupId];
+  const saved = stats.gradeAt?.[groupId] ?? (old !== undefined ? steps[Math.floor(old)]?.g : undefined);
+  let grade = pinned ? range.start : (saved ?? range.start);
+  grade = Math.min(range.hi, Math.max(range.lo, grade)) as Grade;
+  // Snap to a grade the ladder really has.
+  if (!range.grades.includes(grade)) grade = [...range.grades].reverse().find((g) => g <= grade) ?? range.lo;
+  return { steps, range, grade, pinned };
 }
 
 export function groupReport(stats: LearningStats, settings: LearningSettings, groupId: string): GroupReport {
@@ -155,9 +166,8 @@ export function groupReport(stats: LearningStats, settings: LearningSettings, gr
   const answered = recent.length;
   const accuracy = answered ? recent.reduce((a, b) => a + b, 0) / answered : 0;
   const strength: Strength = answered < 5 ? 'new' : accuracy >= 0.85 ? 'strong' : accuracy >= 0.65 ? 'good' : 'practice';
-  const { steps, pos, pinned } = ladderState(stats, settings, groupId);
-  const step = steps[Math.floor(pos)];
-  return { answered, accuracy, strength, grade: step?.g ?? settings.grade, pinned: !!pinned };
+  const { grade, pinned } = gradeState(stats, settings, groupId);
+  return { answered, accuracy, strength, grade, pinned: !!pinned };
 }
 
 export class QuestionEngine {
@@ -234,11 +244,10 @@ export class QuestionEngine {
   }
 
   private questionFor(groupId: string, subject: Subject): Question {
-    const { steps, range, pos } = ladderState(this.stats, this.settings, groupId);
-    let i = Math.floor(pos);
-    // Now and then a step down, to review and keep confidence up.
-    if (i > range.min && Math.random() < 0.2) i--;
-    const step: Step = steps[i];
+    const { steps, grade } = gradeState(this.stats, this.settings, groupId);
+    // Any step of the group's current grade.
+    const here = steps.filter((st) => st.g === grade);
+    const step: Step = pick(here.length ? here : steps);
     if (subject === 'math') {
       const focus = this.focusTopic(groupId);
       if (focus) return this.mathQuestion(focus.topic, step.d, focus.factors);
@@ -322,11 +331,24 @@ export class QuestionEngine {
     const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
     s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), lo, hi + 0.49);
 
-    // Climb or step down this group's ladder.
+    // Move the group down a grade when it's under 75% right, up a grade at 95%+.
     if (q.group) {
-      const { range, pos } = ladderState(s, this.settings, q.group);
-      s.ladder ??= {};
-      s.ladder[q.group] = clamp(pos + (correct ? CLIMB : -DROP), range.min, range.max + 0.99);
+      const { range, grade, pinned } = gradeState(s, this.settings, q.group);
+      s.gradeAt ??= {};
+      s.sinceMove ??= {};
+      s.gradeAt[q.group] = grade;
+      const since = (s.sinceMove[q.group] ??= []);
+      since.push(correct ? 1 : 0);
+      if (since.length > CLIMB_AFTER) since.shift();
+      const acc = since.reduce((a, b) => a + b, 0) / since.length;
+      const i = range.grades.indexOf(grade);
+      if (!pinned && since.length >= DROP_AFTER && acc < DROP_BELOW && grade > range.lo) {
+        s.gradeAt[q.group] = range.grades[i - 1];
+        s.sinceMove[q.group] = [];
+      } else if (!pinned && since.length >= CLIMB_AFTER && acc >= CLIMB_AT && grade < range.hi) {
+        s.gradeAt[q.group] = range.grades[i + 1];
+        s.sinceMove[q.group] = [];
+      }
       s.recentByGroup ??= {};
       const rec = (s.recentByGroup[q.group] ??= []);
       rec.push(correct ? 1 : 0);

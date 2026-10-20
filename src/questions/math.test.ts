@@ -1,7 +1,7 @@
 import { MATH_TOPICS, makeMathQuestion, mathTopicsFor } from './math';
 import { QuestionEngine, isCorrect, newLearningStats, defaultLearningSettings, teacherHelp } from './engine';
 import { type Grade } from './curriculum';
-import { ladderFor, ladderRange } from './ladders';
+import { gradeRange, ladderFor } from './ladders';
 import type { Difficulty } from './types';
 
 const N = 400;
@@ -169,14 +169,14 @@ describe('teacher hints and grades', () => {
   });
 
   it('grade and topic choices are respected (topics come from the chosen ladders)', () => {
-    for (const grade of [3, 4, 5] as Grade[]) {
+    for (const grade of [1, 2, 3, 4, 5] as Grade[]) {
       const settings = { ...defaultLearningSettings(), grade, mathPercent: 100 };
       const e = new QuestionEngine(newLearningStats(), settings);
       for (let i = 0; i < 300; i++) {
         const q = e.next();
         const steps = ladderFor(q.group!, 'en');
-        const { max } = ladderRange(steps, grade);
-        const ok = steps.slice(0, max + 1).some((st) => st.topics.includes(q.topic));
+        const { hi } = gradeRange(steps, grade);
+        const ok = steps.filter((st) => st.g <= hi).some((st) => st.topics.includes(q.topic));
         expect(ok, `grade ${grade}: ${q.group} ${q.topic}`).toBe(true);
         e.record(q, i % 4 !== 0);
       }

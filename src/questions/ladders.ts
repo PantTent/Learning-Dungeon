@@ -23,6 +23,7 @@ const st = (topics: string | string[], d: Difficulty, g: Grade): Step => ({ topi
 /** English math ladders (Massachusetts grades), easiest first. Early steps use the bilingual early-grade questions. */
 const EN_MATH: Record<string, Step[]> = {
   multiply: [
+    st('e-doubles', 1, 1),
     st('e-doubles', 2, 2),
     st('e-mult', 3, 2),
     st('mult-facts', 1, 3),
@@ -50,6 +51,7 @@ const EN_MATH: Record<string, Step[]> = {
     st('add-sub', 3, 5),
   ],
   numbers: [
+    st(['e-count', 'e-compare', 'e-place', 'e-skip'], 1, 1),
     st(['e-place', 'e-compare', 'e-skip'], 2, 2),
     st(['place-value', 'compare', 'patterns', 'rounding'], 1, 3),
     st(['place-value', 'compare', 'patterns', 'rounding', 'factors'], 2, 4),
@@ -68,12 +70,14 @@ const EN_MATH: Record<string, Step[]> = {
     st(['decimals', 'decimal-ops'], 3, 5),
   ],
   measure: [
+    st('e-shapes', 1, 1),
     st(['e-measure', 'e-time', 'e-shapes'], 2, 2),
     st(['measurement', 'area-perimeter', 'e-measure'], 1, 3),
     st(['measurement', 'area-perimeter', 'angles'], 2, 4),
     st(['area-perimeter', 'angles', 'volume'], 3, 5),
   ],
   word: [
+    st('e-word', 1, 1),
     st('e-word', 2, 2),
     st('e-word', 3, 3),
     st('word-problems', 1, 3),
@@ -118,39 +122,32 @@ export function ladderFor(groupId: string, lang: Lang): Step[] {
   return steps;
 }
 
-export interface LadderRange {
+export interface GradeRange {
+  /** Grades this ladder has, easiest first. */
+  grades: Grade[];
+  /** Lowest and highest grade allowed. */
+  lo: Grade;
+  hi: Grade;
   /** Where a child of this grade starts. */
-  start: number;
-  /** Lowest and highest step allowed. */
-  min: number;
-  max: number;
+  start: Grade;
 }
 
 /**
- * Range on a ladder. Normally the child can drop all the way to the first
- * step, and climb one step past their grade. A parent can pin a group to one
- * grade ("pinned"): then it stays on that grade's steps.
+ * The grades a group can move between. Normally the child can drop all the
+ * way to the ladder's first grade and climb one grade past their own. A
+ * parent can pin a group to one grade.
  */
-export function ladderRange(steps: Step[], grade: Grade, pinned?: Grade): LadderRange {
-  const last = steps.length - 1;
-  if (last < 0) return { start: 0, min: 0, max: 0 };
-  const firstOf = (g: Grade) => steps.findIndex((s) => s.g >= g);
-  const lastUpTo = (g: Grade) => {
-    let i = -1;
-    steps.forEach((s, k) => s.g <= g && (i = k));
-    return i;
-  };
+export function gradeRange(steps: Step[], grade: Grade, pinned?: Grade): GradeRange {
+  const grades = ladderGrades(steps);
+  if (!grades.length) return { grades, lo: grade, hi: grade, start: grade };
+  const atOrBelow = (g: Grade) => [...grades].reverse().find((x) => x <= g) ?? grades[0];
   if (pinned) {
-    let min = steps.findIndex((s) => s.g === pinned);
-    let max = lastUpTo(pinned);
-    if (min < 0) min = max >= 0 ? max : 0;
-    if (max < min) max = min;
-    return { start: min, min, max };
+    const g = atOrBelow(pinned);
+    return { grades, lo: g, hi: g, start: g };
   }
-  const top = Math.max(0, lastUpTo(grade));
-  const first = firstOf(grade);
-  const start = first < 0 ? top : Math.min(first, top);
-  return { start, min: 0, max: Math.min(last, top + 1) };
+  const start = atOrBelow(grade);
+  const hi = grades.find((x) => x === grade + 1) ?? start;
+  return { grades, lo: grades[0], hi: Math.max(hi, start) as Grade, start };
 }
 
 /** Grades that have steps on this ladder (for the parent's level picker). */

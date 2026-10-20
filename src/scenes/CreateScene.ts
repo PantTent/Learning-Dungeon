@@ -83,12 +83,12 @@ export class CreateScene extends Phaser.Scene {
     // School grade picks how hard the questions are.
     txt(this, 470, 438, tr('Grade:'), 20);
     this.gradeButtons = gradesFor().map((g, i) =>
-      button(this, 494 + i * 62, 486, 54, 46, gradeLabel(g), () => this.setGrade(g), { size: 22 }),
+      button(this, 490 + i * 44, 486, 40, 46, gradeLabel(g), () => this.setGrade(g), { size: 22 }),
     );
     this.setGrade(this.grade);
 
     button(this, 120, 510, 160, 46, tr('Back'), () => this.scene.start('Title'), { size: 20, color: 0x3a3450 });
-    button(this, W - 170, 490, 280, 70, tr('Start Adventure!'), () => this.start(), { color: 0x2f9a4a, size: 26 });
+    button(this, W - 135, 490, 240, 70, tr('Start Adventure!'), () => this.start(), { color: 0x2f9a4a, size: 26 });
 
     this.select(data.keep ? this.selected : CLASSES[0]);
   }
@@ -152,7 +152,7 @@ export class CreateScene extends Phaser.Scene {
       const b = this.gradeButtons[i];
       const label = b.label.text;
       b.destroy();
-      this.gradeButtons[i] = button(this, 494 + i * 62, 486, 54, 46, label, () => this.setGrade(x), { size: 22, color: x === g ? 0x2f9a4a : 0x4b3a78 });
+      this.gradeButtons[i] = button(this, 490 + i * 44, 486, 40, 46, label, () => this.setGrade(x), { size: 22, color: x === g ? 0x2f9a4a : 0x4b3a78 });
     });
   }
 

@@ -22,6 +22,8 @@ describe('rare spawns', () => {
       expect(r.hp).toBe(r.maxHp);
       expect(r.xp).toBeGreaterThan(last.xp);
       expect(r.gold).toBeGreaterThan(last.gold);
+      expect(r.atk).toBeGreaterThan(last.atk);
+      expect(r.level).toBe(5 + t);
       last = r;
     }
   });

@@ -94,14 +94,15 @@ export class PracticeScene extends Phaser.Scene {
     c.add(txt(this, W / 2 - 170, 76, tr('Grade:'), 22).setOrigin(1, 0.5));
     const grades = gradesFor(s.lang);
     grades.forEach((g, i) => {
-      c.add(button(this, W / 2 - 110 + i * 82, 76, 72, 42, gradeLabel(g, s.lang), () => {
+      const step = grades.length > 3 ? 62 : 82;
+      c.add(button(this, W / 2 - 110 + i * step, 76, step - 10, 42, gradeLabel(g, s.lang), () => {
         s.grade = g;
         this.draw();
       }, { size: 22, color: s.grade === g ? 0x2f9a4a : 0x4b3a78 }));
     });
     const mid = defaultGrade(s.lang);
     const hint = s.grade === mid ? tr('(the full grade {g} set)', { g: gradeLabel(s.grade, s.lang) }) : s.grade < mid ? tr('(easier)') : tr('(harder)');
-    c.add(txt(this, W / 2 + 140, 76, hint, 15, C.dim).setOrigin(0, 0.5));
+    c.add(txt(this, W / 2 - 110 + grades.length * (grades.length > 3 ? 62 : 82) - 26, 76, hint, 15, C.dim).setOrigin(0, 0.5));
 
     const groups = groupsForGrade(s.grade, s.lang);
     this.column(c, 24, 'math', groups.filter((g) => g.subject === 'math'));

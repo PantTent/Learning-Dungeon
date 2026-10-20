@@ -1,6 +1,6 @@
 import { defaultLearningSettings, groupReport, newLearningStats, QuestionEngine } from './engine';
 import { allGroupIds, topicGroups, type Grade } from './curriculum';
-import { ladderFor, ladderGrades, ladderRange } from './ladders';
+import { gradeRange, ladderFor, ladderGrades } from './ladders';
 import { EARLY_GENERATORS } from './mathEarly';
 import { mathTopicLevels } from './math';
 import { setLang } from '../i18n';
@@ -23,31 +23,56 @@ describe('skill ladders', () => {
     }
   });
 
-  it('a grade 4 child who keeps missing multiplying drops back to the basics', () => {
+  it('a grade 4 child who keeps missing multiplying drops a grade at a time', () => {
     const stats = newLearningStats();
     const settings = { ...defaultLearningSettings(), grade: 4 as Grade, groups: ['multiply'], mathPercent: 100 };
     const e = new QuestionEngine(stats, settings);
     const first = e.next();
-    expect(['mult-2x1', 'mult-big', 'mult-facts']).toContain(first.topic);
+    expect(ladderFor('multiply', 'en').filter((s) => s.g === 4).flatMap((s) => s.topics)).toContain(first.topic);
+    // 10 answers under 75% right: down one grade.
+    for (let i = 0; i < 10; i++) e.record(e.next(), i < 5);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(3);
     for (let i = 0; i < 40; i++) e.record(e.next(), false);
     stats.retry = []; // (missed questions come back later; ignore them here)
     const after = Array.from({ length: 30 }, () => e.next().topic);
-    expect(after.every((t) => t === 'e-doubles' || t === 'e-mult')).toBe(true);
+    expect(after.every((t) => t === 'e-doubles')).toBe(true);
     expect(groupReport(stats, settings, 'multiply').strength).toBe('practice');
-    expect(groupReport(stats, settings, 'multiply').grade).toBe(2);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(1);
   });
 
-  it('then climbs back up, and can go one step past the grade', () => {
+  it('stays on a grade between 75% and 95%, and climbs after 20 answers at 95%+', () => {
     const stats = newLearningStats();
+    stats.gradeAt = { multiply: 3 };
     const settings = { ...defaultLearningSettings(), grade: 4 as Grade, groups: ['multiply'], mathPercent: 100 };
     const e = new QuestionEngine(stats, settings);
-    for (let i = 0; i < 40; i++) e.record(e.next(), false);
-    for (let i = 0; i < 80; i++) e.record(e.next(), true);
-    const steps = ladderFor('multiply', 'en');
-    const { max } = ladderRange(steps, 4);
-    expect(Math.floor(stats.ladder!.multiply)).toBe(max);
-    expect(steps[max].g).toBe(5);
+    // 85% right for a long time: no change.
+    for (let i = 0; i < 60; i++) e.record(e.next(), i % 7 !== 0);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(3);
+    // Right answers until the last 20 are 95%+ right: up to grade 4.
+    let n = 0;
+    while (groupReport(stats, settings, 'multiply').grade === 3 && n < 30) {
+      e.record(e.next(), true);
+      n++;
+    }
+    expect(n).toBeLessThan(30);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(4);
+    // Moving up needs 20 answers on the new grade: 19 is not enough yet.
+    for (let i = 0; i < 19; i++) e.record(e.next(), true);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(4);
+    e.record(e.next(), true);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(5);
+    // And one grade past the child's own grade at most.
+    for (let i = 0; i < 100; i++) e.record(e.next(), true);
+    expect(groupReport(stats, settings, 'multiply').grade).toBe(5);
+    expect(gradeRange(ladderFor('multiply', 'en'), 4).hi).toBe(5);
     expect(groupReport(stats, settings, 'multiply').strength).toBe('strong');
+  });
+
+  it('old saves (step numbers) turn into grades', () => {
+    const stats = newLearningStats();
+    stats.ladder = { 'add-sub': 0 };
+    const settings = { ...defaultLearningSettings(), grade: 4 as Grade, groups: ['add-sub'], mathPercent: 100 };
+    expect(groupReport(stats, settings, 'add-sub').grade).toBe(1);
   });
 
   it('a parent can pin a group to an easier grade', () => {
@@ -60,7 +85,7 @@ describe('skill ladders', () => {
       e.record(q, true);
     }
     expect(groupReport(stats, settings, 'multiply').pinned).toBe(true);
-    expect(ladderGrades(ladderFor('multiply', 'en'))).toEqual([2, 3, 4, 5]);
+    expect(ladderGrades(ladderFor('multiply', 'en'))).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('reading groups climb by difficulty too', () => {
@@ -77,28 +102,23 @@ describe('skill ladders', () => {
 });
 
 describe('adapting to the child', () => {
-  it('a weak group stays on grade 1 adding & subtracting until the child is ready', () => {
+  it('a weak group stays on grade 1 adding & subtracting until it is above 75%', () => {
     const stats = newLearningStats();
-    stats.ladder = { 'add-sub': 0 };
+    stats.gradeAt = { 'add-sub': 1 };
     const settings = { ...defaultLearningSettings('en'), grade: 4 as Grade, groups: ['add-sub'], mathPercent: 100 };
     const e = new QuestionEngine(stats, settings);
-    const steps = ladderFor('add-sub', 'en');
-    const onStep = () => Math.floor(stats.ladder!['add-sub']);
-    // About 2 in 3 right is not enough to move up.
-    for (let i = 0; i < 60; i++) {
+    const grade1 = ladderFor('add-sub', 'en').filter((s) => s.g === 1).flatMap((s) => s.topics);
+    for (let i = 0; i < 80; i++) {
       stats.retry = [];
       const q = e.next();
-      expect(steps[0].topics.concat(steps[1].topics)).toContain(q.topic);
-      e.record(q, i % 3 !== 0);
+      expect(grade1).toContain(q.topic);
+      e.record(q, i % 5 !== 0); // 80% right: good, but not 95%
     }
-    expect(onStep()).toBe(0);
     expect(groupReport(stats, settings, 'add-sub').grade).toBe(1);
-    // Getting them right moves the questions up the ladder, step by step.
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 20; i++) {
       stats.retry = [];
       e.record(e.next(), true);
     }
-    expect(onStep()).toBeGreaterThanOrEqual(3);
-    expect(groupReport(stats, settings, 'add-sub').grade).toBeGreaterThanOrEqual(3);
+    expect(groupReport(stats, settings, 'add-sub').grade).toBe(2);
   });
 });

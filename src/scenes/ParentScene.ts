@@ -103,13 +103,13 @@ export class ParentScene extends Phaser.Scene {
     // School grade, in the hero's own language (1re-3e or 3-5).
     c.add(txt(this, 486, 158, tr('Grade:'), 17).setOrigin(0, 0.5));
     gradesFor(S.lang).forEach((g, i) => {
-      c.add(button(this, 600 + i * 62, 158, 54, 34, gradeLabel(g, S.lang), () => {
+      c.add(button(this, 584 + i * 46, 158, 40, 34, gradeLabel(g, S.lang), () => {
         S.grade = g;
         saveProfile(p);
         this.draw();
       }, { size: 16, color: S.grade === g ? 0x2f9a4a : 0x4b3a78 }));
     });
-    c.add(button(this, 852, 158, 168, 36, S.readAloud ? tr('Read aloud: ON') : tr('Read aloud: OFF'), () => {
+    c.add(button(this, 880, 158, 128, 36, S.readAloud ? tr('Read aloud: ON') : tr('Read aloud: OFF'), () => {
       S.readAloud = !S.readAloud;
       saveProfile(p);
       this.draw();
