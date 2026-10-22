@@ -784,7 +784,8 @@ export class DungeonScene extends Phaser.Scene {
     const gold = ri(5, 12) * Math.ceil(ilvl / 3);
     // Chests often hold a potion too.
     if (Math.random() < 0.5) {
-      const d = POTIONS.find((x) => x.kind === (Math.random() < 0.7 ? 'hp' : 'mp') && x.tier === tierForLevel(ilvl))!;
+      const kind = Math.random() < 0.7 ? 'hp' : 'mp';
+      const d = POTIONS.find((x) => x.kind === kind && x.tier === tierForLevel(ilvl))!;
       p.potions[d.id] = (p.potions[d.id] ?? 0) + 1;
       this.time.delayedCall(1300, () => toast(this, tr('+1 {potion}', { potion: tr(d.name) }), '#ff8a8a'));
     }

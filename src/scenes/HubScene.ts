@@ -9,6 +9,12 @@ import { openKeyboard } from '../ui/keyboard';
 import { parentGate } from '../ui/parentGate';
 import { C, H, W, button, langButton, unitsButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
+import { animal } from '../animal/data';
+import { loadAnimals } from '../animal/state';
+import { tx } from '../animal/ui';
+import { loadFarm } from '../farm/state';
+import { loadSpace } from '../space/state';
+import { loadProfiles } from '../state/profile';
 import { androidBrowser, APK_URL } from '../util/platform';
 import { openTransferPanel } from '../ui/transferPanel';
 
@@ -31,10 +37,12 @@ export class HubScene extends Phaser.Scene {
     title.setStroke('#5a2a00', 8);
     txt(this, W / 2, 112, tr('Every game is free to try!'), 19, C.dim).setOrigin(0.5);
 
-    const cw = 270;
-    const gap = 24;
-    const x0 = W / 2 - (GAMES.length * cw + (GAMES.length - 1) * gap) / 2;
-    GAMES.forEach((g, i) => this.card(g, x0 + i * (cw + gap), 132, cw));
+    // A 2x2 grid of game tiles.
+    const cw = 440;
+    const ch = 172;
+    const gap = 14;
+    const x0 = W / 2 - cw - gap / 2;
+    GAMES.forEach((g, i) => this.card(g, x0 + (i % 2) * (cw + gap), 132 + Math.floor(i / 2) * (ch + 10), cw, ch));
 
     const built = GAMES.filter((g) => g.scene);
     if (!built.every((g) => hasFullGame(this.own, g.id))) {
@@ -52,33 +60,36 @@ export class HubScene extends Phaser.Scene {
     }
   }
 
-  private card(g: GameInfo, x: number, y: number, w: number) {
+  private card(g: GameInfo, x: number, y: number, w: number, h: number) {
     const built = !!g.scene;
     const full = hasFullGame(this.own, g.id);
-    const h = 336;
     panel(this, x, y, w, h, built ? C.panel : 0x1a1526, built ? g.color : 0x3a3054);
-    const icon = sprite(this, x + w / 2, y + 66, g.icon, 6);
+    const icon = sprite(this, x + 66, y + 74, g.icon, 6);
     if (built) {
       this.tweens.add({ targets: icon, y: icon.y - 6, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-      if (g.id === 'dungeon') sprite(this, x + w / 2 + 64, y + 96, 'enemy_slime', 3.5).setFlipX(true);
-      if (g.id === 'farm') sprite(this, x + w / 2 + 70, y + 92, 'crop_carrot', 3);
+      if (g.id === 'dungeon') sprite(this, x + 106, y + 112, 'enemy_slime', 3).setFlipX(true);
+      if (g.id === 'farm') sprite(this, x + 108, y + 110, 'crop_carrot', 2.6);
+      if (g.id === 'animals') sprite(this, x + 108, y + 112, 'pet_dog', 3).setFlipX(true);
     } else {
       icon.setAlpha(0.35);
-      txt(this, x + w / 2, y + 66, '?', 54, '#ffd24a').setOrigin(0.5);
+      txt(this, x + 66, y + 74, '?', 54, '#ffd24a').setOrigin(0.5);
     }
-    txt(this, x + w / 2, y + 136, tr(g.name), 26, built ? '#ffffff' : C.dim).setOrigin(0.5);
-    txt(this, x + w / 2, y + 160, tr(g.blurb), 15, built ? C.text : C.dim, { align: 'center', wordWrap: { width: w - 36 } }).setOrigin(0.5, 0);
+    const tx0 = x + 136;
+    txt(this, tx0, y + 12, tr(g.name), 24, built ? '#ffffff' : C.dim);
+    txt(this, tx0, y + 44, tr(g.blurb), 14, built ? C.text : C.dim, { wordWrap: { width: w - 150 } });
+    const prog = progressLine(g.id);
+    txt(this, tx0, y + 96, prog ?? tr('New game!'), 15, prog ? '#ffe9a0' : C.dim);
 
     if (!built) {
-      button(this, x + w / 2, y + h - 34, w - 40, 48, tr('Coming soon'), () => {}, { size: 20, color: 0x3a3450 }).setEnabled(false);
+      button(this, x + w - 86, y + h - 30, 150, 42, tr('Coming soon'), () => {}, { size: 16, color: 0x3a3450 }).setEnabled(false);
       return;
     }
-    if (full) txt(this, x + w / 2, y + 250, tr('Full game unlocked'), 16, C.good).setOrigin(0.5);
+    if (full) txt(this, tx0, y + h - 30, tr('Full game unlocked'), 14, C.good).setOrigin(0, 0.5);
     else {
-      button(this, x + w / 2, y + 250, w - 60, 34, tr('Full game - {price}', { price: unlockPrice(getLang()) }), () => this.unlock(), { size: 15, color: 0xb07a10 });
+      button(this, tx0 + 66, y + h - 30, 134, 34, unlockPrice(getLang()), () => this.unlock(), { size: 15, color: 0xb07a10 });
     }
     const label = full ? tr('Play') : tr('Play free');
-    button(this, x + w / 2, y + h - 34, w - 40, 48, label, () => this.play(g), { size: label.length > 12 ? 20 : 24, color: 0x2f9a4a });
+    button(this, x + w - 86, y + h - 30, 150, 44, label, () => this.play(g), { size: label.length > 12 ? 17 : 20, color: 0x2f9a4a });
   }
 
   private play(g: GameInfo) {
@@ -108,4 +119,25 @@ export class HubScene extends Phaser.Scene {
       } else toast(this, tr('That code does not work.'), C.bad);
     });
   }
+}
+
+/** One line about how far you got in a game, or undefined for a new game. */
+function progressLine(id: string): string | undefined {
+  if (id === 'dungeon') {
+    const p = loadProfiles().sort((a, b) => b.lastPlayed - a.lastPlayed)[0];
+    return p && `${p.name}  ·  ${tr('Level {n}', { n: p.level })}`;
+  }
+  if (id === 'farm') {
+    const f = loadFarm();
+    return f && `${f.farmer}  ·  ${tr('{n} coins', { n: f.coins })}`;
+  }
+  if (id === 'space') {
+    const s = loadSpace();
+    return s ? `${s.commander}  ·  ${tr('World {n}', { n: s.world })}` : undefined;
+  }
+  if (id === 'animals') {
+    const a = loadAnimals();
+    return a ? `${a.name}  ·  ${tx(animal(a.animal).name)}  ·  ${tr('Level {n}', { n: a.level })}` : undefined;
+  }
+  return undefined;
 }

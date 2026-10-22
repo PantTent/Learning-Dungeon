@@ -36,6 +36,14 @@ export const GAMES: GameInfo[] = [
     color: 0x7fd3ff,
     scene: 'SpaceSetup',
   },
+  {
+    id: 'animals',
+    name: 'Animal Kingdom Quest',
+    blurb: 'Be an animal, help the village and calm grumpy jungle animals!',
+    icon: 'pet_cat',
+    color: 0xff9a5a,
+    scene: 'AnimalSetup',
+  },
 ];
 
 /**
