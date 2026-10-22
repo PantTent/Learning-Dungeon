@@ -28,7 +28,14 @@ export const GAMES: GameInfo[] = [
     color: 0x7ccb4c,
     scene: 'FarmSetup',
   },
-  { id: 'game3', name: 'Coming soon', blurb: 'Another adventure is being built.', icon: 'tile_chest', color: 0xb26bff },
+  {
+    id: 'space',
+    name: 'Learning Space',
+    blurb: 'Build a space base, mine asteroids and fly from planet to planet!',
+    icon: 'ship_earth',
+    color: 0x7fd3ff,
+    scene: 'SpaceSetup',
+  },
 ];
 
 /**
@@ -41,6 +48,8 @@ export const FREE_LIMITS = {
   /** Farm land / stall upgrades allowed for free (6 plots, 2 stalls). */
   farmLandTier: 1,
   farmStallTier: 1,
+  /** Space worlds playable for free (your starting planet). */
+  spaceWorlds: 1,
 };
 
 /** Unlock id for the "everything" bundle. */

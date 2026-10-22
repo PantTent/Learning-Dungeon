@@ -2,7 +2,7 @@
 // unlocked, settings) into one text code, and load such a code on another
 // device or in the app. The code is compressed so it stays short enough to
 // copy and paste.
-const PREFIXES = ['learning-dungeon.', 'learning-farm.', 'learning-arcade.'];
+const PREFIXES = ['learning-dungeon.', 'learning-farm.', 'learning-arcade.', 'learning-space.'];
 const VERSION = 'LD1';
 
 function storage(): Storage {

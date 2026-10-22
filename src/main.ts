@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import './ui/containerFix';
 import { BattleScene } from './scenes/BattleScene';
 import { BootScene } from './scenes/BootScene';
 import { CreateScene } from './scenes/CreateScene';
@@ -6,6 +7,10 @@ import { DungeonScene } from './scenes/DungeonScene';
 import { HubScene } from './scenes/HubScene';
 import { FarmScene } from './scenes/FarmScene';
 import { FarmSetupScene } from './scenes/FarmSetupScene';
+import { SpaceBaseScene } from './scenes/SpaceBaseScene';
+import { SpaceFlightScene } from './scenes/SpaceFlightScene';
+import { SpaceMapScene } from './scenes/SpaceMapScene';
+import { SpaceSetupScene } from './scenes/SpaceSetupScene';
 import { InventoryScene } from './scenes/InventoryScene';
 import { ParentScene } from './scenes/ParentScene';
 import { PracticeScene } from './scenes/PracticeScene';
@@ -25,7 +30,7 @@ const game = new Phaser.Game({
   pixelArt: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 2 },
-  scene: [BootScene, HubScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene, FarmSetupScene, FarmScene],
+  scene: [BootScene, HubScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene, FarmSetupScene, FarmScene, SpaceSetupScene, SpaceBaseScene, SpaceFlightScene, SpaceMapScene],
 });
 
 // Browsers only allow sound after the player taps or presses a key.
