@@ -7,7 +7,7 @@
 // recompute the answer from it.
 import type { Difficulty, Question } from './types';
 import { chance, pick, ri, shuffle } from '../util/rng';
-import { L, fmtNum, getUnits } from '../i18n';
+import { L, fmtNum, getRegion, getUnits } from '../i18n';
 
 export const EARLY_TOPICS: Record<string, { en: string; fr: string }> = {
   'e-count': { en: 'Counting (before, after, between)', fr: 'Compter (avant, après, entre)' },
@@ -941,8 +941,10 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
   'e-mult': {
     levels: [3],
     gen: () => {
-      let a = pick([2, 3, 4, 5, 10, 2, 3, 4, 5, 1]);
-      let b = ri(2, 10);
+      // Nova Scotia grade 3 stops at 5 x 5.
+      const ns = getRegion() === 'ns';
+      let a = ns ? ri(1, 5) : pick([2, 3, 4, 5, 10, 2, 3, 4, 5, 1]);
+      let b = ri(2, ns ? 5 : 10);
       if (chance(0.5)) [a, b] = [b, a];
       const p = a * b;
       if (chance(0.5))
@@ -969,7 +971,7 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
     levels: [3],
     gen: () => {
       const k = ri(2, 5);
-      const each = ri(2, 10);
+      const each = ri(2, getRegion() === 'ns' ? 5 : 10);
       const t = k * each;
       if (chance(0.3))
         return num(
@@ -1136,7 +1138,7 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
       if (type === 'mult') {
         const si = ri(0, MULT_STORIES.length - 1);
         const a = ri(2, 5);
-        const b = ri(2, 10);
+        const b = ri(2, getRegion() === 'ns' ? 5 : 10);
         return num(
           `mult:${si}:${pi}:${a},${b}`,
           MULT_STORIES[si](p, a, b),
@@ -1148,7 +1150,7 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
       if (type === 'share') {
         const si = ri(0, SHARE_STORIES.length - 1);
         const k = ri(2, 5);
-        const each = ri(2, 10);
+        const each = ri(2, getRegion() === 'ns' ? 5 : 10);
         const t = k * each;
         return num(
           `share:${si}:${pi}:${t},${k}`,

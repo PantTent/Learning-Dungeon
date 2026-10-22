@@ -3,7 +3,7 @@
 // has its own position on its ladder: right answers climb, wrong answers step
 // down, so a child who finds 7 x 143 hard goes back to times tables, then
 // "groups of", and climbs again as they get better.
-import type { Lang } from '../i18n';
+import { getRegion, type Lang } from '../i18n';
 import { mathTopicLevels } from './math';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR } from './readingBankFr';
@@ -89,6 +89,88 @@ const EN_MATH: Record<string, Step[]> = {
   ],
 };
 
+/**
+ * Nova Scotia math ladders in English (grades 1-5). Times tables to 5 x 5 in
+ * grade 3 (the early questions shrink to 5 x 5 when Nova Scotia is picked),
+ * money and fractions from grade 3, decimals in grades 4-5, and no adding
+ * fractions, angles or order of operations yet (those come in grades 6-7).
+ */
+const NS_MATH: Record<string, Step[]> = {
+  multiply: [
+    st('e-doubles', 1, 1),
+    st('e-doubles', 2, 2),
+    st('e-mult', 3, 3),
+    st('mult-facts', 1, 4),
+    st('mult-2x1', 1, 4),
+    st('mult-big', 2, 4),
+    st('mult-2x1', 2, 5),
+    st('mult-2x2', 2, 5),
+    st('mult-big', 3, 5),
+  ],
+  divide: [
+    st('e-div', 3, 3),
+    st('div-facts', 1, 4),
+    st('div-remainder', 2, 4),
+    st('div-long', 3, 5),
+  ],
+  'add-sub': [
+    st(['e-add', 'e-sub'], 1, 1),
+    st(['e-add', 'e-sub', 'e-missing'], 2, 2),
+    st(['e-add', 'e-sub', 'add-sub'], 3, 3),
+    st('add-sub', 2, 4),
+    st('add-sub', 3, 5),
+  ],
+  numbers: [
+    st(['e-count', 'e-compare', 'e-skip'], 1, 1),
+    st(['e-place', 'e-compare', 'e-skip'], 2, 2),
+    st(['place-value', 'compare', 'patterns'], 1, 3),
+    st(['place-value', 'compare', 'patterns', 'rounding'], 2, 4),
+    st(['place-value', 'rounding', 'compare'], 3, 5),
+  ],
+  fractions: [
+    st('e-fractions', 2, 3),
+    st('e-fractions', 3, 3),
+    st('fractions-equiv', 2, 4),
+    st(['fractions-equiv', 'fractions-compare'], 3, 5),
+  ],
+  decimals: [
+    st(['decimals', 'decimal-ops'], 2, 4),
+    st(['decimals', 'decimal-ops'], 3, 5),
+  ],
+  measure: [
+    st('e-shapes', 1, 1),
+    st(['e-measure', 'e-time', 'e-shapes'], 2, 2),
+    st(['e-measure', 'e-time', 'e-shapes', 'measurement'], 3, 3),
+    st(['measurement', 'area-perimeter', 'e-time'], 2, 4),
+    st(['area-perimeter', 'volume', 'measurement'], 3, 5),
+  ],
+  word: [
+    st('e-word', 1, 1),
+    st('e-word', 2, 2),
+    st(['e-word', 'word-problems'], 3, 3),
+    st('word-problems', 2, 4),
+    st('word-problems', 3, 5),
+  ],
+};
+
+/** Nova Scotia math ladders in French (CSAP, 1re to 3e annee). */
+const NS_MATH_FR: Record<string, Step[]> = {
+  'fr-nombres': [
+    st(['e-count', 'e-compare', 'e-skip'], 1, 1),
+    st(['e-count', 'e-compare', 'e-place', 'e-skip', 'e-even-odd'], 2, 2),
+    st(['e-count', 'e-compare', 'e-place', 'e-skip', 'e-even-odd'], 3, 3),
+  ],
+  'fr-add-sub': [
+    st(['e-add', 'e-sub', 'e-missing', 'e-doubles'], 1, 1),
+    st(['e-add', 'e-sub', 'e-missing', 'e-doubles'], 2, 2),
+    st(['e-add', 'e-sub', 'e-missing'], 3, 3),
+  ],
+  'fr-mult': [st(['e-mult', 'e-div'], 3, 3)],
+  'fr-mesure': [st(['e-time', 'e-measure'], 2, 2), st(['e-money', 'e-time', 'e-measure'], 2, 3), st(['e-money', 'e-time', 'e-measure'], 3, 3)],
+  'fr-formes': [st('e-shapes', 1, 1), st('e-shapes', 2, 2), st(['e-shapes', 'e-fractions'], 3, 3)],
+  'fr-problemes': [st('e-word', 1, 1), st('e-word', 2, 2), st('e-word', 3, 3)],
+};
+
 /** Spelling tests: word lists from grade 1 up, in both languages. */
 const SPELLING: Record<string, Step[]> = {
   spell: [st('spell-1', 1, 1), st('spell-2', 1, 2), st('spell-3', 1, 3), st('spell-4', 2, 4), st('spell-5', 3, 5)],
@@ -123,10 +205,12 @@ function generic(groupId: string, lang: Lang): Step[] {
 const cache = new Map<string, Step[]>();
 
 export function ladderFor(groupId: string, lang: Lang): Step[] {
-  const key = `${lang}:${groupId}`;
+  const ns = getRegion() === 'ns';
+  const key = `${lang}:${ns ? 'ns' : ''}:${groupId}`;
   let steps = cache.get(key);
   if (!steps) {
-    steps = SPELLING[groupId] ?? ((lang === 'en' && EN_MATH[groupId]) || generic(groupId, lang));
+    const math = ns ? (lang === 'en' ? NS_MATH : NS_MATH_FR) : lang === 'en' ? EN_MATH : {};
+    steps = SPELLING[groupId] ?? math[groupId] ?? generic(groupId, lang);
     cache.set(key, steps);
   }
   return steps;

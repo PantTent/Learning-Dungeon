@@ -33,6 +33,7 @@ export const FR_MENUS: Record<string, string> = {
   'Paste or type the words, one per line (or with commas):': 'Colle ou écris les mots, un par ligne (ou avec des virgules) :',
   'Units: inches & miles': 'Unités : pouces et milles',
   'Units: cm & km': 'Unités : cm et km',
+  'School: {region}': 'École : {region}',
   // Sound / language buttons (every screen)
   'Sound: ON': 'Son : oui',
   'Music: OFF': 'Musique : non',

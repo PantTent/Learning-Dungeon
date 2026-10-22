@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { cycleSoundMode, sfx, soundModeLabel } from '../audio/audio';
-import { LANGS, fmtNum, getLang, getUnits, setLang, setUnits, tr } from '../i18n';
+import { LANGS, fmtNum, getLang, getRegion, getUnits, regionName, setLang, setRegion, setUnits, tr } from '../i18n';
 
 export const W = 960;
 export const H = 540;
@@ -192,6 +192,17 @@ export function unitsButton(scene: Phaser.Scene, x: number, y: number, w: number
   const b = button(scene, x, y, w, h, label(), () => {
     setUnits(getUnits() === 'imperial' ? 'metric' : 'imperial');
     b.label.setText(label());
+  }, { size: 14, color: 0x2e5a7a });
+  return b;
+}
+
+/** "School program: Massachusetts" / "Nova Scotia" toggle (Québec / Nouvelle-Écosse in French). */
+export function regionButton(scene: Phaser.Scene, x: number, y: number, w: number, h: number, onChange?: () => void): Button {
+  const label = () => tr('School: {region}', { region: regionName() });
+  const b = button(scene, x, y, w, h, label(), () => {
+    setRegion(getRegion() === 'ns' ? 'home' : 'ns');
+    b.label.setText(label());
+    onChange?.();
   }, { size: 14, color: 0x2e5a7a });
   return b;
 }

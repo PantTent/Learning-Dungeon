@@ -2,7 +2,7 @@
 // "What do you want to practice?" screen, and the teacher lessons used for
 // reading questions (math questions carry their own step-by-step hints).
 import type { Difficulty, Subject } from './types';
-import { getLang, type Lang } from '../i18n';
+import { getLang, getRegion, type Lang } from '../i18n';
 
 export type Grade = 1 | 2 | 3 | 4 | 5;
 /** English questions follow Massachusetts grades 1-5. */
@@ -117,6 +117,31 @@ const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
   ],
 };
 
+/**
+ * Nova Scotia math by grade (same in English and French schools). Money starts
+ * in grade 3, fractions in grade 3, times tables to 5 x 5 in grade 3, adding
+ * fractions and angles wait until after grade 5.
+ */
+const MATH_BY_GRADE_NS: Partial<Record<Grade, string[]>> = {
+  1: ['e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-shapes', 'e-word'],
+  2: [
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-even-odd', 'e-time', 'e-shapes',
+    'e-measure', 'e-word',
+  ],
+  3: [
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-even-odd', 'e-money', 'e-time', 'e-shapes',
+    'e-mult', 'e-div', 'e-fractions', 'e-measure', 'e-word', 'add-sub', 'place-value', 'compare', 'patterns', 'measurement', 'word-problems',
+  ],
+  4: [
+    'mult-facts', 'mult-2x1', 'mult-big', 'div-facts', 'div-remainder', 'add-sub', 'place-value', 'rounding', 'compare', 'patterns',
+    'fractions-equiv', 'decimals', 'decimal-ops', 'measurement', 'area-perimeter', 'e-time', 'word-problems',
+  ],
+  5: [
+    'mult-2x1', 'mult-big', 'mult-2x2', 'div-remainder', 'div-long', 'add-sub', 'place-value', 'rounding', 'compare', 'fractions-equiv',
+    'fractions-compare', 'decimals', 'decimal-ops', 'measurement', 'area-perimeter', 'volume', 'word-problems',
+  ],
+};
+
 /** Difficulty range for each grade (1 = warm-up, 3 = stretch). */
 export const GRADE_BAND: Partial<Record<Grade, [Difficulty, Difficulty]>> = {
   1: [1, 1],
@@ -139,6 +164,7 @@ export function gradeBand(grade: Grade, lang: Lang = getLang()): [Difficulty, Di
 
 export function mathTopicsForGrade(grade: Grade, lang: Lang = getLang()): string[] {
   const g = fitGrade(grade, lang);
+  if (getRegion() === 'ns') return MATH_BY_GRADE_NS[g]!;
   return (lang === 'fr' ? MATH_BY_GRADE_FR : MATH_BY_GRADE)[g]!;
 }
 

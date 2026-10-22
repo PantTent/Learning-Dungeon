@@ -7,7 +7,7 @@ import { getLang, tr } from '../i18n';
 import { isDevCode } from '../state/profile';
 import { openKeyboard } from '../ui/keyboard';
 import { parentGate } from '../ui/parentGate';
-import { C, H, W, button, langButton, unitsButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
+import { C, H, W, button, langButton, regionButton, unitsButton, panel, soundButton, sprite, toast, txt } from '../ui/widgets';
 import { menuBackground } from './TitleScene';
 import { animal } from '../animal/data';
 import { loadAnimals } from '../animal/state';
@@ -31,8 +31,9 @@ export class HubScene extends Phaser.Scene {
     menuBackground(this);
     this.own = loadOwnership();
     soundButton(this, W - 76, 30, 130, 40);
-    langButton(this, 96, 30, 172, 40, () => this.scene.restart());
-    unitsButton(this, 96, 76, 172, 36);
+    langButton(this, 104, 24, 188, 34, () => this.scene.restart());
+    unitsButton(this, 104, 62, 188, 32);
+    regionButton(this, 104, 98, 188, 32, () => this.scene.restart());
     const title = txt(this, W / 2, 70, tr('Pick a game!'), 44, '#ffd24a').setOrigin(0.5);
     title.setStroke('#5a2a00', 8);
     txt(this, W / 2, 112, tr('Every game is free to try!'), 19, C.dim).setOrigin(0.5);
@@ -75,7 +76,8 @@ export class HubScene extends Phaser.Scene {
       txt(this, x + 66, y + 74, '?', 54, '#ffd24a').setOrigin(0.5);
     }
     const tx0 = x + 136;
-    txt(this, tx0, y + 12, tr(g.name), 24, built ? '#ffffff' : C.dim);
+    const name = tr(g.name);
+    txt(this, tx0, y + 12, name, name.length > 22 ? 21 : 24, built ? '#ffffff' : C.dim);
     txt(this, tx0, y + 44, tr(g.blurb), 14, built ? C.text : C.dim, { wordWrap: { width: w - 150 } });
     const prog = progressLine(g.id);
     txt(this, tx0, y + 96, prog ?? tr('New game!'), 15, prog ? '#ffe9a0' : C.dim);
@@ -86,10 +88,10 @@ export class HubScene extends Phaser.Scene {
     }
     if (full) txt(this, tx0, y + h - 30, tr('Full game unlocked'), 14, C.good).setOrigin(0, 0.5);
     else {
-      button(this, tx0 + 66, y + h - 30, 134, 34, unlockPrice(getLang()), () => this.unlock(), { size: 15, color: 0xb07a10 });
+      button(this, tx0 + 58, y + h - 30, 118, 34, unlockPrice(getLang()), () => this.unlock(), { size: 15, color: 0xb07a10 });
     }
     const label = full ? tr('Play') : tr('Play free');
-    button(this, x + w - 86, y + h - 30, 150, 44, label, () => this.play(g), { size: label.length > 12 ? 17 : 20, color: 0x2f9a4a });
+    button(this, x + w - 92, y + h - 30, 164, 44, label, () => this.play(g), { size: label.length > 12 ? 15 : 20, color: 0x2f9a4a });
   }
 
   private play(g: GameInfo) {
