@@ -1,4 +1,4 @@
-import { ANIMALS, BOSSES, DESERT, FOODS, FOREST, GORILLA, JUNGLE, MOUNTAINS, QUESTS, RECIPES, SEASHORE, SHOP } from './data';
+import { ANIMALS, BOSSES, DESERT, FOODS, FOREST, GORILLA, JUNGLE, MOUNTAINS, QUESTS, RECIPES, SAVANNA, SEASHORE, SHOP } from './data';
 import {
   buy, canCook, cook, currentQuest, desertOpen, landOpen, loadAnimals, questOpen, questReady, setBossCalm, swipe,
   accept, addFood, calmAmount, canTurnIn, dropsFor, eat, gainXp, makeFoe, maxHearts, moves, newAnimalSave, progress, startCalm, turnIn,
@@ -213,7 +213,7 @@ describe('Animal Kingdom Quest rules', () => {
   });
 
   it('every boss and wild animal has a fact, and every food in a recipe or the shop exists', () => {
-    for (const w of [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...Object.values(BOSSES)]) {
+    for (const w of [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...SAVANNA, ...Object.values(BOSSES)]) {
       expect(w.fact.en.length, w.id).toBeGreaterThan(10);
       expect(w.fact.fr.length, w.id).toBeGreaterThan(10);
       if (w.drop) expect(FOODS.map((f) => f.id)).toContain(w.drop[0]);
@@ -237,5 +237,22 @@ describe('Animal Kingdom Quest rules', () => {
     setBossCalm(s, 'octopus');
     expect(canTurnIn(s, 'octopus')).toBe(true);
     expect(SEASHORE.length).toBe(8);
+  });
+
+  it('Part 5: the Savanna opens after the octopus; calves, then the rhino', () => {
+    const s = newAnimalSave('Ava', 'lion', 4, 0);
+    expect(landOpen(s, 'savanna')).toBe(false);
+    s.octopusCalm = true;
+    expect(landOpen(s, 'savanna')).toBe(true);
+    s.quests.fossils = 'done';
+    expect(currentQuest(s, 'mole')!.id).toBe('calves');
+    accept(s, 'calves');
+    s.calves = ['grass0', 'grass1', 'grass2', 'grass3', 'grass4'];
+    expect(turnIn(s, 'calves')).not.toBeNull();
+    expect(questReady(s, 'rhino')).toBe(true);
+    accept(s, 'rhino');
+    setBossCalm(s, 'rhino');
+    expect(canTurnIn(s, 'rhino')).toBe(true);
+    expect(SAVANNA.length).toBe(8);
   });
 });

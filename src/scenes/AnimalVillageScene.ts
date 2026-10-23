@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, BOSSES, DESERT, FOREST, food, JUNGLE, LANDS, MOUNTAINS, QUESTS, RECIPES, SEASHORE, SHOP, wild, type LandId, type WildDef } from '../animal/data';
+import { animal, BOSSES, DESERT, FOREST, food, JUNGLE, LANDS, MOUNTAINS, QUESTS, RECIPES, SAVANNA, SEASHORE, SHOP, wild, type LandId, type WildDef } from '../animal/data';
 import { buy, canCook, canTurnIn, cook, currentQuest, hasCharm, landOpen, questOpen, loadAnimals, maxHearts, progress, puppiesFound, questReady, rest, saveAnimals, type AnimalSave } from '../animal/state';
 import { ask, dialog, grassTexture, keyVector, questTalk, say, Stick, topBar, tx } from '../animal/ui';
 import { jungleState } from './AnimalJungleScene';
@@ -9,6 +9,7 @@ import { desertState } from './AnimalDesertScene';
 import { forestState } from './AnimalForestScene';
 import { mountainsState } from './AnimalMountainsScene';
 import { seashoreState } from './AnimalSeashoreScene';
+import { savannaState } from './AnimalSavannaScene';
 import type { LandState } from './AnimalLandScene';
 
 /** Each land's screen, and what it remembers between battles. */
@@ -18,10 +19,13 @@ const LAND_SCENES: Record<LandId, { key: string; state: LandState }> = {
   forest: { key: 'AnimalForest', state: forestState },
   mountains: { key: 'AnimalMountains', state: mountainsState },
   seashore: { key: 'AnimalSeashore', state: seashoreState },
+  savanna: { key: 'AnimalSavanna', state: savannaState },
 };
 
 /** The little boat on the pond that sails to the Seashore. */
 const BOAT = { x: 205, y: 445 };
+/** The hot-air balloon that flies to the Savanna. */
+const BALLOON = { x: 792, y: 222 };
 import { C, H, W, button, panel, txt } from '../ui/widgets';
 
 /** The village helpers stand here. */
@@ -72,6 +76,7 @@ export class AnimalVillageScene extends Phaser.Scene {
       desert: { x: W / 2, y: H - 60 },
       forest: { x: 80, y: H / 2 + 20 },
       seashore: { x: BOAT.x + 90, y: BOAT.y - 30 },
+      savanna: { x: BALLOON.x - 70, y: BALLOON.y + 30 },
       mountains: { x: W / 2, y: TOP + 40 },
     }[data.from ?? ('' as LandId)] ?? { x: W / 2, y: H / 2 + 60 };
     this.hero = this.add.image(start.x, start.y, animal(s.animal).sprite).setScale(3.6).setDepth(start.y);
@@ -95,6 +100,8 @@ export class AnimalVillageScene extends Phaser.Scene {
       this.time.delayedCall(600, () => this.festival());
     } else if (s.quests.octopus === 'done' && !s.beachParty) {
       this.time.delayedCall(600, () => this.beachParty());
+    } else if (s.quests.rhino === 'done' && !s.champion) {
+      this.time.delayedCall(600, () => this.championParty());
     }
   }
 
@@ -107,7 +114,11 @@ export class AnimalVillageScene extends Phaser.Scene {
     g.fillStyle(0xb88a50, 1).fillRect(0, H / 2 + 48, W, 4).fillRect(W / 2 + 24, TOP - 10, 4, H - TOP + 10);
     // Homes and decorations.
     this.add.image(110, 170, 'prop_hut').setScale(3.2);
-    this.add.image(860, 170, 'prop_den').setScale(3.2);
+    // The hot-air balloon flies to the Savanna.
+    const balloon = this.add.image(BALLOON.x, BALLOON.y, 'prop_balloon').setScale(2.2).setOrigin(0.5, 1).setDepth(BALLOON.y).setInteractive({ useHandCursor: true });
+    this.tweens.add({ targets: balloon, y: BALLOON.y - 6, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    balloon.on('pointerup', () => this.walk(BALLOON.x - 70, BALLOON.y + 20, () => this.toLand('savanna', this.time.now)));
+    this.label(BALLOON.x, BALLOON.y + 2, tx(LANDS.find((l) => l.id === 'savanna')!.name), 12);
     this.add.ellipse(POND.x, POND.y, 170, 80, 0x4a90e0).setStrokeStyle(4, 0x2a6ab0);
     this.add.ellipse(POND.x - 30, POND.y - 12, 50, 14, 0xb8e0ff, 0.6);
     this.label(POND.x, POND.y + 48, tr('Rest'));
@@ -159,7 +170,7 @@ export class AnimalVillageScene extends Phaser.Scene {
     boat.on('pointerup', () => this.walk(BOAT.x + 80, BOAT.y - 10, () => this.toLand('seashore', this.time.now)));
     this.label(BOAT.x, BOAT.y + 24, tx(LANDS.find((l) => l.id === 'seashore')!.name), 12);
     for (const land of LANDS) {
-      if (land.dir === 'boat') continue;
+      if (land.dir === 'boat' || land.dir === 'balloon') continue;
       const pos = { right: { x: W - 34, y: H / 2 + 24 }, left: { x: 34, y: H / 2 + 24 }, up: { x: W / 2, y: TOP + 14 }, down: { x: W / 2, y: H - 36 } }[land.dir];
       if (landOpen(s, land.id)) {
         const look = {
@@ -252,7 +263,7 @@ export class AnimalVillageScene extends Phaser.Scene {
         say(this, this.lockedText(land), '#ffe9a0');
       }
       // Step back from the gate.
-      const back = { jungle: [-30, 0], desert: [0, -30], forest: [30, 0], mountains: [0, 30], seashore: [0, 0] }[land];
+      const back = { jungle: [-30, 0], desert: [0, -30], forest: [30, 0], mountains: [0, 30], seashore: [0, 0], savanna: [0, 0] }[land];
       this.hero.x += back[0];
       this.hero.y += back[1];
       return;
@@ -263,6 +274,33 @@ export class AnimalVillageScene extends Phaser.Scene {
     to.state.fresh = true;
     this.cameras.main.fadeOut(300);
     this.time.delayedCall(320, () => this.scene.start(to.key));
+  }
+
+  /** The very end (for now): every land is happy. */
+  private championParty() {
+    const s = this.s;
+    s.champion = true;
+    saveAnimals(s);
+    this.busy = true;
+    sfx('victory');
+    const c = this.add.container(0, 0).setDepth(3000);
+    c.add(this.add.rectangle(0, 0, W, H, 0, 0.6).setOrigin(0).setInteractive());
+    c.add(panel(this, 70, 50, W - 140, H - 80, 0x2a1a10, 0xffd24a));
+    c.add(txt(this, W / 2, 84, tr('Champion of the Animal Kingdom!'), 30, '#ffd24a').setOrigin(0.5));
+    Object.values(BOSSES).forEach((b, i) => {
+      const img = this.add.image(150 + i * 132, 196, b.sprite).setScale(2.1);
+      this.tweens.add({ targets: img, y: 182, duration: 380 + i * 70, yoyo: true, repeat: -1 });
+      c.add(img);
+    });
+    const hero = this.add.image(W / 2, 296, animal(s.animal).sprite).setScale(4.4);
+    this.tweens.add({ targets: hero, angle: { from: -6, to: 6 }, duration: 300, yoyo: true, repeat: -1 });
+    c.add(hero);
+    c.add(txt(this, W / 2, 348, tr('From the Jungle to the Savanna, every grumpy animal is happy again. The whole kingdom is cheering for you, {name}!', { name: s.name }), 18, C.text, { align: 'center', wordWrap: { width: W - 240 } }).setOrigin(0.5, 0));
+    c.add(txt(this, W / 2, 420, tr('You can keep playing: calm more animals, cook, and fill the Animal Book!'), 15, '#9ad0ff', { align: 'center', wordWrap: { width: W - 240 } }).setOrigin(0.5, 0));
+    c.add(button(this, W / 2, H - 64, 220, 46, tr('Hooray!'), () => {
+      c.destroy();
+      this.busy = false;
+    }, { size: 20, color: 0x2f9a4a }));
   }
 
   /** The beach party after the octopus is calm. */
@@ -459,15 +497,15 @@ export class AnimalVillageScene extends Phaser.Scene {
       c.add(this.add.image(W / 2 - 60, 120, 'item_acorn').setScale(2));
       c.add(txt(this, W / 2 - 44, 120, tr('You have {n} acorns', { n: s.acorns }), 16, '#ffe9a0').setOrigin(0, 0.5));
       SHOP.forEach((it, i) => {
-        // Five to a row.
-        const x = 150 + (i % 5) * 165;
-        const y = 222 + Math.floor(i / 5) * 160;
+        // Six to a row.
+        const x = 128 + (i % 6) * 141;
+        const y = 222 + Math.floor(i / 6) * 160;
         const owned = it.kind === 'charm' && hasCharm(s, it.id);
-        c.add(panel(this, x - 78, y - 70, 156, 146, 0x2a2244, it.kind === 'charm' ? 0xb98aff : 0x5a4a7a));
-        c.add(this.add.image(x, y - 40, it.icon).setScale(3.2));
-        c.add(txt(this, x, y - 6, tx(it.name), 14, '#ffffff').setOrigin(0.5));
-        c.add(txt(this, x, y + 18, tx(it.info), 11, C.dim, { align: 'center', wordWrap: { width: 146 } }).setOrigin(0.5));
-        const b = button(this, x, y + 54, 136, 28, owned ? tr('You have it!') : tr('{n} acorns', { n: it.price }), () => {
+        c.add(panel(this, x - 66, y - 70, 132, 146, 0x2a2244, it.kind === 'charm' ? 0xb98aff : 0x5a4a7a));
+        c.add(this.add.image(x, y - 40, it.icon).setScale(3));
+        c.add(txt(this, x, y - 6, tx(it.name), 13, '#ffffff', { align: 'center', wordWrap: { width: 124 } }).setOrigin(0.5));
+        c.add(txt(this, x, y + 20, tx(it.info), 10, C.dim, { align: 'center', wordWrap: { width: 122 } }).setOrigin(0.5));
+        const b = button(this, x, y + 54, 118, 28, owned ? tr('You have it!') : tr('{n} acorns', { n: it.price }), () => {
           if (buy(s, it)) {
             saveAnimals(s);
             sfx('coin');
@@ -504,16 +542,16 @@ export class AnimalVillageScene extends Phaser.Scene {
       if (i < s.fossils.length) c.add(this.add.image(x, 124, 'item_fossil').setScale(2.8));
       else c.add(txt(this, x, 124, '?', 20, C.dim).setOrigin(0.5));
     }
-    const all: WildDef[] = [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...Object.values(BOSSES)];
+    const all: WildDef[] = [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...SAVANNA, ...Object.values(BOSSES)];
     c.add(txt(this, 110, 160, tr('Animal Book: {n} of {all} animals calmed. Tap one to read about it.', { n: all.filter((a) => s.facts.includes(a.id)).length, all: all.length }), 16, '#ffe9a0'));
-    // Twelve to a row; tap one to read its name and fact.
+    // Fourteen to a row; tap one to read its name and fact.
     all.forEach((a, i) => {
-      const x = 118 + (i % 12) * 66;
-      const y = 206 + Math.floor(i / 12) * 64;
+      const x = 110 + (i % 14) * 55;
+      const y = 202 + Math.floor(i / 14) * 56;
       const met = s.facts.includes(a.id);
       const big = !!BOSSES[a.id];
-      c.add(this.add.rectangle(x, y, 58, 56, met ? 0x3a3450 : 0x1a1420).setStrokeStyle(2, met ? 0x9a8ac8 : 0x4a3a5a));
-      const img = this.add.image(x, y, a.sprite).setScale(big ? 1.4 : 2.6).setInteractive({ useHandCursor: true });
+      c.add(this.add.rectangle(x, y, 50, 50, met ? 0x3a3450 : 0x1a1420).setStrokeStyle(2, met ? 0x9a8ac8 : 0x4a3a5a));
+      const img = this.add.image(x, y, a.sprite).setScale(big ? 1.3 : 2.4).setInteractive({ useHandCursor: true });
       if (!met) img.setTintFill(0x14101e).setAlpha(0.8);
       img.on('pointerup', () => fact.setText(met ? `${tx(a.name)}: ${tx(a.fact)}` : tr('Calm this animal to learn about it!')));
       c.add(img);

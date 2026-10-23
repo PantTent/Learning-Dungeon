@@ -296,6 +296,40 @@ export function buildSeashore(): LandMap {
   return { ...m, h, oasis, helper, waterY };
 }
 
+/**
+ * The Savanna, reached by hot-air balloon: you land at the top and the
+ * grumpy rhino charges about at the bottom. Tall grass hides lost elephant
+ * calves; a watering hole is the place to rest.
+ */
+export function buildSavanna(): LandMap {
+  const w = 2400;
+  const h = 1900;
+  const oasis = { x: w / 2 + 420, y: 430, r: 85 };
+  const helper = { x: oasis.x - 170, y: oasis.y + 10 };
+  const m = layout({
+    seed: 20261027,
+    w,
+    h,
+    start: { x: w / 2, y: 90 },
+    boss: { x: w / 2, y: h - 200 },
+    glade: { x: 420, y: 980, r: 150 },
+    burrows: { outside: { x: 640, y: 980 }, inside: { x: 480, y: 980 } },
+    stump: { x: 400, y: 980, id: 'stump6' },
+    ids: { rock: 'grass', fruit: 'baobab', gold: 'vgold' },
+    rocks: 8,
+    hidden: 5,
+    fruit: 6,
+    golden: 5,
+    spawns: 14,
+    trees: 45,
+    // Stronger animals live further from the balloon (lower down).
+    levelAt: (p) => 16 + Math.min(2, Math.floor((p.y / h) * 3)),
+    keep: [{ ...oasis, r: oasis.r + 60 }, { ...helper, r: 60 }],
+  });
+  m.trees.push({ ...oasis });
+  return { ...m, oasis, helper };
+}
+
 /** Can a body of radius `r` stand here (not inside a tree or a rock that is still there)? */
 export function blocked(m: LandMap, p: Pt, r: number, rocksLeft: Set<string>): boolean {
   if (p.x < r || p.y < r || p.x > m.w - r || p.y > m.h - r) return true;

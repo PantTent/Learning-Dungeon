@@ -39,7 +39,7 @@ function rng(seed: number) {
 }
 
 /** A 32x32 ground tile: light grass in the village, deep green in the jungle, sand in the desert. */
-export function grassTexture(scene: Phaser.Scene, kind: 'village' | 'jungle' | 'desert' | 'forest' | 'snow' | 'beach'): string {
+export function grassTexture(scene: Phaser.Scene, kind: 'village' | 'jungle' | 'desert' | 'forest' | 'snow' | 'beach' | 'savanna'): string {
   const key = `agrass_${kind}`;
   if (scene.textures.exists(key)) return key;
   const [a, b, c] = {
@@ -49,10 +49,11 @@ export function grassTexture(scene: Phaser.Scene, kind: 'village' | 'jungle' | '
     forest: ['#2f5e3a', '#264d30', '#3e7a4c'],
     snow: ['#e8f0f8', '#d2e0ee', '#ffffff'],
     beach: ['#f0d9a0', '#e2c486', '#fbe8bc'],
+    savanna: ['#d8b860', '#c4a04a', '#e8cc78'],
   }[kind];
   const tex = scene.textures.createCanvas(key, 32, 32)!;
   const ctx = tex.getContext();
-  const rand = rng({ village: 7, jungle: 11, desert: 13, forest: 17, snow: 19, beach: 23 }[kind]);
+  const rand = rng({ village: 7, jungle: 11, desert: 13, forest: 17, snow: 19, beach: 23, savanna: 29 }[kind]);
   ctx.fillStyle = a;
   ctx.fillRect(0, 0, 32, 32);
   for (let i = 0; i < 60; i++) {

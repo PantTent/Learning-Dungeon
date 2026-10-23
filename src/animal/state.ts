@@ -40,6 +40,11 @@ export interface AnimalSave {
   /** Part 4: baby turtles helped to the sea, and the octopus. */
   turtles: string[];
   octopusCalm: boolean;
+  /** Part 5: elephant calves found, and the rhino. */
+  calves: string[];
+  rhinoCalm: boolean;
+  /** The champion celebration has been shown. */
+  champion?: boolean;
   /** The beach party has been shown. */
   beachParty?: boolean;
   /** Charms bought at the shop (they help for good). */
@@ -88,6 +93,8 @@ export function newAnimalSave(name: string, animalId: string, grade: Grade, now 
     leopardCalm: false,
     turtles: [],
     octopusCalm: false,
+    calves: [],
+    rhinoCalm: false,
     charms: [],
     facts: [],
     settings,
@@ -122,6 +129,8 @@ export function loadAnimals(): AnimalSave | null {
     s.leopardCalm ??= false;
     s.turtles ??= [];
     s.octopusCalm ??= false;
+    s.calves ??= [];
+    s.rhinoCalm ??= false;
     s.charms ??= [];
     return s;
   } catch {
@@ -255,11 +264,12 @@ export function progress(s: AnimalSave, id: QuestDef['id']): number {
   if (id === 'mushrooms') return Math.min(s.mushrooms.length, need);
   if (id === 'crystals') return Math.min(s.crystals.length, need);
   if (id === 'turtles') return Math.min(s.turtles.length, need);
+  if (id === 'calves') return Math.min(s.calves.length, need);
   return bossCalm(s, quest(id).boss ? BOSS_OF[id] : id) ? 1 : 0;
 }
 
 /** The boss each boss quest asks you to calm. */
-const BOSS_OF: Partial<Record<QuestDef['id'], string>> = { gorilla: 'gorilla', tortoise: 'tortoise', moose: 'moose', leopard: 'snowleopard', octopus: 'octopus' };
+const BOSS_OF: Partial<Record<QuestDef['id'], string>> = { gorilla: 'gorilla', tortoise: 'tortoise', moose: 'moose', leopard: 'snowleopard', octopus: 'octopus', rhino: 'rhino' };
 
 /** Rocks in the Jungle that hide a puppy (the other rocks only hide acorns). */
 const PUPPY_ROCKS = new Set(buildJungle().rocks.filter((r) => r.puppy).map((r) => r.id));
@@ -267,7 +277,7 @@ export const puppiesFound = (s: AnimalSave) => s.rescued.filter((id) => PUPPY_RO
 
 /** Has this boss been calmed? */
 export function bossCalm(s: AnimalSave, id: string | undefined): boolean {
-  return { gorilla: s.gorillaCalm, tortoise: s.tortoiseCalm, moose: s.mooseCalm, snowleopard: s.leopardCalm, octopus: s.octopusCalm }[id ?? ''] ?? false;
+  return { gorilla: s.gorillaCalm, tortoise: s.tortoiseCalm, moose: s.mooseCalm, snowleopard: s.leopardCalm, octopus: s.octopusCalm, rhino: s.rhinoCalm }[id ?? ''] ?? false;
 }
 
 export function setBossCalm(s: AnimalSave, id: string): void {
@@ -276,6 +286,7 @@ export function setBossCalm(s: AnimalSave, id: string): void {
   if (id === 'moose') s.mooseCalm = true;
   if (id === 'snowleopard') s.leopardCalm = true;
   if (id === 'octopus') s.octopusCalm = true;
+  if (id === 'rhino') s.rhinoCalm = true;
 }
 
 /** Each land opens once the boss of the land before it is calm. */

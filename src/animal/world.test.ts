@@ -1,4 +1,4 @@
-import { blocked, buildDesert, buildForest, buildJungle, buildMountains, buildSeashore, reachable } from './world';
+import { blocked, buildDesert, buildForest, buildJungle, buildMountains, buildSavanna, buildSeashore, reachable } from './world';
 
 describe('the Jungle map', () => {
   const m = buildJungle();
@@ -84,7 +84,7 @@ describe('the Enchanted Forest and the Snowy Mountains', () => {
   }
 
   it('every land uses its own names', () => {
-    const ids = [buildJungle, buildDesert, buildForest, buildMountains, buildSeashore].flatMap((b) => {
+    const ids = [buildJungle, buildDesert, buildForest, buildMountains, buildSeashore, buildSavanna].flatMap((b) => {
       const m = b();
       return [...m.rocks, ...m.fruit, ...m.golden, m.stump].map((p) => p.id);
     });
@@ -100,6 +100,24 @@ describe('the Sunny Seashore', () => {
     expect(m.spawns.every((s) => s.level >= 13 && s.level <= 15)).toBe(true);
     expect(blocked(m, { x: 500, y: m.waterY! + 20 }, 14, new Set())).toBe(true);
     for (const p of [...m.rocks, ...m.fruit, ...m.golden, ...m.spawns, m.boss, m.start]) expect(p.y).toBeLessThan(m.waterY! - 30);
+  });
+  it('everything important can be walked to, the secret only through the burrow', () => {
+    const edge = { x: m.oasis!.x, y: m.oasis!.y + m.oasis!.r + 30 };
+    for (const p of [...m.rocks, ...m.fruit, ...m.golden, ...m.spawns, m.boss, m.burrows.outside, m.helper!, edge]) {
+      expect(reachable(m, m.start, p), JSON.stringify(p)).toBe(true);
+    }
+    expect(reachable(m, m.start, m.stump)).toBe(false);
+    expect(reachable(m, m.burrows.inside, m.stump)).toBe(true);
+  });
+});
+
+describe('the Savanna', () => {
+  const m = buildSavanna();
+  it('has 5 hidden calves, baobabs, a watering hole and the toughest animals', () => {
+    expect(JSON.stringify(buildSavanna())).toBe(JSON.stringify(m));
+    expect(m.rocks.filter((r) => r.puppy).length).toBe(5);
+    expect(m.fruit.length).toBeGreaterThanOrEqual(4);
+    expect(m.spawns.every((s) => s.level >= 16 && s.level <= 18)).toBe(true);
   });
   it('everything important can be walked to, the secret only through the burrow', () => {
     const edge = { x: m.oasis!.x, y: m.oasis!.y + m.oasis!.r + 30 };

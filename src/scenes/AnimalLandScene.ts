@@ -49,19 +49,21 @@ export interface LandConfig {
   bossQuest: QuestDef['id'];
   /** Which edge the path home is on. */
   exit: 'left' | 'top' | 'right' | 'bottom';
-  ground: 'jungle' | 'desert' | 'forest' | 'snow' | 'beach';
+  ground: 'jungle' | 'desert' | 'forest' | 'snow' | 'beach' | 'savanna';
   /** Sign by the path home. */
   sign: string;
   /** What the rocks (or mounds, logs, snow piles) hide, and the quest that wants it. */
-  hidden: { quest: QuestDef['id']; list?: 'fossils' | 'mushrooms' | 'crystals' | 'turtles'; icon?: string; dust: number[]; toSea?: boolean };
+  hidden: { quest: QuestDef['id']; list?: 'fossils' | 'mushrooms' | 'crystals' | 'turtles' | 'calves'; icon?: string; dust: number[]; toSea?: boolean; trotOff?: boolean };
   /** Skills that break a rock with one question (a wrong answer still works). */
   strong: SkillId[];
   /** The rest spot (oasis, spring): water color. */
   spring?: number;
   /** Something next to the boss (the tortoise's well). */
   bossProp?: string;
-  /** Too cold without a warm scarf: lose a heart now and then. */
+  /** Too cold (or too hot) without the right charm: lose a heart now and then. */
   cold?: boolean;
+  /** The charm that keeps you comfortable here (default: the warm scarf). */
+  coldCharm?: string;
   decorCount?: number;
   /** Something at the path home (the Seashore's boat). */
   exitProp?: string;
@@ -233,7 +235,7 @@ export class AnimalLandScene extends Phaser.Scene {
     this.add.tileSprite(0, 0, m.w, m.h, grassTexture(this, cfg.ground)).setOrigin(0).setTileScale(3);
     // The path home, with a sign beside it.
     const d = DIR[cfg.exit];
-    const pathColor = { jungle: 0xb88a50, desert: 0xc89a60, forest: 0x7a5a3a, snow: 0xc8d8e8, beach: 0x9a7a50 }[cfg.ground];
+    const pathColor = { jungle: 0xb88a50, desert: 0xc89a60, forest: 0x7a5a3a, snow: 0xc8d8e8, beach: 0x9a7a50, savanna: 0xa87a40 }[cfg.ground];
     // The sea along the bottom, with gentle waves.
     if (m.waterY !== undefined) {
       this.add.rectangle(0, m.waterY, m.w, m.h - m.waterY, 0x3a8ad0).setOrigin(0).setDepth(m.waterY - 5);
@@ -248,7 +250,11 @@ export class AnimalLandScene extends Phaser.Scene {
     const signAt = d.x ? { x: m.start.x - d.x * 30, y: m.start.y - 70 } : { x: m.start.x + 80, y: m.start.y - d.y * 70 };
     this.add.image(signAt.x, signAt.y, cfg.sign).setScale(3).setFlipX(d.x < 0).setDepth(signAt.y);
     this.label(signAt.x, signAt.y - 50, text.home);
-    if (cfg.exitProp) this.add.image(m.start.x - 20, m.start.y + 70, cfg.exitProp).setScale(3).setDepth(m.start.y + 70);
+    if (cfg.exitProp) {
+      // Beside the path (not on it).
+      const at = d.x ? { x: m.start.x - 20, y: m.start.y + 70 } : { x: m.start.x - 110, y: m.start.y + 60 };
+      this.add.image(at.x, at.y, cfg.exitProp).setScale(3).setDepth(at.y);
+    }
     // Ground plants and pebbles (just pretty).
     for (let i = 0; i < (cfg.decorCount ?? 90); i++) {
       const x = (i * 337) % m.w;
@@ -298,7 +304,7 @@ export class AnimalLandScene extends Phaser.Scene {
       this.add.ellipse(o.x, o.y, o.r * 2.2, o.r * 1.3, water).setStrokeStyle(5, Phaser.Display.Color.ValueToColor(water).darken(25).color).setDepth(o.y - 40);
       this.add.ellipse(o.x - 30, o.y - 16, 60, 16, 0xffffff, 0.45).setDepth(o.y - 39);
       if (cfg.land === 'desert') this.add.image(o.x + o.r + 30, o.y - 30, 'prop_palm').setScale(3.2).setOrigin(0.5, 0.75).setDepth(o.y);
-      if (cfg.cold) {
+      if (cfg.cold && !cfg.coldCharm) {
         // Steam rising from the hot spring.
         for (let i = 0; i < 3; i++) {
           const puff = this.add.ellipse(o.x - 40 + i * 40, o.y - 10, 26, 18, 0xffffff, 0.5).setDepth(o.y);
@@ -416,16 +422,17 @@ export class AnimalLandScene extends Phaser.Scene {
 
   /** Brrr! Without a warm scarf the mountain cold takes a heart now and then (never the last one). */
   private chill(t: number) {
-    if (!this.cfg.cold || warm(this.s) || t < this.chillAt) return;
+    const comfy = this.cfg.coldCharm ? hasCharm(this.s, this.cfg.coldCharm) : warm(this.s);
+    if (!this.cfg.cold || comfy || t < this.chillAt) return;
     this.chillAt = t + 20000;
     if (this.s.hearts > 1) {
       this.s.hearts--;
       saveAnimals(this.s);
       this.refresh();
-      this.hero.setTint(0x9ad0ff);
+      this.hero.setTint(this.cfg.coldCharm === 'hat' ? 0xffb070 : 0x9ad0ff);
       this.time.delayedCall(400, () => this.hero.clearTint());
     }
-    say(this, this.cfg.text().cold ?? '', '#9ad0ff');
+    say(this, this.cfg.text().cold ?? '', this.cfg.coldCharm === 'hat' ? '#ffd27a' : '#9ad0ff');
   }
 
   private solidRocks(): Set<string> {
@@ -622,6 +629,10 @@ export class AnimalLandScene extends Phaser.Scene {
             // A baby turtle waddles all the way down to the sea.
             this.tweens.add({ targets: f, angle: { from: -8, to: 8 }, duration: 200, yoyo: true, repeat: -1 });
             this.tweens.add({ targets: f, y: this.map.waterY + 40, duration: Math.max(1200, (this.map.waterY - r.y) * 6), onUpdate: () => f.setDepth(f.y + 10), onComplete: () => this.tweens.add({ targets: f, alpha: 0, duration: 500, onComplete: () => f.destroy() }) });
+          } else if (hid.trotOff) {
+            // A lost calf trots happily off to find its mom.
+            this.tweens.add({ targets: f, y: f.y - 6, duration: 160, yoyo: true, repeat: -1 });
+            this.tweens.add({ targets: f, x: r.x + 320, duration: 2200, onComplete: () => this.tweens.add({ targets: f, alpha: 0, duration: 500, onComplete: () => f.destroy() }) });
           } else this.tweens.add({ targets: f, y: r.y - 90, alpha: 0, duration: 1400, onComplete: () => f.destroy() });
         }
         say(this, text.foundHidden, C.good);

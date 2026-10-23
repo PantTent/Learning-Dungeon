@@ -114,6 +114,8 @@ export const FOODS: FoodDef[] = [
   { id: 'coconut', name: t('Coconut', 'Noix de coco'), icon: 'food_coconut', heal: 6 },
   { id: 'mango', name: t('Mango', 'Mangue'), icon: 'food_mango', heal: 6 },
   { id: 'smoothie', name: t('Tropical Smoothie', 'Smoothie tropical'), icon: 'food_smoothie', heal: 22 },
+  { id: 'baobab', name: t('Baobab Fruit', 'Fruit du baobab'), icon: 'food_baobab', heal: 7 },
+  { id: 'kebab', name: t('Fruit Kebab', 'Brochette de fruits'), icon: 'food_kebab', heal: 28 },
   { id: 'pie', name: t('Apple Pie', 'Tarte aux pommes'), icon: 'food_pie', heal: 99 },
 ];
 
@@ -130,6 +132,7 @@ export const RECIPES: RecipeDef[] = [
   { id: 'salad', makes: 'salad', needs: { berries: 1, apple: 1, banana: 1 } },
   { id: 'honeycake', makes: 'honeycake', needs: { honey: 1, date: 1, berries: 1 } },
   { id: 'smoothie', makes: 'smoothie', needs: { mango: 1, coconut: 1, berries: 1 } },
+  { id: 'kebab', makes: 'kebab', needs: { baobab: 1, mango: 1, banana: 1 } },
 ];
 
 /** Hazel Hedgehog's shop: foods, and charms that help for good. */
@@ -151,6 +154,7 @@ export const SHOP: ShopItem[] = [
   { id: 'clover', kind: 'charm', icon: 'item_charm_clover', name: t('Clover Charm', 'Breloque trèfle'), info: t('Every move calms a bit more', 'Chaque geste calme un peu plus'), price: 200 },
   { id: 'mango', kind: 'food', icon: 'food_mango', name: t('Mango', 'Mangue'), info: t('+6 hearts', '+6 cœurs'), price: 14 },
   { id: 'cocoa', kind: 'food', icon: 'food_cocoa', name: t('Hot Cocoa', 'Chocolat chaud'), info: t('+8 hearts, and warms you up', '+8 cœurs, et ça réchauffe'), price: 15 },
+  { id: 'hat', kind: 'charm', icon: 'item_charm_hat', name: t('Safari Hat', 'Chapeau de safari'), info: t('Stay cool under the Savanna sun', 'Reste au frais sous le soleil de la savane'), price: 160 },
   { id: 'scarf', kind: 'charm', icon: 'item_charm_scarf', name: t('Warm Scarf', 'Foulard chaud'), info: t('Stay warm in the Snowy Mountains', 'Reste au chaud dans les montagnes'), price: 100 },
   { id: 'boot', kind: 'charm', icon: 'item_charm_boot', name: t('Speedy Charm', 'Breloque rapide'), info: t('Walk faster everywhere', 'Marche plus vite partout'), price: 120 },
 ];
@@ -259,16 +263,33 @@ export const OCTOPUS: WildDef = {
   fact: t('An octopus has three hearts and blue blood!', 'La pieuvre a trois cœurs et du sang bleu!'),
 };
 
+/** Wild animals of the Savanna (levels 16 to 18). */
+export const SAVANNA: WildDef[] = [
+  { id: 'zebra', name: t('Zebra', 'Zèbre'), sprite: 'wild_zebra', grump: 15, swipe: 1, drop: ['baobab', 0.35], xp: 58, fact: t('Every zebra has its own pattern of stripes, like a fingerprint.', 'Chaque zèbre a ses propres rayures, comme une empreinte digitale.') },
+  { id: 'warthog', name: t('Warthog', 'Phacochère'), sprite: 'wild_warthog', grump: 15, swipe: 1, xp: 58, fact: t('Warthogs kneel on their front knees to eat short grass.', 'Les phacochères se mettent à genoux pour brouter l’herbe courte.') },
+  { id: 'gazelle', name: t('Gazelle', 'Gazelle'), sprite: 'wild_gazelle', grump: 15, swipe: 1, drop: ['baobab', 0.35], xp: 59, fact: t('Gazelles can bounce high into the air with all four legs stiff. This is called pronking!', 'Les gazelles peuvent bondir très haut, les quatre pattes raides. Ça s’appelle le « pronking »!') },
+  { id: 'ostrich', name: t('Ostrich', 'Autruche'), sprite: 'wild_ostrich', grump: 16, swipe: 1, xp: 61, fact: t('The ostrich is the biggest bird in the world, and it lays the biggest eggs.', 'L’autruche est le plus grand oiseau du monde, et elle pond les plus gros œufs.') },
+  { id: 'baboon', name: t('Baboon', 'Babouin'), sprite: 'wild_baboon', grump: 16, swipe: 1, drop: ['banana', 0.5], xp: 61, fact: t('Baboons live in big groups called troops and groom each other to stay friends.', 'Les babouins vivent en grands groupes appelés troupes et se toilettent pour rester amis.') },
+  { id: 'hyena', name: t('Hyena', 'Hyène'), sprite: 'wild_hyena', grump: 16, swipe: 1, xp: 62, fact: t('Spotted hyenas live in big family groups and make a sound like laughing.', 'Les hyènes tachetées vivent en grandes familles et font un bruit qui ressemble à un rire.') },
+  { id: 'hippo', name: t('Hippo', 'Hippopotame'), sprite: 'wild_hippo', grump: 17, swipe: 1, drop: ['baobab', 0.5], xp: 64, fact: t('Hippos stay in the water on hot days and come out at night to eat grass.', 'Les hippopotames restent dans l’eau les jours chauds et sortent la nuit pour brouter.') },
+  { id: 'buffalo', name: t('Buffalo', 'Buffle'), sprite: 'wild_buffalo', grump: 17, swipe: 1, drop: ['baobab', 0.4], xp: 64, fact: t('African buffalo live in big herds and protect each other from danger.', 'Les buffles d’Afrique vivent en grands troupeaux et se protègent les uns les autres.') },
+];
+
+export const RHINO: WildDef = {
+  id: 'rhino', name: t('Grumpy Rhino', 'Rhinocéros grognon'), sprite: 'boss_rhino', grump: 18, swipe: 1, xp: 520,
+  fact: t('A rhino’s horn is made of keratin, the same stuff as your fingernails!', 'La corne du rhinocéros est faite de kératine, comme tes ongles!'),
+};
+
 /** Every boss, and the quest that asks you to calm it. */
-export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE, moose: MOOSE, snowleopard: SNOW_LEOPARD, octopus: OCTOPUS };
+export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE, moose: MOOSE, snowleopard: SNOW_LEOPARD, octopus: OCTOPUS, rhino: RHINO };
 
 export function wild(id: string): WildDef {
-  return BOSSES[id] ?? [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE].find((w) => w.id === id) ?? JUNGLE[0];
+  return BOSSES[id] ?? [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...SAVANNA].find((w) => w.id === id) ?? JUNGLE[0];
 }
 
 /** The village helpers and their quests. */
 export interface QuestDef {
-  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise' | 'mushrooms' | 'moose' | 'crystals' | 'leopard' | 'turtles' | 'octopus';
+  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise' | 'mushrooms' | 'moose' | 'crystals' | 'leopard' | 'turtles' | 'octopus' | 'calves' | 'rhino';
   giver: string;
   giverName: Text;
   sprite: string;
@@ -291,7 +312,7 @@ export interface QuestDef {
   where?: LandId;
 }
 
-export type LandId = 'jungle' | 'desert' | 'forest' | 'mountains' | 'seashore';
+export type LandId = 'jungle' | 'desert' | 'forest' | 'mountains' | 'seashore' | 'savanna';
 
 export const QUESTS: QuestDef[] = [
   {
@@ -383,6 +404,21 @@ export const QUESTS: QuestDef[] = [
     need: 1, acorns: 400, xp: 420, land: 'seashore', where: 'seashore',
     boss: { level: 16, after: ['turtles'] },
   },
+  {
+    id: 'calves', giver: 'mole', giverName: t('Professor Mole', 'Professeure Taupe'), sprite: 'npc_mole',
+    title: t('Lost elephant calves', 'Les éléphanteaux perdus'),
+    ask: t('My friend Mama Elephant wrote to me from the Savanna: five of her calves are hiding in the tall grass and cannot find their way back! Could you fly there and help them home?', 'Mon amie Maman Éléphant m’a écrit de la savane : cinq de ses petits se cachent dans les hautes herbes et ne retrouvent plus leur chemin! Peux-tu t’y envoler pour les aider?'),
+    thanks: t('Mama Elephant sent a thank-you note with a big trunk print on it! You are wonderful.', 'Maman Éléphant a envoyé une carte de remerciement avec une grosse trace de trompe! Tu es merveilleux.'),
+    need: 5, acorns: 200, xp: 360, land: 'savanna',
+  },
+  {
+    id: 'rhino', giver: 'giraffe', giverName: t('Gigi Giraffe', 'Gigi la Girafe'), sprite: 'npc_giraffe',
+    title: t('The grumpy rhino', 'Le rhinocéros grognon'),
+    ask: t('From up here I can see everything. A grumpy rhino is charging around the far end of the Savanna, and the animals are afraid to drink! Can you calm him?', 'De là-haut, je vois tout. Un rhinocéros grognon fonce partout au fond de la savane, et les animaux ont peur d’aller boire! Peux-tu le calmer?'),
+    thanks: t('The rhino is smiling! Now every land in the kingdom is happy. You are the Champion of the Animal Kingdom!', 'Le rhinocéros sourit! Maintenant, toutes les terres du royaume sont heureuses. Tu es le champion du royaume animal!'),
+    need: 1, acorns: 500, xp: 520, land: 'savanna', where: 'savanna',
+    boss: { level: 19, after: ['calves'] },
+  },
 ];
 
 export function quest(id: QuestDef['id']): QuestDef {
@@ -394,7 +430,7 @@ export interface LandDef {
   id: LandId;
   name: Text;
   /** Which edge of the village leads there (the Seashore is reached by boat). */
-  dir: 'right' | 'down' | 'left' | 'up' | 'boat';
+  dir: 'right' | 'down' | 'left' | 'up' | 'boat' | 'balloon';
   open: boolean;
   /** The boss that must be calm before this land opens. */
   after?: string;
@@ -406,4 +442,5 @@ export const LANDS: LandDef[] = [
   { id: 'forest', name: t('Enchanted Forest', 'Forêt enchantée'), dir: 'left', open: true, after: 'tortoise' },
   { id: 'mountains', name: t('Snowy Mountains', 'Montagnes enneigées'), dir: 'up', open: true, after: 'moose' },
   { id: 'seashore', name: t('Sunny Seashore', 'Plage ensoleillée'), dir: 'boat', open: true, after: 'snowleopard' },
+  { id: 'savanna', name: t('Savanna', 'Savane'), dir: 'balloon', open: true, after: 'octopus' },
 ];
