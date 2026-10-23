@@ -1,5 +1,6 @@
 import { ANIMALS, GORILLA, JUNGLE, QUESTS } from './data';
 import {
+  questReady,
   accept, addFood, calmAmount, canTurnIn, dropsFor, eat, gainXp, makeFoe, maxHearts, moves, newAnimalSave, progress, startCalm, turnIn,
   xpToNext,
 } from './state';
@@ -78,6 +79,19 @@ describe('Animal Kingdom Quest rules', () => {
     s.hearts = 1;
     eat(s, 'pie');
     expect(s.hearts).toBe(maxHearts(s));
+  });
+
+  it('the gorilla quest waits until the hero is ready (other quests done or level 4)', () => {
+    const s = newAnimalSave('Mia', 'cat', 2, 0);
+    expect(questReady(s, 'pie')).toBe(true);
+    expect(questReady(s, 'gorilla')).toBe(false);
+    s.quests.pie = 'done';
+    expect(questReady(s, 'gorilla')).toBe(false);
+    s.quests.puppies = 'done';
+    expect(questReady(s, 'gorilla')).toBe(true);
+    const t = newAnimalSave('Leo', 'dog', 2, 0);
+    t.level = 4;
+    expect(questReady(t, 'gorilla')).toBe(true);
   });
 
   it('the puppy and gorilla quests finish when the puppies are rescued and the gorilla is calm', () => {

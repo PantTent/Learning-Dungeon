@@ -79,4 +79,11 @@ export const FR_ANIMALS: Record<string, string> = {
   "{n} of {need}": "{n} sur {need}",
   "New game!": "Nouvelle partie!",
   "Be an animal, help the village and calm grumpy jungle animals!": "Deviens un animal, aide le village et calme les animaux grognons de la jungle!",
+  "(This gorilla is too grumpy for now. Talk to Mayor Beaver in the village first.)": "(Ce gorille est trop grognon pour l'instant. Parle d'abord au maire Castor, au village.)",
+  "He is very strong. Suggested level: {lv}. You are level {n}.": "Il est très fort. Niveau conseillé : {lv}. Tu es au niveau {n}.",
+  " and ": " et ",
+  "{quest}: this is a big challenge! First help {helpers}, or come back at level {lv}. You are level {n} now.": "{quest} : c'est un grand défi! Aide d'abord {helpers}, ou reviens au niveau {lv}. Tu es au niveau {n} maintenant.",
+  "I feel ready!": "Je suis prêt!",
+  "Okay!": "D'accord!",
+  "Later: when you reach level {lv} or finish the other quests.": "Plus tard : au niveau {lv} ou quand les autres quêtes seront finies.",
 };

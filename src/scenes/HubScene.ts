@@ -17,6 +17,7 @@ import { loadSpace } from '../space/state';
 import { loadProfiles } from '../state/profile';
 import { androidBrowser, APK_URL } from '../util/platform';
 import { openTransferPanel } from '../ui/transferPanel';
+import { openReportPanel } from '../ui/errorPanel';
 
 /** First screen: pick which game to play. Every game is free to try; the full games can be unlocked. */
 export class HubScene extends Phaser.Scene {
@@ -30,7 +31,12 @@ export class HubScene extends Phaser.Scene {
     playMusic('title');
     menuBackground(this);
     this.own = loadOwnership();
-    soundButton(this, W - 76, 30, 130, 40);
+    soundButton(this, W - 76, 26, 130, 36);
+    // Something broke or froze? Make a report a grown-up can send.
+    button(this, W - 76, 66, 130, 32, tr('Report a problem'), () => {
+      this.input.enabled = false;
+      openReportPanel(() => (this.input.enabled = true));
+    }, { size: 13, color: 0x5a3a2e });
     langButton(this, 104, 24, 188, 34, () => this.scene.restart());
     unitsButton(this, 104, 62, 188, 32);
     regionButton(this, 104, 98, 188, 32, () => this.scene.restart());

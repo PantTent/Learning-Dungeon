@@ -27,6 +27,8 @@ export interface AnimalSave {
   gorillaCalm: boolean;
   /** Animal facts seen (wild animal ids). */
   facts: string[];
+  /** The mayor has said hello. */
+  welcomed?: boolean;
   settings: LearningSettings;
   learning: LearningStats;
   createdAt: number;
@@ -176,6 +178,12 @@ export function progress(s: AnimalSave, id: QuestDef['id']): number {
 }
 
 export const canTurnIn = (s: AnimalSave, id: QuestDef['id']) => s.quests[id] === 'active' && progress(s, id) >= quest(id).need;
+
+/** Is the hero ready to be offered this quest? (Only boss quests wait.) */
+export function questReady(s: AnimalSave, id: QuestDef['id']): boolean {
+  const b = quest(id).boss;
+  return !b || s.level >= b.level || b.after.every((a) => s.quests[a] === 'done');
+}
 
 export function accept(s: AnimalSave, id: QuestDef['id']): void {
   if (s.quests[id] === 'new') s.quests[id] = 'active';

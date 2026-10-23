@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
 import { animal, LANDS, QUESTS, quest, type QuestDef } from '../animal/data';
-import { accept, canTurnIn, loadAnimals, maxHearts, progress, rest, saveAnimals, turnIn, type AnimalSave } from '../animal/state';
+import { accept, canTurnIn, loadAnimals, maxHearts, progress, questReady, rest, saveAnimals, turnIn, type AnimalSave } from '../animal/state';
 import { dialog, grassTexture, keyVector, say, Stick, topBar, tx } from '../animal/ui';
 import { jungleState } from './AnimalJungleScene';
 import { C, H, W, button, panel, txt } from '../ui/widgets';
@@ -122,7 +122,7 @@ export class AnimalVillageScene extends Phaser.Scene {
     this.bar = topBar(this, this.s, () => this.refresh());
     // Quest marks over the villagers: ! new, ? ready to hand in, ... in progress.
     this.marks.forEach((m) => m.destroy());
-    this.marks = QUESTS.filter((q) => this.s.quests[q.id] !== 'done').map((q) => {
+    this.marks = QUESTS.filter((q) => this.s.quests[q.id] !== 'done' && (this.s.quests[q.id] !== 'new' || questReady(this.s, q.id))).map((q) => {
       const sp = NPC_SPOT[q.giver];
       const ready = canTurnIn(this.s, q.id);
       const mark = this.s.quests[q.id] === 'new' ? '!' : ready ? '?' : '…';
@@ -194,13 +194,16 @@ export class AnimalVillageScene extends Phaser.Scene {
     };
     const state = s.quests[q.id];
     // The mayor says hello the first time.
-    if (giver === 'beaver' && state === 'new' && s.quests.pie === 'new' && s.quests.puppies === 'new') {
+    if (giver === 'beaver' && !s.welcomed) {
+      s.welcomed = true;
+      saveAnimals(s);
       dialog(this, q.sprite, name, tr('Welcome to Meadowbrook Village, {name}! The animals of the wild lands are grumpy, and we need a helper like you. Talk to villagers with a yellow mark over their heads to get a quest.', { name: s.name }), [
-        { label: tr('I will help!'), fn: () => this.offer(q, done) },
+        { label: tr('I will help!'), fn: done },
       ]);
       return;
     }
-    if (state === 'new') this.offer(q, done);
+    if (state === 'new' && !questReady(s, q.id)) this.notReady(q, done);
+    else if (state === 'new') this.offer(q, done);
     else if (canTurnIn(s, q.id)) {
       const r = turnIn(s, q.id)!;
       saveAnimals(s);
@@ -212,6 +215,16 @@ export class AnimalVillageScene extends Phaser.Scene {
     } else {
       dialog(this, q.sprite, name, tr('Thank you again for your help, {name}!', { name: s.name }), [{ label: tr('Bye!'), fn: done }]);
     }
+  }
+
+  /** A boss quest before the hero is ready: they can still ask for it. */
+  private notReady(q: QuestDef, done: () => void) {
+    const b = q.boss!;
+    const helpers = b.after.map((id) => tx(quest(id).giverName)).join(tr(' and '));
+    dialog(this, q.sprite, tx(q.giverName), tr('{quest}: this is a big challenge! First help {helpers}, or come back at level {lv}. You are level {n} now.', { quest: tx(q.title), helpers, lv: b.level, n: this.s.level }), [
+      { label: tr('I feel ready!'), color: 0xb02a4a, fn: () => this.offer(q, done) },
+      { label: tr('Okay!'), fn: done },
+    ]);
   }
 
   private offer(q: QuestDef, done: () => void) {
@@ -239,7 +252,7 @@ export class AnimalVillageScene extends Phaser.Scene {
       const st = s.quests[q.id];
       c.add(this.add.image(180, y + 20, q.sprite).setScale(3));
       c.add(txt(this, 220, y, `${tx(q.title)}  ·  ${tx(q.giverName)}`, 18, st === 'done' ? C.good : '#ffffff'));
-      const line = st === 'done' ? tr('Done! Thank you!') : st === 'new' ? tr('Talk to {who} to start.', { who: tx(q.giverName) }) : canTurnIn(s, q.id) ? tr('Ready! Go see {who}.', { who: tx(q.giverName) }) : tr('{n} of {need}', { n: progress(s, q.id), need: q.need });
+      const line = st === 'done' ? tr('Done! Thank you!') : st === 'new' && !questReady(s, q.id) ? tr('Later: when you reach level {lv} or finish the other quests.', { lv: q.boss!.level }) : st === 'new' ? tr('Talk to {who} to start.', { who: tx(q.giverName) }) : canTurnIn(s, q.id) ? tr('Ready! Go see {who}.', { who: tx(q.giverName) }) : tr('{n} of {need}', { n: progress(s, q.id), need: q.need });
       c.add(txt(this, 220, y + 26, line, 15, st === 'done' ? C.good : canTurnIn(s, q.id) ? '#ffd24a' : C.dim));
     });
     c.add(button(this, W / 2, H - 90, 180, 46, tr('Close'), () => {

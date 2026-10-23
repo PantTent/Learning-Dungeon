@@ -24,6 +24,10 @@ import { TitleScene } from './scenes/TitleScene';
 import { H, W } from './ui/widgets';
 import { unlockAudio } from './audio/audio';
 import { inApp } from './util/platform';
+import { installErrorCatcher } from './ui/errorPanel';
+
+// Catch crashes before the game starts, so one error never freezes the game.
+const watchGame = installErrorCatcher();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -36,6 +40,8 @@ const game = new Phaser.Game({
   input: { activePointers: 2 },
   scene: [BootScene, HubScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene, FarmSetupScene, FarmScene, SpaceSetupScene, SpaceBaseScene, SpaceFlightScene, SpaceMapScene, AnimalSetupScene, AnimalVillageScene, AnimalJungleScene, AnimalBattleScene],
 });
+
+watchGame(game);
 
 // Browsers only allow sound after the player taps or presses a key.
 window.addEventListener('pointerdown', unlockAudio);

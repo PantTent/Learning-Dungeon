@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, GORILLA, JUNGLE, type WildDef } from '../animal/data';
-import { addFood, loadAnimals, saveAnimals, skill, type AnimalSave } from '../animal/state';
+import { animal, GORILLA, JUNGLE, quest, type WildDef } from '../animal/data';
+import { addFood, canTurnIn, loadAnimals, saveAnimals, skill, type AnimalSave } from '../animal/state';
 import { ask, dialog, grassTexture, keyVector, say, Stick, topBar, tx } from '../animal/ui';
 import { blocked, buildJungle, type Pt } from '../animal/world';
 import { C } from '../ui/widgets';
@@ -426,12 +426,21 @@ export class AnimalJungleScene extends Phaser.Scene {
 
   private bossTalk() {
     this.busy = true;
-    dialog(this, 'boss_gorilla', tx(GORILLA.name), tr('GRRR! This is MY jungle! Nobody gets past me!'), [
-      { label: tr('Back away'), color: 0x3a3450, fn: () => {
-        this.busy = false;
-        this.graceUntil = this.time.now + 3000;
-        this.hero.x -= 120;
-      } },
+    const s = this.s;
+    const backAway = { label: tr('Back away'), color: 0x3a3450, fn: () => {
+      this.busy = false;
+      this.graceUntil = this.time.now + 3000;
+      this.hero.x -= 120;
+    } };
+    // No fighting the boss by surprise: Mayor Beaver gives that quest when you are ready.
+    if (s.quests.gorilla !== 'active') {
+      dialog(this, 'boss_gorilla', tx(GORILLA.name), `${tr('GRRR! This is MY jungle! Nobody gets past me!')}\n${tr('(This gorilla is too grumpy for now. Talk to Mayor Beaver in the village first.)')}`, [backAway]);
+      return;
+    }
+    const lv = quest('gorilla').boss!.level;
+    const warn = s.level < lv ? `\n${tr('He is very strong. Suggested level: {lv}. You are level {n}.', { lv, n: s.level })}` : '';
+    dialog(this, 'boss_gorilla', tx(GORILLA.name), tr('GRRR! This is MY jungle! Nobody gets past me!') + warn, [
+      backAway,
       { label: tr('Calm him down!'), color: 0xb02a4a, fn: () => {
         jungleState.pos = { x: this.hero.x - 100, y: this.hero.y };
         jungleState.wilds.forEach((x) => (x.img = undefined));
@@ -447,7 +456,10 @@ export class AnimalJungleScene extends Phaser.Scene {
     let goal: Pt | undefined;
     const rocks = MAP.rocks.filter((r) => r.puppy && this.rocks.has(r.id));
     if (s.quests.puppies !== 'done' && rocks.length) goal = rocks.reduce((a, b) => (Phaser.Math.Distance.Between(this.hero.x, this.hero.y, a.x, a.y) < Phaser.Math.Distance.Between(this.hero.x, this.hero.y, b.x, b.y) ? a : b));
-    else if (!s.gorillaCalm) goal = MAP.boss;
+    // All found: lead the puppies home to the village.
+    else if (this.pups.length || canTurnIn(s, 'puppies')) goal = { x: 0, y: MAP.start.y };
+    // The boss only once Mayor Beaver has asked for help.
+    else if (s.quests.gorilla === 'active' && !s.gorillaCalm) goal = MAP.boss;
     if (!goal) {
       this.paw.setVisible(false);
       return;

@@ -155,6 +155,12 @@ export interface QuestDef {
   need: number;
   acorns: number;
   xp: number;
+  /**
+   * A boss quest is only offered when the hero is ready: the other quests of
+   * that land are done, or the hero has reached the suggested level. A player
+   * who feels ready can still ask for it early.
+   */
+  boss?: { level: number; after: QuestDef['id'][] };
 }
 
 export const QUESTS: QuestDef[] = [
@@ -178,6 +184,7 @@ export const QUESTS: QuestDef[] = [
     ask: t('A big grumpy gorilla is blocking the jungle path. Everyone is scared! Can you calm him down? He lives at the far end of the Jungle.', 'Un gros gorille grognon bloque le sentier de la jungle. Tout le monde a peur! Peux-tu le calmer? Il vit tout au bout de la jungle.'),
     thanks: t('You did it! The gorilla is smiling again. The village is so proud of you!', 'Bravo! Le gorille sourit de nouveau. Le village est si fier de toi!'),
     need: 1, acorns: 80, xp: 80,
+    boss: { level: 4, after: ['pie', 'puppies'] },
   },
 ];
 
