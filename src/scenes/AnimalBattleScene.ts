@@ -1,15 +1,23 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, food, wild, type MoveDef } from '../animal/data';
+import { animal, BOSSES, food, wild, type MoveDef } from '../animal/data';
 import {
-  addFood, calmAmount, dropsFor, gainXp, loadAnimals, makeFoe, maxHearts, moves, saveAnimals, skill, startCalm, swipe, xpFor,
+  addFood, calmAmount, dropsFor, gainXp, loadAnimals, makeFoe, maxHearts, moves, saveAnimals, setBossCalm, skill, startCalm, swipe, xpFor,
   type AnimalSave, type Foe,
 } from '../animal/state';
 import { ask, backpack, grassTexture, tx } from '../animal/ui';
 import { Bar, C, H, W, button, panel, txt } from '../ui/widgets';
 
 const HERO = { x: 720, y: 300 };
+
+/** Which animal, how strong, and the land to go back to afterwards. */
+export interface BattleData {
+  foe: string;
+  level: number;
+  wild?: number;
+  land?: 'jungle' | 'desert';
+}
 const FOE = { x: 250, y: 290 };
 
 /**
@@ -20,7 +28,9 @@ const FOE = { x: 250, y: 290 };
 export class AnimalBattleScene extends Phaser.Scene {
   private s!: AnimalSave;
   private foe!: Foe;
-  private data0!: { foe: string; level: number; wild?: number };
+  private data0!: BattleData;
+  /** Turns the animal has had (slow animals swipe every other turn). */
+  private turns = 0;
   private heroImg!: Phaser.GameObjects.Image;
   private foeImg!: Phaser.GameObjects.Image;
   private heroBar!: Bar;
@@ -35,7 +45,7 @@ export class AnimalBattleScene extends Phaser.Scene {
     super('AnimalBattle');
   }
 
-  create(data: { foe: string; level: number; wild?: number }) {
+  create(data: BattleData) {
     const s = loadAnimals();
     if (!s) {
       this.scene.start('AnimalSetup', { fresh: true });
@@ -45,17 +55,22 @@ export class AnimalBattleScene extends Phaser.Scene {
     this.data0 = data;
     this.wiseUsed = false;
     this.asleep = false;
+    this.turns = 0;
     this.menu = undefined;
     this.foe = makeFoe(wild(data.foe), data.level);
     this.foe.calm = startCalm(s, this.foe);
-    playMusic(data.foe === 'gorilla' ? 'boss' : 'battle');
+    const big = !!BOSSES[data.foe];
+    playMusic(big ? 'boss' : 'battle');
 
-    this.add.tileSprite(0, 0, W, H, grassTexture(this, 'jungle')).setOrigin(0).setTileScale(3);
-    this.add.rectangle(0, 0, W, 150, 0x1f4a1a, 0.55).setOrigin(0);
-    for (let i = 0; i < 8; i++) this.add.image(60 + i * 125, 110, 'prop_jtree').setScale(3.4).setAlpha(0.9);
+    const desert = data.land === 'desert';
+    this.add.tileSprite(0, 0, W, H, grassTexture(this, desert ? 'desert' : 'jungle')).setOrigin(0).setTileScale(3);
+    this.add.rectangle(0, 0, W, 150, desert ? 0xc88a40 : 0x1f4a1a, desert ? 0.35 : 0.55).setOrigin(0);
+    for (let i = 0; i < 8; i++) {
+      if (desert) this.add.image(60 + i * 125, 118, i % 3 ? 'prop_cactus' : 'prop_palm').setScale(i % 3 ? 3 : 3.2).setAlpha(0.95);
+      else this.add.image(60 + i * 125, 110, 'prop_jtree').setScale(3.4).setAlpha(0.9);
+    }
     this.add.ellipse(FOE.x, FOE.y + 50, 110, 22, 0x000000, 0.3);
     this.add.ellipse(HERO.x, HERO.y + 46, 90, 18, 0x000000, 0.3);
-    const big = data.foe === 'gorilla';
     this.foeImg = this.add.image(FOE.x, FOE.y, this.foe.def.sprite).setScale(big ? 5 : 6);
     this.tweens.add({ targets: this.foeImg, scaleY: this.foeImg.scaleY * 0.94, duration: 500, yoyo: true, repeat: -1 });
     this.heroImg = this.add.image(HERO.x, HERO.y, animal(s.animal).sprite).setScale(6).setFlipX(true);
@@ -73,7 +88,13 @@ export class AnimalBattleScene extends Phaser.Scene {
     this.heroBar = new Bar(this, W - 254, H - 80, 230, 20, 0xe05a5a);
     this.heroBar.set(s.hearts, maxHearts(s), false);
     this.log = txt(this, W / 2, 14, '', 20, '#ffe9a0', { align: 'center', wordWrap: { width: 640 } }).setOrigin(0.5, 0).setDepth(50).setStroke('#1a3a10', 5);
-    this.say(big ? tr('The Grumpy Gorilla beats his chest! Calm him down!') : tr('A grumpy {name} appears! Calm it down!', { name: tx(this.foe.def.name) }));
+    const intro =
+      data.foe === 'gorilla'
+        ? tr('The Grumpy Gorilla beats his chest! Calm him down!')
+        : data.foe === 'tortoise'
+          ? tr('The Grumpy Old Tortoise snaps and stomps! Calm her down!')
+          : tr('A grumpy {name} appears! Calm it down!', { name: tx(this.foe.def.name) });
+    this.say(intro);
     if (this.foe.calm) this.time.delayedCall(700, () => this.say(tr('Your friendly roar makes it a little calmer!')));
     this.cameras.main.fadeIn(250);
     this.time.delayedCall(600, () => this.showMenu());
@@ -157,6 +178,11 @@ export class AnimalBattleScene extends Phaser.Scene {
 
   private foeTurn() {
     const s = this.s;
+    this.turns++;
+    if (this.foe.def.slow && this.turns % 2 === 0) {
+      this.say(tr('The {name} is very slow and is still getting ready...', { name: tx(this.foe.def.name) }));
+      return this.time.delayedCall(900, () => this.afterFoe());
+    }
     if (this.asleep) {
       this.asleep = false;
       this.say(tr('Zzz... the {name} fell asleep and misses its turn!', { name: tx(this.foe.def.name) }));
@@ -212,8 +238,8 @@ export class AnimalBattleScene extends Phaser.Scene {
     const xp = xpFor(this.foe);
     s.acorns += drops.acorns;
     if (drops.food) addFood(s, drops.food);
-    const boss = this.data0.foe === 'gorilla';
-    if (boss) s.gorillaCalm = true;
+    const boss = !!BOSSES[this.data0.foe];
+    if (boss) setBossCalm(s, this.data0.foe);
     const firstFact = !s.facts.includes(this.foe.def.id);
     if (firstFact) s.facts.push(this.foe.def.id);
     const levels = gainXp(s, xp);
@@ -222,7 +248,7 @@ export class AnimalBattleScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(200);
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.55).setOrigin(0).setInteractive());
     c.add(panel(this, W / 2 - 320, 70, 640, 400, 0x1d1730, 0xff7ab8));
-    c.add(txt(this, W / 2, 104, boss ? tr('The gorilla is smiling again!') : tr('The {name} is happy now!', { name: tx(this.foe.def.name) }), 28, '#ffb8e0').setOrigin(0.5));
+    c.add(txt(this, W / 2, 104, this.data0.foe === 'gorilla' ? tr('The gorilla is smiling again!') : this.data0.foe === 'tortoise' ? tr('The old tortoise is smiling again!') : tr('The {name} is happy now!', { name: tx(this.foe.def.name) }), 28, '#ffb8e0').setOrigin(0.5));
     c.add(this.add.image(W / 2, 180, this.foe.def.sprite).setScale(boss ? 3.4 : 5));
     let y = 240;
     c.add(txt(this, W / 2, y, tr('+{xp} XP   +{a} acorns', { xp, a: drops.acorns }), 20, '#ffe9a0').setOrigin(0.5));
@@ -260,6 +286,6 @@ export class AnimalBattleScene extends Phaser.Scene {
   private back(result: 'calm' | 'tired' | 'ran') {
     saveAnimals(this.s);
     this.cameras.main.fadeOut(250);
-    this.time.delayedCall(260, () => this.scene.start('AnimalJungle', { result, wild: this.data0.wild }));
+    this.time.delayedCall(260, () => this.scene.start(this.data0.land === 'desert' ? 'AnimalDesert' : 'AnimalJungle', { result, wild: this.data0.wild }));
   }
 }

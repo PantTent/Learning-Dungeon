@@ -3,7 +3,8 @@ import { defaultLearningSettings, newLearningStats, upgradeSettings, type Learni
 import { getLang } from '../i18n';
 import type { Grade } from '../questions/curriculum';
 import { ri } from '../util/rng';
-import { animal, FOODS, food, quest, type QuestDef, type WildDef } from './data';
+import { buildJungle } from './world';
+import { animal, FOODS, food, quest, QUESTS, type QuestDef, type RecipeDef, type ShopItem, type WildDef } from './data';
 
 export type QuestState = 'new' | 'active' | 'done';
 
@@ -25,6 +26,14 @@ export interface AnimalSave {
   /** Secret stumps opened. */
   stumps: string[];
   gorillaCalm: boolean;
+  /** Part 2: sand mounds dug in the Desert, and the fossils found in them. */
+  dug: string[];
+  fossils: string[];
+  /** Dishes cooked in Chef Raccoon's kitchen. */
+  cooked: number;
+  tortoiseCalm: boolean;
+  /** Charms bought at the shop (they help for good). */
+  charms: string[];
   /** Animal facts seen (wild animal ids). */
   facts: string[];
   /** The mayor has said hello. */
@@ -51,12 +60,17 @@ export function newAnimalSave(name: string, animalId: string, grade: Grade, now 
     xp: 0,
     hearts: 0,
     acorns: 0,
-    foods: { berries: 2, apple: 0, banana: 0, pie: 0 },
-    quests: { pie: 'new', puppies: 'new', gorilla: 'new' },
+    foods: { berries: 2 },
+    quests: newQuests(),
     rescued: [],
     golden: [],
     stumps: [],
     gorillaCalm: false,
+    dug: [],
+    fossils: [],
+    cooked: 0,
+    tortoiseCalm: false,
+    charms: [],
     facts: [],
     settings,
     learning: newLearningStats(),
@@ -67,14 +81,24 @@ export function newAnimalSave(name: string, animalId: string, grade: Grade, now 
   return s;
 }
 
+function newQuests(): AnimalSave['quests'] {
+  return Object.fromEntries(QUESTS.map((q) => [q.id, 'new'])) as AnimalSave['quests'];
+}
+
 export function loadAnimals(): AnimalSave | null {
   try {
     const raw = globalThis.localStorage?.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as AnimalSave;
     s.settings = upgradeSettings(s.settings);
-    s.foods = { berries: 0, apple: 0, banana: 0, pie: 0, ...s.foods };
+    s.foods = { ...s.foods };
+    s.quests = { ...newQuests(), ...s.quests };
     s.stumps ??= [];
+    s.dug ??= [];
+    s.fossils ??= [];
+    s.cooked ??= 0;
+    s.tortoiseCalm ??= false;
+    s.charms ??= [];
     return s;
   } catch {
     return null;
@@ -91,7 +115,8 @@ export function saveAnimals(s: AnimalSave): void {
 }
 
 // ---------------------------------------------------------------- hero
-export const maxHearts = (s: AnimalSave) => animal(s.animal).hearts + (s.level - 1) * 2;
+export const hasCharm = (s: AnimalSave, id: string) => s.charms.includes(id);
+export const maxHearts = (s: AnimalSave) => animal(s.animal).hearts + (s.level - 1) * 2 + (hasCharm(s, 'heart') ? 4 : 0);
 /** How strong each calming move is. */
 export const power = (s: AnimalSave) => 1 + (s.level - 1) * 0.25;
 export const xpToNext = (level: number) => 20 + level * 15;
@@ -125,6 +150,31 @@ export function eat(s: AnimalSave, foodId: string): number {
 
 export const hasFood = (s: AnimalSave) => FOODS.some((f) => s.foods[f.id] > 0);
 
+/** Do we have everything a recipe needs? */
+export const canCook = (s: AnimalSave, r: RecipeDef) => Object.entries(r.needs).every(([id, n]) => (s.foods[id] ?? 0) >= n);
+
+/** Cook a recipe: uses the ingredients; a right answer makes one extra. Returns how many were made. */
+export function cook(s: AnimalSave, r: RecipeDef, correct: boolean): number {
+  if (!canCook(s, r)) return 0;
+  for (const [id, n] of Object.entries(r.needs)) s.foods[id] -= n;
+  const made = correct ? 2 : 1;
+  addFood(s, r.makes, made);
+  s.cooked++;
+  return made;
+}
+
+/** Buy at the shop. Charms are bought once. */
+export function buy(s: AnimalSave, item: ShopItem): boolean {
+  if (s.acorns < item.price || (item.kind === 'charm' && hasCharm(s, item.id))) return false;
+  s.acorns -= item.price;
+  if (item.kind === 'food') addFood(s, item.id);
+  else {
+    s.charms.push(item.id);
+    if (item.id === 'heart') s.hearts += 4;
+  }
+  return true;
+}
+
 export function rest(s: AnimalSave): void {
   s.hearts = maxHearts(s);
 }
@@ -144,6 +194,7 @@ export function makeFoe(def: WildDef, level: number): Foe {
 /** How much one move calms the animal: right answer = full, wrong = half. */
 export function calmAmount(s: AnimalSave, movePower: number, correct: boolean, lucky = false): number {
   let n = movePower * power(s);
+  if (hasCharm(s, 'clover')) n *= 1.15;
   if (!correct) n /= 2;
   if (lucky) n *= 1.5;
   return Math.round(n * 10) / 10;
@@ -172,10 +223,30 @@ export function addFood(s: AnimalSave, id: string, n = 1): void {
 
 // ---------------------------------------------------------------- quests
 export function progress(s: AnimalSave, id: QuestDef['id']): number {
-  if (id === 'pie') return Math.min(s.foods.apple ?? 0, quest('pie').need);
-  if (id === 'puppies') return Math.min(s.rescued.length, quest('puppies').need);
-  return s.gorillaCalm ? 1 : 0;
+  const need = quest(id).need;
+  if (id === 'pie') return Math.min(s.foods.apple ?? 0, need);
+  if (id === 'puppies') return Math.min(puppiesFound(s), need);
+  if (id === 'fossils') return Math.min(s.fossils.length, need);
+  if (id === 'cook') return Math.min(s.cooked, need);
+  return bossCalm(s, id) ? 1 : 0;
 }
+
+/** Rocks in the Jungle that hide a puppy (the other rocks only hide acorns). */
+const PUPPY_ROCKS = new Set(buildJungle().rocks.filter((r) => r.puppy).map((r) => r.id));
+export const puppiesFound = (s: AnimalSave) => s.rescued.filter((id) => PUPPY_ROCKS.has(id)).length;
+
+/** Has this boss been calmed? */
+export function bossCalm(s: AnimalSave, id: string): boolean {
+  return id === 'gorilla' ? s.gorillaCalm : id === 'tortoise' ? s.tortoiseCalm : false;
+}
+
+export function setBossCalm(s: AnimalSave, id: string): void {
+  if (id === 'gorilla') s.gorillaCalm = true;
+  if (id === 'tortoise') s.tortoiseCalm = true;
+}
+
+/** The Desert opens once the gorilla in the Jungle is calm. */
+export const desertOpen = (s: AnimalSave) => s.gorillaCalm;
 
 export const canTurnIn = (s: AnimalSave, id: QuestDef['id']) => s.quests[id] === 'active' && progress(s, id) >= quest(id).need;
 
@@ -197,6 +268,7 @@ export function turnIn(s: AnimalSave, id: QuestDef['id']): { acorns: number; xp:
     s.foods.apple -= q.need;
     addFood(s, 'pie', 2);
   }
+  if (id === 'cook') addFood(s, 'salad');
   s.quests[id] = 'done';
   s.acorns += q.acorns;
   return { acorns: q.acorns, xp: q.xp, levels: gainXp(s, q.xp) };

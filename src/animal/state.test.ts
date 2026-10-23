@@ -1,6 +1,6 @@
-import { ANIMALS, GORILLA, JUNGLE, QUESTS } from './data';
+import { ANIMALS, GORILLA, JUNGLE, QUESTS, RECIPES, SHOP } from './data';
 import {
-  questReady,
+  buy, canCook, cook, desertOpen, loadAnimals, questReady,
   accept, addFood, calmAmount, canTurnIn, dropsFor, eat, gainXp, makeFoe, maxHearts, moves, newAnimalSave, progress, startCalm, turnIn,
   xpToNext,
 } from './state';
@@ -97,13 +97,80 @@ describe('Animal Kingdom Quest rules', () => {
   it('the puppy and gorilla quests finish when the puppies are rescued and the gorilla is calm', () => {
     const s = newAnimalSave('Mia', 'elephant', 2, 0);
     accept(s, 'puppies');
-    s.rescued = ['r1', 'r2', 'r3', 'r4'];
+    // The two empty rocks (rock5, rock6) do not count as puppies.
+    s.rescued = ['rock0', 'rock1', 'rock2', 'rock3', 'rock5', 'rock6'];
     expect(canTurnIn(s, 'puppies')).toBe(false);
-    s.rescued.push('r5');
+    s.rescued.push('rock4');
     expect(turnIn(s, 'puppies')).not.toBeNull();
     accept(s, 'gorilla');
     expect(canTurnIn(s, 'gorilla')).toBe(false);
     s.gorillaCalm = true;
     expect(turnIn(s, 'gorilla')!.xp).toBe(QUESTS[2].xp);
+  });
+
+  it('Part 2: fossils, cooking and the tortoise quest', () => {
+    const s = newAnimalSave('Leo', 'dog', 3, 0);
+    expect(desertOpen(s)).toBe(false);
+    s.gorillaCalm = true;
+    expect(desertOpen(s)).toBe(true);
+    accept(s, 'fossils');
+    s.fossils = ['dig0', 'dig1', 'dig2', 'dig3'];
+    expect(canTurnIn(s, 'fossils')).toBe(false);
+    s.fossils.push('dig4');
+    expect(turnIn(s, 'fossils')).not.toBeNull();
+    // The tortoise waits until the fossils and cooking are done (or level 8).
+    expect(questReady(s, 'tortoise')).toBe(false);
+    accept(s, 'cook');
+    s.cooked = 3;
+    expect(turnIn(s, 'cook')).not.toBeNull();
+    expect(s.foods.salad).toBe(1);
+    expect(questReady(s, 'tortoise')).toBe(true);
+    accept(s, 'tortoise');
+    s.tortoiseCalm = true;
+    expect(canTurnIn(s, 'tortoise')).toBe(true);
+  });
+
+  it('cooking uses the ingredients, and a right answer makes two', () => {
+    const s = newAnimalSave('Leo', 'cat', 3, 0);
+    const salad = RECIPES.find((r) => r.id === 'salad')!;
+    expect(canCook(s, salad)).toBe(false);
+    s.foods = { berries: 2, apple: 1, banana: 1 };
+    expect(cook(s, salad, true)).toBe(2);
+    expect(s.foods).toMatchObject({ berries: 1, apple: 0, banana: 0, salad: 2 });
+    expect(canCook(s, salad)).toBe(false);
+    expect(cook(s, salad, false)).toBe(0);
+    expect(s.cooked).toBe(1);
+  });
+
+  it('the shop sells food and charms (each charm once) for acorns', () => {
+    const s = newAnimalSave('Leo', 'owl', 3, 0);
+    const heart = SHOP.find((i) => i.id === 'heart')!;
+    const apple = SHOP.find((i) => i.id === 'apple')!;
+    expect(buy(s, apple)).toBe(false);
+    s.acorns = 200;
+    const before = maxHearts(s);
+    expect(buy(s, heart)).toBe(true);
+    expect(maxHearts(s)).toBe(before + 4);
+    expect(s.hearts).toBe(before + 4);
+    expect(buy(s, heart)).toBe(false);
+    expect(buy(s, apple)).toBe(true);
+    expect(s.acorns).toBe(200 - heart.price - apple.price);
+    expect(s.foods.apple).toBe(1);
+    // The clover charm calms a bit more.
+    const n = calmAmount(s, 1, true);
+    s.charms.push('clover');
+    expect(calmAmount(s, 1, true)).toBeGreaterThan(n);
+  });
+
+  it('older saves get the new quests and fields', () => {
+    const old = newAnimalSave('Old', 'cat', 2, 0) as unknown as Record<string, unknown>;
+    old.quests = { pie: 'done', puppies: 'active', gorilla: 'new' };
+    for (const k of ['dug', 'fossils', 'cooked', 'tortoiseCalm', 'charms']) delete old[k];
+    const store = new Map<string, string>([['learning-animals.save.v1', JSON.stringify(old)]]);
+    (globalThis as unknown as { localStorage: Partial<Storage> }).localStorage = { getItem: (k) => store.get(k) ?? null, setItem: () => {} };
+    const s = loadAnimals()!;
+    expect(s.quests).toMatchObject({ pie: 'done', puppies: 'active', fossils: 'new', cook: 'new', tortoise: 'new' });
+    expect(s.charms).toEqual([]);
+    expect(s.cooked).toBe(0);
   });
 });

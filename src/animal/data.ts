@@ -101,7 +101,45 @@ export const FOODS: FoodDef[] = [
   { id: 'berries', name: t('Berries', 'Petits fruits'), icon: 'food_berries', heal: 3 },
   { id: 'apple', name: t('Apple', 'Pomme'), icon: 'food_apple', heal: 4 },
   { id: 'banana', name: t('Banana', 'Banane'), icon: 'food_banana', heal: 5 },
+  { id: 'date', name: t('Dates', 'Dattes'), icon: 'food_date', heal: 4 },
+  { id: 'cactusfruit', name: t('Cactus Fruit', 'Figue de Barbarie'), icon: 'food_cactusfruit', heal: 5 },
+  { id: 'juice', name: t('Cactus Juice', 'Jus de cactus'), icon: 'food_juice', heal: 7 },
+  { id: 'bread', name: t('Banana Bread', 'Pain aux bananes'), icon: 'food_bread', heal: 10 },
+  { id: 'salad', name: t('Fruit Salad', 'Salade de fruits'), icon: 'food_salad', heal: 14 },
   { id: 'pie', name: t('Apple Pie', 'Tarte aux pommes'), icon: 'food_pie', heal: 99 },
+];
+
+/** Chef Raccoon's kitchen: mix foods into better ones. A right answer makes one extra. */
+export interface RecipeDef {
+  id: string;
+  makes: string;
+  needs: Record<string, number>;
+}
+
+export const RECIPES: RecipeDef[] = [
+  { id: 'juice', makes: 'juice', needs: { cactusfruit: 2 } },
+  { id: 'bread', makes: 'bread', needs: { banana: 2, date: 1 } },
+  { id: 'salad', makes: 'salad', needs: { berries: 1, apple: 1, banana: 1 } },
+];
+
+/** Hazel Hedgehog's shop: foods, and charms that help for good. */
+export interface ShopItem {
+  id: string;
+  kind: 'food' | 'charm';
+  icon: string;
+  name: Text;
+  info: Text;
+  price: number;
+}
+
+export const SHOP: ShopItem[] = [
+  { id: 'berries', kind: 'food', icon: 'food_berries', name: t('Berries', 'Petits fruits'), info: t('+3 hearts', '+3 cœurs'), price: 6 },
+  { id: 'apple', kind: 'food', icon: 'food_apple', name: t('Apple', 'Pomme'), info: t('+4 hearts', '+4 cœurs'), price: 10 },
+  { id: 'banana', kind: 'food', icon: 'food_banana', name: t('Banana', 'Banane'), info: t('+5 hearts', '+5 cœurs'), price: 12 },
+  { id: 'date', kind: 'food', icon: 'food_date', name: t('Dates', 'Dattes'), info: t('+4 hearts', '+4 cœurs'), price: 12 },
+  { id: 'heart', kind: 'charm', icon: 'item_charm_heart', name: t('Heart Charm', 'Breloque cœur'), info: t('+4 hearts for good', '+4 cœurs pour toujours'), price: 150 },
+  { id: 'clover', kind: 'charm', icon: 'item_charm_clover', name: t('Clover Charm', 'Breloque trèfle'), info: t('Every move calms a bit more', 'Chaque geste calme un peu plus'), price: 200 },
+  { id: 'boot', kind: 'charm', icon: 'item_charm_boot', name: t('Speedy Charm', 'Breloque rapide'), info: t('Walk faster everywhere', 'Marche plus vite partout'), price: 120 },
 ];
 
 export function food(id: string): FoodDef {
@@ -120,6 +158,8 @@ export interface WildDef {
   drop?: [string, number];
   xp: number;
   fact: Text;
+  /** Slow animals only swipe every other turn. */
+  slow?: boolean;
 }
 
 export const JUNGLE: WildDef[] = [
@@ -134,17 +174,37 @@ export const JUNGLE: WildDef[] = [
 ];
 
 export const GORILLA: WildDef = {
-  id: 'gorilla', name: t('Grumpy Gorilla', 'Gorille grognon'), sprite: 'boss_gorilla', grump: 14, swipe: 2, xp: 60,
+  id: 'gorilla', name: t('Grumpy Gorilla', 'Gorille grognon'), sprite: 'boss_gorilla', grump: 14, swipe: 1, xp: 60,
   fact: t('Gorillas are gentle giants: they eat mostly leaves and fruit.', 'Les gorilles sont de doux géants : ils mangent surtout des feuilles et des fruits.'),
 };
 
+/** Wild animals of the Desert (levels 4 to 6). */
+export const DESERT: WildDef[] = [
+  { id: 'gecko', name: t('Gecko', 'Gecko'), sprite: 'wild_gecko', grump: 6, swipe: 1, drop: ['date', 0.4], xp: 16, fact: t('Geckos can walk up walls and even upside down on ceilings!', 'Les geckos peuvent marcher sur les murs et même au plafond!') },
+  { id: 'jackrabbit', name: t('Jackrabbit', 'Lièvre du désert'), sprite: 'wild_jackrabbit', grump: 6, swipe: 1, drop: ['cactusfruit', 0.45], xp: 16, fact: t('A jackrabbit’s giant ears help it stay cool in the hot sun.', 'Les grandes oreilles du lièvre l’aident à rester au frais sous le soleil.') },
+  { id: 'meerkat', name: t('Meerkat', 'Suricate'), sprite: 'wild_meerkat', grump: 6, swipe: 1, drop: ['date', 0.4], xp: 17, fact: t('Meerkats take turns standing guard while the others look for food.', 'Les suricates montent la garde chacun leur tour pendant que les autres cherchent à manger.') },
+  { id: 'fennec', name: t('Fennec Fox', 'Fennec'), sprite: 'wild_fennec', grump: 7, swipe: 1, drop: ['berries', 0.4], xp: 18, fact: t('The fennec is the smallest fox in the world, with the biggest ears for its size.', 'Le fennec est le plus petit renard du monde, avec les plus grandes oreilles pour sa taille.') },
+  { id: 'armadillo', name: t('Armadillo', 'Tatou'), sprite: 'wild_armadillo', grump: 7, swipe: 1, drop: ['cactusfruit', 0.5], xp: 19, fact: t('Some armadillos can roll up into a hard ball to stay safe.', 'Certains tatous peuvent se rouler en boule dure pour se protéger.') },
+  { id: 'vulture', name: t('Vulture', 'Vautour'), sprite: 'wild_vulture', grump: 7, swipe: 1, xp: 19, fact: t('Vultures help keep nature clean by eating leftovers.', 'Les vautours aident à garder la nature propre en mangeant les restes.') },
+  { id: 'camel', name: t('Camel', 'Chameau'), sprite: 'wild_camel', grump: 8, swipe: 2, drop: ['date', 0.6], xp: 22, fact: t('A camel’s hump stores fat, not water!', 'La bosse du chameau garde du gras, pas de l’eau!') },
+  { id: 'scorpion', name: t('Scorpion', 'Scorpion'), sprite: 'wild_scorpion', grump: 8, swipe: 2, xp: 22, fact: t('Scorpions glow blue-green under a special purple light.', 'Les scorpions brillent en bleu-vert sous une lumière violette spéciale.') },
+];
+
+export const TORTOISE: WildDef = {
+  id: 'tortoise', name: t('Grumpy Old Tortoise', 'Vieille tortue grognonne'), sprite: 'boss_tortoise', grump: 22, swipe: 2, xp: 140, slow: true,
+  fact: t('Desert tortoises can live more than 50 years, and they dig burrows to escape the heat.', 'Les tortues du désert peuvent vivre plus de 50 ans et creusent des terriers pour fuir la chaleur.'),
+};
+
+/** Every boss, and the quest that asks you to calm it. */
+export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE };
+
 export function wild(id: string): WildDef {
-  return id === 'gorilla' ? GORILLA : JUNGLE.find((w) => w.id === id) ?? JUNGLE[0];
+  return BOSSES[id] ?? [...JUNGLE, ...DESERT].find((w) => w.id === id) ?? JUNGLE[0];
 }
 
 /** The village helpers and their quests. */
 export interface QuestDef {
-  id: 'pie' | 'puppies' | 'gorilla';
+  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise';
   giver: string;
   giverName: Text;
   sprite: string;
@@ -186,13 +246,38 @@ export const QUESTS: QuestDef[] = [
     need: 1, acorns: 80, xp: 80,
     boss: { level: 4, after: ['pie', 'puppies'] },
   },
+  {
+    id: 'fossils', giver: 'mole', giverName: t('Professor Mole', 'Professeure Taupe'), sprite: 'npc_mole',
+    title: t('Desert fossils', 'Les fossiles du désert'),
+    ask: t('Dinosaur fossils are hidden under the sand mounds in the Desert! Could you dig up 5 of them for my museum? Answer a question at each mound to dig.', 'Des fossiles de dinosaures sont cachés sous les buttes de sable du désert! Peux-tu m’en déterrer 5 pour mon musée? Réponds à une question à chaque butte pour creuser.'),
+    thanks: t('Marvelous! Look at these bones! My museum is complete. Come and visit any time.', 'Merveilleux! Regarde ces os! Mon musée est complet. Viens le visiter quand tu veux.'),
+    need: 5, acorns: 70, xp: 90,
+  },
+  {
+    id: 'cook', giver: 'raccoon', giverName: t('Chef Raccoon', 'Chef Raton'), sprite: 'npc_chef_raccoon',
+    title: t('Little chef', 'Petit chef'),
+    ask: t('Welcome to my kitchen! Mix foods to make yummy dishes that heal more hearts. Cook 3 dishes and I will make you my helper chef!', 'Bienvenue dans ma cuisine! Mélange des aliments pour faire de bons plats qui redonnent plus de cœurs. Cuisine 3 plats et tu deviendras mon aide-chef!'),
+    thanks: t('Delicious! You are a real chef now. Here is a fruit salad for the road!', 'Délicieux! Tu es un vrai chef maintenant. Voici une salade de fruits pour la route!'),
+    need: 3, acorns: 40, xp: 60,
+  },
+  {
+    id: 'tortoise', giver: 'camel', giverName: t('Auntie Camel', 'Tante Chamelle'), sprite: 'npc_camel',
+    title: t('The grumpy old tortoise', 'La vieille tortue grognonne'),
+    ask: t('A grumpy old tortoise is sitting on the desert well and will not let anyone drink! Please calm her down. She is at the bottom of the Desert.', 'Une vieille tortue grognonne est assise sur le puits du désert et empêche tout le monde de boire! Calme-la, s’il te plaît. Elle est tout au fond du désert.'),
+    thanks: t('Water for everyone again! Thank you, brave friend. The whole desert is cheering for you!', 'De l’eau pour tout le monde! Merci, brave ami. Tout le désert t’acclame!'),
+    need: 1, acorns: 150, xp: 160,
+    boss: { level: 8, after: ['fossils', 'cook'] },
+  },
 ];
+
+/** Which quests belong to the village, and which to the Desert oasis. */
+export const DESERT_QUESTS: QuestDef['id'][] = ['tortoise'];
 
 export function quest(id: QuestDef['id']): QuestDef {
   return QUESTS.find((q) => q.id === id)!;
 }
 
-/** The four lands around the village. Only the Jungle is open in this version. */
+/** The four lands around the village. The Desert opens once the gorilla is calm. */
 export interface LandDef {
   id: string;
   name: Text;
@@ -202,7 +287,7 @@ export interface LandDef {
 
 export const LANDS: LandDef[] = [
   { id: 'jungle', name: t('Jungle', 'Jungle'), dir: 'right', open: true },
-  { id: 'desert', name: t('Desert', 'Désert'), dir: 'down', open: false },
+  { id: 'desert', name: t('Desert', 'Désert'), dir: 'down', open: true },
   { id: 'forest', name: t('Enchanted Forest', 'Forêt enchantée'), dir: 'left', open: false },
   { id: 'mountains', name: t('Snowy Mountains', 'Montagnes enneigées'), dir: 'up', open: false },
 ];
