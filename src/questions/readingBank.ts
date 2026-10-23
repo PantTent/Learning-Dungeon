@@ -2,6 +2,7 @@ import type { BankItem, Difficulty } from './types';
 import { READING_BANK_EXTRA } from './readingBankExtra';
 import { READING_BANK_MORE_READING } from './readingBankMoreReading';
 import { READING_BANK_MORE_VOCAB } from './readingBankMoreVocab';
+import { READING_BANK_MORE_WORDS } from './readingBankMoreWords';
 
 /**
  * Grade 4 reading / language bank, aligned with the Massachusetts 2017
@@ -313,4 +314,4 @@ export const READING_BANK_CORE: BankItem[] = [...BASE, ...READING_BANK_EXTRA];
  * Every grade 3-5 question. New sets go at the end, so the ids of older
  * questions (their place in this list) stay the same.
  */
-export const READING_BANK: BankItem[] = [...READING_BANK_CORE, ...READING_BANK_MORE_VOCAB, ...READING_BANK_MORE_READING];
+export const READING_BANK: BankItem[] = [...READING_BANK_CORE, ...READING_BANK_MORE_VOCAB, ...READING_BANK_MORE_READING, ...READING_BANK_MORE_WORDS];
