@@ -8,7 +8,7 @@ import { mathTopicLevels } from './math';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR } from './readingBankFr';
 import { READING_BANK_FR_UPPER } from './readingBankFrUpper';
-import { READING_BANK_EARLY } from './readingBankEarly';
+import { READING_BANK_EARLY_ALL } from './readingBankEarlyMore';
 import { topicGroups, type Grade } from './curriculum';
 import type { Difficulty } from './types';
 
@@ -243,7 +243,7 @@ function generic(groupId: string, lang: Lang): Step[] {
   // English reading starts with the grade 1 and 2 set, then grades 3-5.
   if (lang === 'en' && group.subject === 'reading') {
     for (const g of [1, 2] as Grade[]) {
-      const topics = group.topics.filter((t) => READING_BANK_EARLY.some((b) => b.topic === t && b.difficulty === g));
+      const topics = group.topics.filter((t) => READING_BANK_EARLY_ALL.some((b) => b.topic === t && b.difficulty === g));
       if (topics.length) steps.push({ topics, d: g as Difficulty, g, early: true });
     }
   }

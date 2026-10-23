@@ -1,4 +1,5 @@
 import { READING_BANK_EARLY } from './readingBankEarly';
+import { READING_BANK_EARLY_ALL } from './readingBankEarlyMore';
 import { READING_TOPICS } from './readingBank';
 import { defaultLearningSettings, isCorrect, newLearningStats, QuestionEngine } from './engine';
 import { topicGroups, type Grade } from './curriculum';
@@ -47,7 +48,7 @@ describe('READING_BANK_EARLY (English grades 1-2)', () => {
   it.each([1, 2] as Grade[])('a grade %i child gets reading questions from their grade', (grade) => {
     const settings = { ...defaultLearningSettings('en'), grade, mathPercent: 0 };
     const e = new QuestionEngine(newLearningStats(), settings);
-    const early = new Set(READING_BANK_EARLY.filter((b) => b.difficulty === grade).map((b) => b.prompt));
+    const early = new Set(READING_BANK_EARLY_ALL.filter((b) => b.difficulty === grade).map((b) => b.prompt));
     for (let i = 0; i < 100; i++) {
       const q = e.next();
       expect(q.subject).toBe('reading');

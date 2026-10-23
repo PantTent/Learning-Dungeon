@@ -9,7 +9,7 @@ import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR_UPPER } from './readingBankFrUpper';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
-import { READING_BANK_EARLY } from './readingBankEarly';
+import { READING_BANK_EARLY_ALL } from './readingBankEarlyMore';
 import { getLang, type Lang as LangT } from '../i18n';
 import { clamp, pick, shuffle } from '../util/rng';
 import { gradeRange, ladderFor, type Step } from './ladders';
@@ -355,7 +355,7 @@ export class QuestionEngine {
   private readingQuestion(d: Difficulty, topics: Set<string>, early = false, upper = false): Question {
     const recent = new Set(this.stats.recent);
     const { bank, prefix } = early
-      ? { bank: READING_BANK_EARLY, prefix: 're' }
+      ? { bank: READING_BANK_EARLY_ALL, prefix: 're' }
       : upper
         ? { bank: READING_BANK_FR_UPPER, prefix: 'ru' }
         : readingBank(this.settings.lang);
