@@ -3,8 +3,8 @@ import { defaultLearningSettings, newLearningStats, upgradeSettings, type Learni
 import { getLang, type Lang } from '../i18n';
 import { uid } from '../util/rng';
 import {
-  animal, crop, FEED_TRIES, GEAR, GEAR_EFFECT, GOLDEN_CHANCE, GOLDEN_MULT, HATS, MAX_ORDERS, ORDER_BONUS, ORDER_EVERY_MS,
-  PORTAL_COST, START_COINS, WORLDS, type WorldId,
+  animal, crop, CONTEST_TO_WIN, FEED_TRIES, GEAR, GEAR_EFFECT, GOLDEN_CHANCE, GOLDEN_MULT, HATS, MAX_ORDERS, MAX_PRODUCTS, ORCHARD_SLOTS,
+  orchardDef, ORDER_BONUS, ORDER_EVERY_MS, PORTAL_COST, QUESTS, recipe, START_COINS, WORLDS, type ContestDef, type QuestDef, type WorldId,
 } from './data';
 import type { Grade } from '../questions/curriculum';
 
@@ -27,7 +27,17 @@ export interface FarmAnimal {
   paidTo: number;
   /** Hat it is wearing (HATS id). */
   hat?: string;
+  /** Happy time (ms) saved up toward its next products (eggs, milk...). */
+  prod?: number;
 }
+
+/** One spot in the orchard: empty, or a tree that was last picked at pickedAt. */
+export interface OrchardSpot {
+  kind?: string;
+  pickedAt?: number;
+}
+
+export type Ribbon = 'blue' | 'red';
 
 export interface Order {
   id: string;
@@ -60,6 +70,15 @@ export interface FarmSave extends WorldState {
   portal?: boolean;
   /** The farm in the magic world (once the portal is built). */
   magic?: WorldState;
+  /** Counts of things done (harvests, sales, dishes...) for the journal. */
+  stats: Record<string, number>;
+  /** Journal jobs finished and rewarded, in order. */
+  questsDone: string[];
+  orchard: OrchardSpot[];
+  /** County Fair ribbons won. */
+  ribbons: Partial<Record<ContestDef['id'], Ribbon>>;
+  /** Grand Champion of the County Fair (the end of the story). */
+  champion?: boolean;
   landTier: number;
   stallTier: number;
   plots: Plot[];
@@ -96,6 +115,10 @@ export function newFarm(farmer: string, grade?: Grade, lang: Lang = getLang(), n
     basket: {},
     gear: [],
     hats: [],
+    stats: {},
+    questsDone: [],
+    orchard: Array.from({ length: ORCHARD_SLOTS }, () => ({})),
+    ribbons: {},
     orders: [],
     nextOrderAt: now,
     settings,
@@ -173,6 +196,8 @@ export function harvest(f: FarmSave, i: number, now = Date.now(), rand: () => nu
   const count = hasGear(f, 'basket') && rand() < GEAR_EFFECT.doubleChance ? 2 : 1;
   const key = golden ? goldKey(id) : id;
   f.basket[key] = (f.basket[key] ?? 0) + count;
+  count1(f, 'harvested', count);
+  if (golden) count1(f, 'golden');
   p.crop = undefined;
   p.plantedAt = undefined;
   return { crop: id, count, golden };
@@ -205,6 +230,7 @@ export function sell(f: FarmSave, key: string, correct: boolean): number {
   const coins = saleValue(key, n, correct, f);
   f.coins += coins;
   delete f.basket[key];
+  count1(f, 'sold');
   return coins;
 }
 
@@ -229,7 +255,12 @@ export function accrue(a: FarmAnimal, now = Date.now(), f?: FarmSave): void {
   const happyUntil = a.fedAt + happyFor(a, f);
   const end = Math.min(now, happyUntil);
   const rate = animal(a.kind).incomePerMin * (hasGear(f, 'bell') ? GEAR_EFFECT.incomeBonus : 1);
-  if (end > a.paidTo) a.pending += (rate * (end - a.paidTo)) / 60000;
+  if (end > a.paidTo) {
+    a.pending += (rate * (end - a.paidTo)) / 60000;
+    // Products (eggs, milk...) also come while it is happy, up to a few at a time.
+    const def = animal(a.kind);
+    if (def.productMs) a.prod = Math.min(MAX_PRODUCTS * def.productMs, (a.prod ?? 0) + end - a.paidTo);
+  }
   a.paidTo = Math.max(a.paidTo, now);
 }
 
@@ -248,6 +279,24 @@ export function feed(a: FarmAnimal, correct: boolean, now = Date.now(), f?: Farm
   a.wrongs = 0;
   a.paidTo = now;
   return true;
+}
+
+/** Products waiting to be picked up. */
+export function productsReady(a: FarmAnimal, now = Date.now(), f?: FarmSave): number {
+  accrue(a, now, f);
+  const ms = animal(a.kind).productMs;
+  return ms ? Math.floor((a.prod ?? 0) / ms) : 0;
+}
+
+/** Put an animal's products in the basket. Returns how many. */
+export function collectProducts(f: FarmSave, a: FarmAnimal, now = Date.now()): number {
+  const n = productsReady(a, now, f);
+  const def = animal(a.kind);
+  if (!n || !def.product) return 0;
+  a.prod = (a.prod ?? 0) - n * def.productMs!;
+  f.basket[def.product] = (f.basket[def.product] ?? 0) + n;
+  count1(f, `got_${def.product}`, n);
+  return n;
 }
 
 export function collect(f: FarmSave, a: FarmAnimal, now = Date.now()): number {
@@ -330,6 +379,7 @@ export function fillOrder(f: FarmSave, orderId: string, correct: boolean, now = 
   }
   const coins = correct ? o.reward : Math.round(o.reward / 2);
   f.coins += coins;
+  count1(f, 'orders');
   f.orders = f.orders.filter((x) => x.id !== orderId);
   if (f.orders.length < MAX_ORDERS && f.nextOrderAt < now) f.nextOrderAt = now + ORDER_EVERY_MS;
   return coins;
@@ -407,7 +457,10 @@ export function buyPortal(root: FarmSave, now = Date.now()): boolean {
 }
 
 const WORLD_KEYS = ['world', 'landTier', 'stallTier', 'plots', 'animals', 'basket', 'orders', 'nextOrderAt'] as const;
-const SHARED_KEYS = ['version', 'farmer', 'coins', 'gear', 'hats', 'settings', 'learning', 'createdAt', 'lastPlayed', 'portal', 'magic'] as const;
+const SHARED_KEYS = [
+  'version', 'farmer', 'coins', 'gear', 'hats', 'settings', 'learning', 'createdAt', 'lastPlayed', 'portal', 'magic', 'stats', 'questsDone',
+  'orchard', 'ribbons', 'champion',
+] as const;
 
 /**
  * The farm as seen from one world: land, animals, basket and orders belong to
@@ -446,6 +499,11 @@ export function loadFarm(): FarmSave | undefined {
     f.basket ??= {};
     f.gear ??= [];
     f.hats ??= [];
+    f.stats ??= {};
+    f.questsDone ??= [];
+    f.orchard ??= [];
+    while (f.orchard.length < ORCHARD_SLOTS) f.orchard.push({});
+    f.ribbons ??= {};
     f.orders ??= [];
     f.nextOrderAt ??= Date.now();
     if (f.magic) {
@@ -481,4 +539,147 @@ export function deleteFarm(): void {
 export function clock(ms: number): string {
   const s = Math.ceil(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+// ------------------------------------------------------------- counting
+
+/** Add to a journal counter (always on the whole save). */
+export function count1(f: FarmSave, key: string, n = 1): void {
+  const root = rootOf(f);
+  root.stats ??= {};
+  root.stats[key] = (root.stats[key] ?? 0) + n;
+}
+
+const stat = (f: FarmSave, key: string) => rootOf(f).stats?.[key] ?? 0;
+
+// -------------------------------------------------------------- kitchen
+
+export function canCook(f: FarmSave, id: string): boolean {
+  const r = recipe(id);
+  return !!r && Object.entries(r.needs).every(([k, n]) => (f.basket[k] ?? 0) >= n);
+}
+
+/** Cook a dish from the basket: a right answer makes 2, a wrong one makes 1. */
+export function cook(f: FarmSave, id: string, correct: boolean): number {
+  const r = recipe(id);
+  if (!r || !canCook(f, id)) return 0;
+  for (const [k, n] of Object.entries(r.needs)) {
+    f.basket[k] -= n;
+    if (f.basket[k] <= 0) delete f.basket[k];
+  }
+  const made = correct ? 2 : 1;
+  f.basket[id] = (f.basket[id] ?? 0) + made;
+  count1(f, 'cooked');
+  count1(f, `cook_${id}`);
+  return made;
+}
+
+// -------------------------------------------------------------- orchard
+
+export function plantTree(f: FarmSave, i: number, kind: string, now = Date.now()): boolean {
+  const root = rootOf(f);
+  const spot = root.orchard[i];
+  const def = orchardDef(kind);
+  if (!spot || spot.kind || root.coins < def.cost) return false;
+  root.coins -= def.cost;
+  spot.kind = def.id;
+  spot.pickedAt = now;
+  count1(root, 'trees');
+  return true;
+}
+
+/** Milliseconds until a tree can be picked (0 = ready now). */
+export function treeLeft(spot: OrchardSpot, now = Date.now(), f?: FarmSave): number {
+  if (!spot.kind) return Infinity;
+  return Math.max(0, (spot.pickedAt ?? now) + orchardDef(spot.kind).everyMs / growSpeed(f) - now);
+}
+
+/** Pick a ready tree: all its fruit for a right answer, half for a wrong one. */
+export function pickTree(f: FarmSave, i: number, correct: boolean, now = Date.now()): number {
+  const root = rootOf(f);
+  const spot = root.orchard[i];
+  if (!spot?.kind || treeLeft(spot, now, root) > 0) return 0;
+  const def = orchardDef(spot.kind);
+  const n = correct ? def.count : Math.ceil(def.count / 2);
+  root.basket[def.fruit] = (root.basket[def.fruit] ?? 0) + n;
+  spot.pickedAt = now;
+  count1(root, 'picked', n);
+  return n;
+}
+
+// -------------------------------------------------------------- journal
+
+/** Is a journal job's goal reached? (Counts things done since the journal started.) */
+export function questMet(f: FarmSave, q: QuestDef): boolean {
+  const root = rootOf(f);
+  const home = root.animals;
+  switch (q.id) {
+    case 'harvest5': return stat(root, 'harvested') >= 5;
+    case 'sell3': return stat(root, 'sold') >= 3;
+    case 'orders2': return stat(root, 'orders') >= 2;
+    case 'chicken': return home.some((a) => a.kind === 'chicken');
+    case 'eggs3': return stat(root, 'got_egg') >= 3;
+    case 'muffin': return stat(root, 'cook_muffin') >= 1;
+    case 'milk3': return stat(root, 'got_milk') >= 3;
+    case 'cook3': return Object.keys(root.stats ?? {}).filter((k) => k.startsWith('cook_')).length >= 3;
+    case 'animals4': return home.length >= 4;
+    case 'tree': return root.orchard.some((o) => o.kind);
+    case 'pick10': return stat(root, 'picked') >= 10;
+    case 'applepie': return stat(root, 'cook_applepie') >= 1;
+    case 'orders10': return stat(root, 'orders') >= 10;
+    case 'golden': return stat(root, 'golden') >= 1;
+    case 'blue_harvest': return root.ribbons.harvest === 'blue';
+    case 'blue_animal': return root.ribbons.animal === 'blue';
+    case 'blue_baking': return root.ribbons.baking === 'blue';
+  }
+  return false;
+}
+
+/** The job the journal is on now (undefined when the story is done). */
+export function currentQuest(f: FarmSave): QuestDef | undefined {
+  const done = rootOf(f).questsDone;
+  return QUESTS.find((q) => !done.includes(q.id));
+}
+
+/** Finish the current job: get its coins. Returns the quest, or undefined if it isn't done yet. */
+export function claimQuest(f: FarmSave): QuestDef | undefined {
+  const root = rootOf(f);
+  const q = currentQuest(root);
+  if (!q || !questMet(root, q)) return undefined;
+  root.coins += q.reward;
+  root.questsDone.push(q.id);
+  return q;
+}
+
+/** Kitchen, orchard and fair open up as the story goes on. */
+export function isOpen(f: FarmSave, place: 'kitchen' | 'orchard' | 'fair'): boolean {
+  const done = rootOf(f).questsDone;
+  return QUESTS.some((q) => q.unlocks === place && done.includes(q.id));
+}
+
+// ----------------------------------------------------------- county fair
+
+/** Do you have what this contest needs? (Nothing is used up.) */
+export function canEnter(f: FarmSave, id: ContestDef['id'], now = Date.now()): boolean {
+  const root = rootOf(f);
+  const b = root.basket;
+  if (id === 'harvest') return (b.pumpkin ?? 0) + (b['gold:pumpkin'] ?? 0) >= 3;
+  if (id === 'baking') return (b.pumpkinpie ?? 0) + (b.applepie ?? 0) >= 1;
+  return root.animals.some((a) => a.hat && !isHungry(a, now, root));
+}
+
+/**
+ * The judges asked their questions: enough right answers win a blue ribbon,
+ * otherwise a red one (try again any time). A blue ribbon is never lost.
+ * Returns true the moment all three are blue (Grand Champion!).
+ */
+export function judge(f: FarmSave, id: ContestDef['id'], right: number): boolean {
+  const root = rootOf(f);
+  if (root.ribbons[id] !== 'blue') root.ribbons[id] = right >= CONTEST_TO_WIN ? 'blue' : 'red';
+  const all = (['harvest', 'animal', 'baking'] as const).every((k) => root.ribbons[k] === 'blue');
+  if (all && !root.champion) {
+    root.champion = true;
+    return true;
+  }
+  return false;
 }

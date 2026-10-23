@@ -34,14 +34,111 @@ export interface AnimalDef {
   sprite: string;
   /** Default names for new animals of this kind. */
   names: string[];
+  /** What it gives while happy (an item id), and how often. */
+  product?: string;
+  productMs?: number;
 }
 
 export const ANIMALS: AnimalDef[] = [
-  { id: 'horse', name: 'Horse', cost: 120, hungryAfterMs: 240 * S, incomePerMin: 4, sprite: 'animal_horse', names: ['Daisy', 'Thunder', 'Biscuit', 'Maple', 'Star'] },
-  { id: 'pig', name: 'Pig', cost: 60, hungryAfterMs: 180 * S, incomePerMin: 2, sprite: 'animal_pig', names: ['Peanut', 'Truffle', 'Wilbur', 'Rosie', 'Muddy'] },
-  { id: 'chicken', name: 'Chicken', cost: 30, hungryAfterMs: 150 * S, incomePerMin: 1, sprite: 'animal_chicken', names: ['Nugget', 'Clucky', 'Pepper', 'Sunny', 'Feathers'] },
-  { id: 'goat', name: 'Goat', cost: 90, hungryAfterMs: 210 * S, incomePerMin: 3, sprite: 'animal_goat', names: ['Billy', 'Pebbles', 'Clover', 'Gizmo', 'Socks'] },
+  { id: 'horse', name: 'Horse', cost: 120, hungryAfterMs: 240 * S, incomePerMin: 4, sprite: 'animal_horse', names: ['Daisy', 'Thunder', 'Biscuit', 'Maple', 'Star'], product: 'horseshoe', productMs: 240 * S },
+  { id: 'pig', name: 'Pig', cost: 60, hungryAfterMs: 180 * S, incomePerMin: 2, sprite: 'animal_pig', names: ['Peanut', 'Truffle', 'Wilbur', 'Rosie', 'Muddy'], product: 'truffle', productMs: 180 * S },
+  { id: 'chicken', name: 'Chicken', cost: 30, hungryAfterMs: 150 * S, incomePerMin: 1, sprite: 'animal_chicken', names: ['Nugget', 'Clucky', 'Pepper', 'Sunny', 'Feathers'], product: 'egg', productMs: 60 * S },
+  { id: 'goat', name: 'Goat', cost: 90, hungryAfterMs: 210 * S, incomePerMin: 3, sprite: 'animal_goat', names: ['Billy', 'Pebbles', 'Clover', 'Gizmo', 'Socks'], product: 'milk', productMs: 120 * S },
+  { id: 'cow', name: 'Cow', cost: 150, hungryAfterMs: 240 * S, incomePerMin: 4, sprite: 'animal_cow', names: ['Bessie', 'Buttercup', 'Moo-Moo', 'Patches', 'Dottie'], product: 'milk', productMs: 90 * S },
+  { id: 'sheep', name: 'Sheep', cost: 100, hungryAfterMs: 210 * S, incomePerMin: 3, sprite: 'animal_sheep', names: ['Fluffy', 'Cotton', 'Woolly', 'Snowball', 'Lamby'], product: 'wool', productMs: 150 * S },
 ];
+
+/** Animals keep at most this many products waiting to be picked up. */
+export const MAX_PRODUCTS = 3;
+
+/**
+ * Things that are not grown in the garden: animal products, orchard fruit and
+ * kitchen dishes. They go in the basket and sell at the market like crops.
+ */
+const good = (id: string, name: string, price: number): CropDef => ({ id, name, seedCost: 0, growMs: 0, price, sprite: `item_${id}`, item: `item_${id}` });
+
+export const PRODUCTS: CropDef[] = [
+  good('egg', 'Egg', 8),
+  good('milk', 'Milk', 14),
+  good('wool', 'Wool', 20),
+  good('truffle', 'Truffle', 26),
+  good('horseshoe', 'Lucky Horseshoe', 22),
+];
+
+export const FRUITS: CropDef[] = [
+  good('apple', 'Apples', 10),
+  good('blueberry', 'Blueberries', 12),
+  good('syrup', 'Maple Syrup', 30),
+  good('cranberry', 'Cranberries', 12),
+  good('honey', 'Honey', 28),
+];
+
+export const DISHES: CropDef[] = [
+  good('muffin', 'Carrot Muffin', 32),
+  good('jam', 'Strawberry Jam', 60),
+  good('soup', 'Tomato Soup', 75),
+  good('cornbread', 'Corn Bread', 115),
+  good('cheese', 'Cheese', 60),
+  good('pumpkinpie', 'Pumpkin Pie', 130),
+  good('applepie', 'Apple Pie', 60),
+  good('pancakes', 'Blueberry Pancakes', 120),
+  good('cranberrysauce', 'Cranberry Sauce', 85),
+  good('honeycake', 'Honey Cake', 120),
+];
+
+export interface RecipeDef {
+  /** The dish (an item id in DISHES). */
+  id: string;
+  needs: Record<string, number>;
+}
+
+/** The Farm Kitchen: a dish is worth more than what goes in it. */
+export const RECIPES: RecipeDef[] = [
+  { id: 'muffin', needs: { carrot: 2, egg: 1 } },
+  { id: 'jam', needs: { strawberry: 3 } },
+  { id: 'soup', needs: { tomato: 2, milk: 1 } },
+  { id: 'cheese', needs: { milk: 3 } },
+  { id: 'cornbread', needs: { corn: 2, egg: 1, milk: 1 } },
+  { id: 'pumpkinpie', needs: { pumpkin: 1, egg: 2, milk: 1 } },
+  { id: 'applepie', needs: { apple: 3, egg: 1 } },
+  { id: 'pancakes', needs: { blueberry: 2, egg: 1, milk: 1, syrup: 1 } },
+  { id: 'cranberrysauce', needs: { cranberry: 3, honey: 1 } },
+  { id: 'honeycake', needs: { honey: 2, egg: 2, milk: 1 } },
+];
+
+/** Trees, bushes and hives in the orchard: plant once, pick again and again. */
+export interface OrchardDef {
+  id: string;
+  name: string;
+  cost: number;
+  /** Time until it can be picked again. */
+  everyMs: number;
+  /** What it gives (an item id in FRUITS), and how many for a right answer. */
+  fruit: string;
+  count: number;
+  sprite: string;
+  ready: string;
+  fact: string;
+}
+
+export const ORCHARD: OrchardDef[] = [
+  { id: 'apple', name: 'Apple Tree', cost: 120, everyMs: 150 * S, fruit: 'apple', count: 4, sprite: 'orchard_apple', ready: 'orchard_apple_ready', fact: 'Apple trees grow in Massachusetts and in the Annapolis Valley of Nova Scotia.' },
+  { id: 'blueberry', name: 'Blueberry Bush', cost: 180, everyMs: 180 * S, fruit: 'blueberry', count: 4, sprite: 'orchard_blueberry', ready: 'orchard_blueberry_ready', fact: 'Nova Scotia grows lots of wild blueberries. They are small and very sweet.' },
+  { id: 'maple', name: 'Maple Tree', cost: 260, everyMs: 240 * S, fruit: 'syrup', count: 2, sprite: 'orchard_maple', ready: 'orchard_maple_ready', fact: 'It takes about 40 buckets of maple sap to make 1 bucket of syrup!' },
+  { id: 'cranberry', name: 'Cranberry Bog', cost: 300, everyMs: 240 * S, fruit: 'cranberry', count: 5, sprite: 'orchard_cranberry', ready: 'orchard_cranberry_ready', fact: 'Cranberries float! Farmers in Massachusetts flood the bog with water to pick them.' },
+  { id: 'beehive', name: 'Beehive', cost: 280, everyMs: 210 * S, fruit: 'honey', count: 2, sprite: 'orchard_beehive', ready: 'orchard_beehive_ready', fact: 'Bees visit flowers to make honey, and they help apples and blueberries grow.' },
+];
+
+/** Places to plant in the orchard (the free farm can use the first two). */
+export const ORCHARD_SLOTS = 6;
+
+export function orchardDef(id: string): OrchardDef {
+  return ORCHARD.find((o) => o.id === id) ?? ORCHARD[0];
+}
+
+export function recipe(id: string): RecipeDef | undefined {
+  return RECIPES.find((r) => r.id === id);
+}
 
 /** Garden plots for each land size, and the price to reach that size. */
 export const LAND_TIERS: { plots: number; cost: number }[] = [
@@ -65,7 +162,7 @@ export const FEED_TRIES = 3;
 export const START_COINS = 20;
 
 export function crop(id: string): CropDef {
-  return CROPS.find((c) => c.id === id) ?? MAGIC_CROPS.find((c) => c.id === id) ?? CROPS[0];
+  return CROPS.find((c) => c.id === id) ?? MAGIC_CROPS.find((c) => c.id === id) ?? GOODS.find((c) => c.id === id) ?? CROPS[0];
 }
 
 export function animal(id: string): AnimalDef {
@@ -224,3 +321,84 @@ export const WORLDS: Record<WorldId, WorldDef> = {
 export function neighbour(id: string) {
   return [...NEIGHBOURS, ...MAGIC_NEIGHBOURS].find((n) => n.id === id) ?? NEIGHBOURS[0];
 }
+
+/** Everything that can be in the basket besides crops. */
+export const GOODS: CropDef[] = [...PRODUCTS, ...FRUITS, ...DISHES];
+
+// ------------------------------------------------- the journal and the fair
+
+export interface QuestDef {
+  id: string;
+  /** Neighbour who asks (NEIGHBOURS id). */
+  who: string;
+  /** What they say, and the goal. */
+  ask: string;
+  goal: string;
+  reward: number;
+  /** What finishing it opens up. */
+  unlocks?: 'kitchen' | 'orchard' | 'fair';
+}
+
+export interface ChapterDef {
+  title: string;
+  quests: QuestDef[];
+}
+
+export const CHAPTERS: ChapterDef[] = [
+  {
+    title: 'Chapter 1: A Growing Farm',
+    quests: [
+      { id: 'harvest5', who: 'moose', ask: 'Welcome, neighbour! Let us see your green thumb.', goal: 'Harvest 5 crops.', reward: 20 },
+      { id: 'sell3', who: 'raccoon', ask: 'The market is busy today. Go sell something!', goal: 'Sell at the market 3 times.', reward: 30 },
+      { id: 'orders2', who: 'beaver', ask: 'Neighbours help neighbours. Fill some orders!', goal: 'Fill 2 orders from the board.', reward: 40 },
+      { id: 'chicken', who: 'owl', ask: 'Every farm needs a chicken. Hoo-hoo!', goal: 'Have a chicken on your farm.', reward: 40 },
+      { id: 'eggs3', who: 'moose', ask: 'Happy chickens lay eggs. Bring me some, and I will build you a kitchen!', goal: 'Collect 3 eggs.', reward: 50, unlocks: 'kitchen' },
+    ],
+  },
+  {
+    title: 'Chapter 2: Kitchen Time',
+    quests: [
+      { id: 'muffin', who: 'moose', ask: 'Your new kitchen is ready. Let us bake!', goal: 'Bake a Carrot Muffin.', reward: 50 },
+      { id: 'milk3', who: 'beaver', ask: 'Cows and goats give milk. Milk makes soup, cheese and pies!', goal: 'Collect 3 bottles of milk.', reward: 70 },
+      { id: 'cook3', who: 'raccoon', ask: 'Yum! Can you cook three different dishes?', goal: 'Cook 3 different dishes.', reward: 80 },
+      { id: 'animals4', who: 'owl', ask: 'A busy farm has lots of friends. Hoo!', goal: 'Have 4 animals on your farm.', reward: 100, unlocks: 'orchard' },
+    ],
+  },
+  {
+    title: 'Chapter 3: The Orchard',
+    quests: [
+      { id: 'tree', who: 'beaver', ask: 'I cleared a path to the orchard. Plant a tree there!', goal: 'Plant something in the Orchard.', reward: 80 },
+      { id: 'pick10', who: 'beaver', ask: 'Fruit is ready? Pick, pick, pick!', goal: 'Pick 10 fruits in the Orchard.', reward: 100 },
+      { id: 'applepie', who: 'moose', ask: 'Nothing beats a warm apple pie.', goal: 'Bake an Apple Pie.', reward: 120 },
+      { id: 'orders10', who: 'raccoon', ask: 'Everyone in town wants your food!', goal: 'Fill 10 orders in all.', reward: 150 },
+      { id: 'golden', who: 'owl', ask: 'The County Fair is coming! Grow something special.', goal: 'Grow a golden crop.', reward: 150, unlocks: 'fair' },
+    ],
+  },
+  {
+    title: 'Chapter 4: The County Fair',
+    quests: [
+      { id: 'blue_harvest', who: 'owl', ask: 'Show the judges your biggest vegetables!', goal: 'Win a blue ribbon for Best Harvest.', reward: 200 },
+      { id: 'blue_animal', who: 'owl', ask: 'A happy animal in a nice hat wins hearts.', goal: 'Win a blue ribbon for Best Animal.', reward: 200 },
+      { id: 'blue_baking', who: 'owl', ask: 'The judges love pie. Hoo-hoo!', goal: 'Win a blue ribbon for Best Baking.', reward: 200 },
+    ],
+  },
+];
+
+export const QUESTS: QuestDef[] = CHAPTERS.flatMap((c) => c.quests);
+
+export interface ContestDef {
+  id: 'harvest' | 'animal' | 'baking';
+  name: string;
+  /** What to bring. */
+  need: string;
+  icon: string;
+}
+
+/** County Fair contests. Answer 3 questions; 2 right wins a blue ribbon. */
+export const CONTESTS: ContestDef[] = [
+  { id: 'harvest', name: 'Best Harvest', need: 'Bring 3 pumpkins.', icon: 'item_pumpkin' },
+  { id: 'animal', name: 'Best Animal', need: 'A happy animal wearing a hat.', icon: 'hat_straw' },
+  { id: 'baking', name: 'Best Baking', need: 'Bring a pie (pumpkin or apple).', icon: 'item_applepie' },
+];
+export const CONTEST_QUESTIONS = 3;
+export const CONTEST_TO_WIN = 2;
