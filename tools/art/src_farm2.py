@@ -936,3 +936,64 @@ SPRITES['farm_journal'] = grid([
     "........Rr......",
     "................",
 ])
+
+
+# --- Pony ride: galloping horse frames (same head as animal_horse), hat, flag ---
+_HORSE_TOP = [
+    "....................",
+    "..............o.o...",
+    ".............PoOoO..",
+    "............PPOOOOO.",
+    "...........PPOOOHkO.",
+    "...........PPOOOkkO.",
+    ".....r....PPOOOOOpp.",
+    ".....RRRq.PPOOOOpoo.",
+    "..P..cBBbPPOOOO.....",
+    ".PPPOcBBbOOOOOOO....",
+    ".PPOOubbuOOOOOOO....",
+    "..P.OOOOOOOOOOOo....",
+]
+
+SPRITES['animal_horse_run1'] = {'w': 20, 'rows': grid(_HORSE_TOP + [
+    "...oOOOOOOOOOOOoO...",
+    "..oO............oO..",
+    ".PP..............PP.",
+    "....................",
+], 20)}
+
+SPRITES['animal_horse_run2'] = {'w': 20, 'rows': grid(_HORSE_TOP + [
+    "....oOOOOOOOOOOo....",
+    ".....Oo.....oO......",
+    ".......PP.PP........",
+    "....................",
+], 20)}
+
+SPRITES['hat_cowboy'] = {'w': 12, 'rows': grid([
+    "............",
+    "....pOOo....",
+    "...pOoOOo...",
+    ".p.pOOOOo.o.",
+    ".p.PPYPPP.o.",
+    ".ppOOOOOOoo.",
+    "..oooooooo..",
+    "............",
+], 12)}
+
+SPRITES['ride_flag'] = grid([
+    "................",
+    "..uY............",
+    "..GgHHKKHHKKHH..",
+    "..GgHHKKHHKKHH..",
+    "..GgKKHHKKHHKK..",
+    "..GgKKHHKKHHKK..",
+    "..GgHHKKHHKKHH..",
+    "..GgHHKKHHKKHH..",
+    "..GgKKHHKKHHKK..",
+    "..GgKKHHKKHHKK..",
+    "..Gg............",
+    "..Gg............",
+    "..Gg............",
+    "..Gg............",
+    ".nggn...........",
+    "................",
+])

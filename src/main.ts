@@ -8,6 +8,7 @@ import { HubScene } from './scenes/HubScene';
 import { FarmScene } from './scenes/FarmScene';
 import { FarmSetupScene } from './scenes/FarmSetupScene';
 import { FarmOrchardScene } from './scenes/FarmOrchardScene';
+import { FarmRideScene } from './scenes/FarmRideScene';
 import { AnimalBattleScene } from './scenes/AnimalBattleScene';
 import { AnimalJungleScene } from './scenes/AnimalJungleScene';
 import { AnimalDesertScene } from './scenes/AnimalDesertScene';
@@ -45,7 +46,7 @@ const game = new Phaser.Game({
   pixelArt: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   input: { activePointers: 2 },
-  scene: [BootScene, HubScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene, FarmSetupScene, FarmScene, FarmOrchardScene, SpaceSetupScene, SpaceBaseScene, SpaceFlightScene, SpaceMapScene, AnimalSetupScene, AnimalVillageScene, AnimalJungleScene, AnimalDesertScene, AnimalForestScene, AnimalMountainsScene, AnimalSeashoreScene, AnimalSavannaScene, AnimalBattleScene],
+  scene: [BootScene, HubScene, TitleScene, CreateScene, DungeonScene, BattleScene, InventoryScene, ShopScene, TravelScene, ParentScene, PracticeScene, SpellbookScene, FarmSetupScene, FarmScene, FarmOrchardScene, FarmRideScene, SpaceSetupScene, SpaceBaseScene, SpaceFlightScene, SpaceMapScene, AnimalSetupScene, AnimalVillageScene, AnimalJungleScene, AnimalDesertScene, AnimalForestScene, AnimalMountainsScene, AnimalSeashoreScene, AnimalSavannaScene, AnimalBattleScene],
 });
 
 watchGame(game);

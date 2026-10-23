@@ -196,6 +196,8 @@ export interface HatDef {
   name: string;
   cost: number;
   sprite: string;
+  /** Only found in trail ride chests (not sold in the shop). */
+  trail?: boolean;
 }
 
 export const HATS: HatDef[] = [
@@ -205,6 +207,7 @@ export const HATS: HatDef[] = [
   { id: 'flowers', name: 'Flower Crown', cost: 40, sprite: 'hat_flowers' },
   { id: 'party', name: 'Party Hat', cost: 50, sprite: 'hat_party' },
   { id: 'crown', name: 'Royal Crown', cost: 100, sprite: 'hat_crown' },
+  { id: 'cowboy', name: 'Cowboy Hat', cost: 0, sprite: 'hat_cowboy', trail: true },
 ];
 
 /** Neighbours who post orders on the board. */

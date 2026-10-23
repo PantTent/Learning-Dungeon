@@ -14,6 +14,7 @@ import {
   productsReady, questMet, type FarmAnimal, type FarmSave, type Order,
 } from '../farm/state';
 import { SPRITES } from '../art/pixelData';
+import { canRide, horseLevel, levelProgress, MAX_HORSE_LEVEL, TRAILS, trailOpen } from '../farm/ride';
 import { openKeyboard } from '../ui/keyboard';
 import { fmtNum, setLang, tr } from '../i18n';
 import { QuestionEngine } from '../questions/engine';
@@ -27,7 +28,7 @@ type ShopTab = 'animals' | 'upgrades' | 'gear' | 'hats';
 const NEIGHBOURS_PARTY = ['moose', 'beaver', 'owl', 'raccoon'];
 
 const GARDEN = { x: 316, y: 96, cols: 4, cell: 72, size: 64 };
-const PEN = { x: 652, y: 92, w: 290, h: 384, cols: 2, cellW: 136, cellH: 122 };
+const PEN = { x: 652, y: 76, w: 290, h: 350, cols: 2, cellW: 136, cellH: 112 };
 
 interface PlotView {
   soil: Phaser.GameObjects.TileSprite;
@@ -51,7 +52,7 @@ interface AnimalView {
 }
 
 /** Where a hat sits: the top of the head, found from the sprite itself. */
-function headOf(key: string): { x: number; y: number } {
+export function headOf(key: string): { x: number; y: number } {
   const sp = SPRITES[key];
   if (!sp) return { x: 0, y: 0 };
   const from = Math.floor(sp.w * 0.55);
@@ -401,7 +402,8 @@ export class FarmScene extends Phaser.Scene {
         prod.on('pointerup', () => this.collectGoods(view));
         this.tweens.add({ targets: prod, y: y + 4, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
       }
-      const label = txt(this, cx, y + h - 2, a.name, 14, '#ffffff').setOrigin(0.5);
+      const lvl = canRide(a) && (a.xp ?? 0) > 0 ? `  ★${horseLevel(a.xp)}` : '';
+      const label = txt(this, cx, y + h - 2, `${a.name}${lvl}`, 14, '#ffffff').setOrigin(0.5);
       const hatImg = this.add.image(cx, cy, a.hat ? hat(a.hat)!.sprite : 'farm_heart').setScale(3).setVisible(!!a.hat);
       const view: AnimalView = { a, body, alert, coin, heart, prod, label, hat: hatImg, head: headOf(animal(a.kind).sprite) };
       this.world.add([body, hatImg, alert, coin, heart, label]);
@@ -645,11 +647,29 @@ export class FarmScene extends Phaser.Scene {
         this.refresh();
       });
     }, { size: 18, color: 0x2e5a7a }));
+    if (canRide(a) && this.worldId === 'home') {
+      // Horses go on trail rides and level up.
+      const lv = horseLevel(a.xp);
+      const pr = levelProgress(a.xp);
+      c.add(txt(this, W / 2 - 60, 282, lv >= MAX_HORSE_LEVEL ? tr('Rider level {n} (top level!)', { n: lv }) : tr('Rider level {n}', { n: lv }), 17, '#ffe9a0'));
+      const bar = this.add.graphics();
+      bar.fillStyle(0x0b0812, 1).fillRoundedRect(W / 2 + 130, 284, 150, 14, 4);
+      bar.fillStyle(0x7fd3ff, 1).fillRoundedRect(W / 2 + 130, 284, Math.max(6, (150 * pr.have) / pr.need), 14, 4);
+      c.add(bar);
+      const ride = button(this, W / 2 + 260, 230, 190, 44, tr('Trail ride!'), () => {
+        c.destroy();
+        this.busy = false;
+        this.openTrails(a);
+      }, { size: 18, color: 0x2f9a4a });
+      this.tweens.add({ targets: ride, scale: 1.05, duration: 600, yoyo: true, repeat: -1 });
+      c.add(ride);
+    }
     c.add(txt(this, W / 2 - 300, 330, tr('Hats:'), 20, '#ffd24a'));
     const owned = HATS.filter((h) => this.f.hats.includes(h.id));
     if (!owned.length) c.add(txt(this, W / 2 - 220, 334, tr('Buy hats in the Shop!'), 17, C.dim));
+    const step = owned.length >= 7 ? 84 : 96;
     [undefined, ...owned.map((h) => h.id)].forEach((id, k) => {
-      const x = W / 2 - 230 + k * 96;
+      const x = W / 2 - 230 + k * step;
       const y = 400;
       const on = a.hat === id;
       const g = this.add.graphics();
@@ -668,6 +688,41 @@ export class FarmScene extends Phaser.Scene {
         const nv = this.animals.find((x2) => x2.a.id === a.id);
         if (nv) this.petCard(nv);
       }));
+    });
+  }
+
+  // --------------------------------------------------------- trail rides
+
+  private openTrails(a: FarmAnimal) {
+    if (this.busy) return;
+    const c = this.overlay(tr('Trail ride with {name}', { name: a.name }));
+    c.add(txt(this, W / 2, 100, tr('Tap to jump over logs and rocks. Grab what you find, and answer at the forks for secret paths!'), 15, C.dim, { align: 'center', wordWrap: { width: 760 } }).setOrigin(0.5));
+    TRAILS.forEach((t, k) => {
+      const x = 92 + k * 262;
+      const y = 132;
+      const open = trailOpen(a, t);
+      const g = this.add.graphics();
+      g.fillStyle(open ? 0x2a3a1e : 0x2a2420, 1).fillRoundedRect(x, y, 250, 320, 12);
+      g.lineStyle(2, open ? 0x9aff9a : 0x6a5a4a, 0.9).strokeRoundedRect(x, y, 250, 320, 12);
+      c.add(g);
+      c.add(this.add.image(x + 125, y + 64, ['farm_tree', 'orchard_maple_ready', 'prop_pine'][k]).setScale(2.6).setAlpha(open ? 1 : 0.4));
+      c.add(txt(this, x + 125, y + 128, tr(t.name), 19, open ? '#ffd24a' : C.dim, { align: 'center', wordWrap: { width: 230 } }).setOrigin(0.5));
+      c.add(txt(this, x + 125, y + 162, tr('{n} forks in the trail', { n: t.forks }), 14, C.text).setOrigin(0.5));
+      c.add(txt(this, x + 125, y + 186, tr('You might find:'), 14, C.dim).setOrigin(0.5));
+      const finds = [...new Set(t.finds)];
+      finds.forEach((id, i) => {
+        c.add(this.add.image(x + 125 + (i - (finds.length - 1) / 2) * 38, y + 216, id === 'coin' ? 'farm_coin' : crop(id).item).setScale(id === 'coin' ? 2.4 : 2));
+      });
+      if (open) {
+        c.add(button(this, x + 125, y + 282, 180, 44, tr('Ride!'), () => {
+          c.destroy();
+          this.busy = false;
+          saveFarm(this.f);
+          sfx('click');
+          this.cameras.main.fadeOut(300);
+          this.time.delayedCall(320, () => this.scene.start('FarmRide', { animal: a.id, trail: t.id }));
+        }, { size: 20, color: 0x2f9a4a }));
+      } else c.add(txt(this, x + 125, y + 282, tr('Reach rider level {n}', { n: t.level }), 16, '#ffb36b').setOrigin(0.5));
     });
   }
 
@@ -717,7 +772,7 @@ export class FarmScene extends Phaser.Scene {
     }
     if (tab === 'hats') {
       c.add(txt(this, W / 2, 158, tr('Tap a happy animal to put a hat on it.'), 16, C.dim).setOrigin(0.5));
-      HATS.forEach((h, k) => {
+      HATS.filter((h) => !h.trail).forEach((h, k) => {
         const x = W / 2 - 330 + (k % 3) * 224;
         const y = 180 + Math.floor(k / 3) * 134;
         const owned = this.f.hats.includes(h.id);
@@ -1210,6 +1265,9 @@ export class FarmScene extends Phaser.Scene {
     if (Object.values(this.f.basket).some((n) => n > 0)) return tr('Take your harvest to the Market to sell it.');
     if (this.f.plots.some((p) => plotState(p, now, this.f) === 'empty')) return tr('Tap an empty garden plot to plant seeds.');
     if (this.animals.some((v) => v.a.pending >= 1)) return tr('Tap the coins above your animals to collect them.');
+    if (this.worldId === 'home' && !rootOf(this.f).stats?.rides && this.animals.some((v) => canRide(v.a) && !isHungry(v.a, now, this.f))) {
+      return tr('Tap your happy horse to go on a trail ride!');
+    }
     if (q && !this.questLocked(q)) return tr('Next job: {goal}', { goal: tr(q.goal) });
     return tr('Your farm is growing! Save up coins for upgrades in the Shop.');
   }

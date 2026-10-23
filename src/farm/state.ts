@@ -29,6 +29,8 @@ export interface FarmAnimal {
   hat?: string;
   /** Happy time (ms) saved up toward its next products (eggs, milk...). */
   prod?: number;
+  /** Trail ride experience (horses). */
+  xp?: number;
 }
 
 /** One spot in the orchard: empty, or a tree that was last picked at pickedAt. */
@@ -319,7 +321,7 @@ export function buyGear(f: FarmSave, id: string): boolean {
 
 export function buyHat(f: FarmSave, id: string): boolean {
   const h = HATS.find((x) => x.id === id);
-  if (!h || f.hats.includes(id) || f.coins < h.cost) return false;
+  if (!h || h.trail || f.hats.includes(id) || f.coins < h.cost) return false;
   f.coins -= h.cost;
   f.hats.push(id);
   return true;
