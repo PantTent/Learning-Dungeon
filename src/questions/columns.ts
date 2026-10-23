@@ -14,3 +14,16 @@ export function parseColumns(prompt: string): { a: string; b: string; op: Op } |
   if (a.length > 7 || b.length > 7) return null;
   return { a, b, op };
 }
+
+/**
+ * The two whole numbers in a question that is not written as "A + B" (like a
+ * story problem), bigger one first, so the scrap paper can start with them.
+ * Only when there are exactly two (and no decimals or fractions).
+ */
+export function twoNumbers(prompt: string): { a: string; b: string } | null {
+  if (/\d[.,]\d|\d\/\d/.test(prompt.replace(/(\d)[,\u00a0\u202f ](\d{3})/g, '$1$2'))) return null;
+  const nums = [...prompt.matchAll(/\d{1,3}(?:[,\u00a0\u202f ]\d{3})+|\d+/g)].map((m) => m[0].replace(/[^\d]/g, ''));
+  if (nums.length !== 2 || nums.some((n) => n.length > 7)) return null;
+  const [x, y] = nums;
+  return Number(x) >= Number(y) ? { a: x, b: y } : { a: y, b: x };
+}

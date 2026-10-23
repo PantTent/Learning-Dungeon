@@ -7,7 +7,7 @@ import Phaser from 'phaser';
 import type { Question } from '../questions/types';
 import { tr } from '../i18n';
 import { H, W, button, txt } from './widgets';
-import { parseColumns, type Op } from '../questions/columns';
+import { parseColumns, twoNumbers, type Op } from '../questions/columns';
 
 interface Box {
   value: string;
@@ -28,6 +28,8 @@ export class PaperPanel {
   private op: Op | '';
   /** Numbers come from the question (fixed) or the child writes them in. */
   private given: boolean;
+  /** The numbers were copied from a story problem (the child picks the sign). */
+  private copied = false;
   private carry: Box[];
   private topRow: Box[];
   private bottomRow: Box[];
@@ -48,13 +50,21 @@ export class PaperPanel {
     this.a = p?.a ?? '';
     this.b = p?.b ?? '';
     this.op = p?.op ?? '';
-    const width = p ? Math.max(p.a.length, p.b.length) + (p.op === '×' ? Math.min(p.b.length, 3) : 1) : 5;
+    // Not "A + B" but a story with two numbers: copy them in, the child picks the sign.
+    const two = p ? null : twoNumbers(q.prompt);
+    this.copied = !!two;
+    const width = p ? Math.max(p.a.length, p.b.length) + (p.op === '×' ? Math.min(p.b.length, 3) : 1) : two ? Math.max(5, two.a.length + 2) : 5;
     this.cols = Math.min(8, Math.max(3, width));
     const row = (max: number) => Array.from({ length: this.cols }, () => ({ value: '', max }));
     this.carry = row(2);
     this.topRow = row(1);
     this.bottomRow = row(1);
     this.work = [row(1)];
+    if (two) {
+      // Right-aligned, still editable.
+      [...two.a].forEach((d, k) => (this.topRow[this.cols - two.a.length + k].value = d));
+      [...two.b].forEach((d, k) => (this.bottomRow[this.cols - two.b.length + k].value = d));
+    }
     this.root = scene.add.container(0, 0).setDepth(3300).setScrollFactor(0);
     this.root.add(scene.add.rectangle(0, 0, W, H, 0x000000, 0.6).setOrigin(0).setInteractive());
     this.buildKeys();
@@ -92,7 +102,7 @@ export class PaperPanel {
     for (let y = top + 40; y < top + pageH - 10; y += 31) g.lineBetween(130, y, 590, y);
     g.lineStyle(2, 0xf0a0a0, 1).lineBetween(160, top + 8, 160, top + pageH - 8);
     s.add(g);
-    s.add(txt(scene, 360, top + 12, this.given ? tr('Work it out here!') : tr('Write the numbers, then work it out!'), 17, '#5a4a7a').setOrigin(0.5, 0));
+    s.add(txt(scene, 360, top + 12, this.given ? tr('Work it out here!') : this.copied ? tr('Here are the numbers. Pick + − or ×, then work it out!') : tr('Write the numbers, then work it out!'), 17, '#5a4a7a').setOrigin(0.5, 0));
 
     let y = top + 70;
     // Little boxes for carrying and borrowing.

@@ -19,6 +19,7 @@ export const FR_BATTLE: Record<string, string> = {
   'Say it again': 'Répète le mot',
   'Work it out here!': 'Fais tes calculs ici!',
   'Write the numbers, then work it out!': 'Écris les nombres, puis calcule!',
+  'Here are the numbers. Pick + − or ×, then work it out!': 'Voici les nombres. Choisis + − ou ×, puis calcule!',
   '+ Row': '+ Ligne',
   SUBMIT: 'VALIDER',
   Close: 'Fermer',
