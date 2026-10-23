@@ -29,6 +29,8 @@ export const TRAILS: TrailDef[] = [
 ];
 
 export const MAX_HORSE_LEVEL = 10;
+/** XP for a right answer at the water stop and at the treasure chest. */
+export const STOP_XP = 5;
 /** XP from one level to the next. */
 export const xpForLevel = (lv: number) => 40 * lv;
 
@@ -82,7 +84,7 @@ export interface RideResult {
  */
 export function finishRide(
   f: FarmSave, a: FarmAnimal, t: TrailDef, found: Record<string, number>, right: number, bumps: number, finished: boolean,
-  now = Date.now(), rand: () => number = Math.random,
+  now = Date.now(), rand: () => number = Math.random, extraXp = 0,
 ): RideResult {
   const root = rootOf(f);
   const from = horseLevel(a.xp);
@@ -103,7 +105,7 @@ export function finishRide(
   }
   coins = Math.round(coins * bonus);
   const itemTotal = Object.values(items).reduce((s, n) => s + n, 0) + (found.coin ?? 0);
-  const xp = (finished ? t.xp : 0) + 2 * itemTotal + 10 * right + (finished && bumps === 0 ? 15 : 0);
+  const xp = (finished ? t.xp : 0) + 2 * itemTotal + 10 * right + (finished && bumps === 0 ? 15 : 0) + extraXp;
   for (const [id, n] of Object.entries(items)) root.basket[id] = (root.basket[id] ?? 0) + n;
   root.coins += coins;
   if (hat) root.hats.push(hat);

@@ -1,6 +1,6 @@
 import { HATS } from './data';
 import { buyHat, isHungry, newFarm } from './state';
-import { finishRide, horseLevel, levelProgress, MAX_HORSE_LEVEL, rideBonus, TRAILS, trailOpen, xpForLevel } from './ride';
+import { finishRide, horseLevel, levelProgress, MAX_HORSE_LEVEL, rideBonus, STOP_XP, TRAILS, trailOpen, xpForLevel } from './ride';
 
 const T0 = 1_000_000;
 
@@ -38,6 +38,10 @@ describe('trail rides', () => {
     expect(r.to).toBe(horseLevel(r.xp));
     expect(isHungry(horse, T0, f)).toBe(true);
     expect(r.hat).toBeUndefined();
+    // The water stop and the chest lock add a little XP for right answers.
+    const g = newFarm('Sam', undefined, 'en', T0);
+    const r3 = finishRide(g, g.animals[0], t, { coin: 5, apple: 2 }, 2, 0, true, T0, () => 0.9, 2 * STOP_XP);
+    expect(r3.xp).toBe(r.xp + 2 * STOP_XP);
   });
 
   it('stopping early keeps the finds but gives no chest; the chest can hold the cowboy hat', () => {

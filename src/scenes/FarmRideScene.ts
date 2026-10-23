@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { animal, crop, hat } from '../farm/data';
-import { finishRide, horseLevel, levelProgress, MAX_HORSE_LEVEL, TRAILS, type RideResult, type TrailDef } from '../farm/ride';
+import { finishRide, horseLevel, levelProgress, MAX_HORSE_LEVEL, STOP_XP, TRAILS, type RideResult, type TrailDef } from '../farm/ride';
 import { isHungry, loadFarm, saveFarm, type FarmAnimal, type FarmSave } from '../farm/state';
 import { fmtNum, setLang, tr } from '../i18n';
 import { QuestionEngine } from '../questions/engine';
@@ -17,7 +17,7 @@ const JUMP = 920;
 
 interface Thing {
   img: Phaser.GameObjects.Image;
-  kind: 'block' | 'item' | 'sign' | 'finish';
+  kind: 'block' | 'item' | 'sign' | 'water' | 'finish';
   /** Item id for things to pick up. */
   id?: string;
   done?: boolean;
@@ -44,6 +44,10 @@ export class FarmRideScene extends Phaser.Scene {
   private dist = 0;
   private nextSpawn = 0;
   private forksLeft: number[] = [];
+  /** Where the water stop is (between the first two forks), and XP from the stops. */
+  private waterAt = 0;
+  private waterPlaced = false;
+  private stopXp = 0;
   private things: Thing[] = [];
   private scenery: { img: Phaser.GameObjects.Image; k: number }[] = [];
   private ground!: Phaser.GameObjects.TileSprite;
@@ -81,6 +85,9 @@ export class FarmRideScene extends Phaser.Scene {
     this.engine = new QuestionEngine(f.learning, f.settings);
     Object.assign(this, { vy: 0, y: GROUND, dist: 0, nextSpawn: 700, things: [], scenery: [], paused: false, over: false, slowUntil: 0, safeUntil: 0, found: {}, right: 0, bumps: 0, finishPlaced: false, frame: 0, frameTime: 0 });
     this.forksLeft = Array.from({ length: trail.forks }, (_x, i) => Math.round((trail.length * (i + 1)) / (trail.forks + 1)));
+    this.waterAt = this.forksLeft.length >= 2 ? (this.forksLeft[0] + this.forksLeft[1]) / 2 : trail.length / 2;
+    this.waterPlaced = false;
+    this.stopXp = 0;
     playMusic('farm');
     this.cameras.main.fadeIn(400);
     this.drawWorld();
@@ -226,7 +233,13 @@ export class FarmRideScene extends Phaser.Scene {
 
     // New things on the trail, the forks, and the end.
     const end = this.trail.length;
-    if (!this.finishPlaced && this.forksLeft.length && this.dist >= this.forksLeft[0]) {
+    if (!this.waterPlaced && this.dist >= this.waterAt) {
+      // A water trough beside the trail: time for a drink.
+      this.waterPlaced = true;
+      const img = this.add.image(W + 80, GROUND + 4, 'farm_trough').setOrigin(0.5, 1).setScale(4.4).setDepth(420);
+      this.things.push({ img, kind: 'water' });
+      this.nextSpawn = this.dist + 700;
+    } else if (!this.finishPlaced && this.forksLeft.length && this.dist >= this.forksLeft[0]) {
       this.forksLeft.shift();
       const img = this.add.image(W + 80, GROUND + 4, 'prop_forestsign').setOrigin(0.5, 1).setScale(4.4).setDepth(420);
       this.things.push({ img, kind: 'sign' });
@@ -252,6 +265,9 @@ export class FarmRideScene extends Phaser.Scene {
       } else if (t.kind === 'sign' && t.img.x <= HORSE_X + 90) {
         t.done = true;
         this.fork();
+      } else if (t.kind === 'water' && t.img.x <= HORSE_X + 90) {
+        t.done = true;
+        this.waterStop();
       } else if (t.kind === 'finish' && t.img.x <= HORSE_X + 60) {
         t.done = true;
         this.finish(true);
@@ -318,10 +334,60 @@ export class FarmRideScene extends Phaser.Scene {
     });
   }
 
+  /** Half way: the horse stops for a drink. A right answer gives a little XP. */
+  private waterStop() {
+    this.paused = true;
+    const q = this.engine.next();
+    new QuestionPanel(this, q, {
+      header: tr('Water stop! {name} is thirsty.', { name: this.a.name }),
+      readAloud: this.f.settings.readAloud,
+      result: {
+        right: tr('Answer: {answer}\n{name} drinks and feels great! +{n} XP', { name: this.a.name, n: STOP_XP }),
+        wrong: tr('You said: {given}\nRight answer: {answer}\n{name} has a drink. Off we go!', { name: this.a.name }),
+        go: tr('Giddy-up!'),
+      },
+      done: (correct) => {
+        this.engine.record(q, correct);
+        saveFarm(this.f);
+        this.paused = false;
+        if (correct) this.gainStopXp();
+      },
+    });
+  }
+
+  private gainStopXp() {
+    this.stopXp += STOP_XP;
+    sfx('heal');
+    const t = txt(this, HORSE_X, this.y - 110, `+${STOP_XP} XP`, 26, '#7fd3ff').setOrigin(0.5).setDepth(2600).setStroke('#120a1c', 6);
+    this.tweens.add({ targets: t, y: t.y - 50, alpha: 0, duration: 1100, onComplete: () => t.destroy() });
+  }
+
   private finish(reached: boolean) {
     if (this.over) return;
     this.over = true;
-    const res = finishRide(this.f, this.a, this.trail, this.found, this.right, this.bumps, reached);
+    if (!reached) return this.endRide(false);
+    // The treasure chest has a lock: one last question.
+    this.time.delayedCall(400, () => {
+      const q = this.engine.next();
+      new QuestionPanel(this, q, {
+        header: tr('The treasure chest is locked!'),
+        readAloud: this.f.settings.readAloud,
+        result: {
+          right: tr('Answer: {answer}\nClick! The chest opens. +{n} XP', { n: STOP_XP }),
+          wrong: tr('You said: {given}\nRight answer: {answer}\nThe key was under a rock. The chest opens!'),
+          go: tr('Open it!'),
+        },
+        done: (correct) => {
+          this.engine.record(q, correct);
+          if (correct) this.gainStopXp();
+          this.endRide(true);
+        },
+      });
+    });
+  }
+
+  private endRide(reached: boolean) {
+    const res = finishRide(this.f, this.a, this.trail, this.found, this.right, this.bumps, reached, Date.now(), Math.random, this.stopXp);
     saveFarm(this.f);
     if (reached) {
       sfx('chest');

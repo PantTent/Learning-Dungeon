@@ -304,4 +304,11 @@ export const FR_FARM: Record<string, string> = {
   "Deep Woods Trail": "Sentier des bois profonds",
   "Cowboy Hat": "Chapeau de cowboy",
   "Tap your happy horse to go on a trail ride!": "Touche ton cheval content pour partir en balade!",
+  "Water stop! {name} is thirsty.": "Pause à l’abreuvoir! {name} a soif.",
+  "Answer: {answer}\n{name} drinks and feels great! +{n} XP": "Réponse : {answer}\n{name} boit et se sent super bien! +{n} XP",
+  "You said: {given}\nRight answer: {answer}\n{name} has a drink. Off we go!": "Tu as dit : {given}\nBonne réponse : {answer}\n{name} boit un peu. C’est reparti!",
+  "The treasure chest is locked!": "Le coffre au trésor est verrouillé!",
+  "Answer: {answer}\nClick! The chest opens. +{n} XP": "Réponse : {answer}\nClic! Le coffre s’ouvre. +{n} XP",
+  "You said: {given}\nRight answer: {answer}\nThe key was under a rock. The chest opens!": "Tu as dit : {given}\nBonne réponse : {answer}\nLa clé était sous une roche. Le coffre s’ouvre!",
+  "Open it!": "Ouvre-le!",
 };
