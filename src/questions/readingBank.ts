@@ -1,5 +1,7 @@
 import type { BankItem, Difficulty } from './types';
 import { READING_BANK_EXTRA } from './readingBankExtra';
+import { READING_BANK_MORE_READING } from './readingBankMoreReading';
+import { READING_BANK_MORE_VOCAB } from './readingBankMoreVocab';
 
 /**
  * Grade 4 reading / language bank, aligned with the Massachusetts 2017
@@ -304,5 +306,11 @@ const BASE: BankItem[] = [
   q('comprehension', 3, 'Juan noticed that the new boy sat alone at lunch every day. On Monday, Juan carried his tray over and asked, "Want to play soccer at recess?"\n\nWhat can you infer about Juan?', 'He is friendly and caring.', ['He wants a new lunch.', 'He does not like soccer.', 'He is new at school.'], 'Juan noticed the boy was alone and invited him to play. That shows he is caring.'),
 ];
 
-/** Base bank plus the extra items, so repeats are rarer. */
-export const READING_BANK: BankItem[] = [...BASE, ...READING_BANK_EXTRA];
+/** Base bank plus the first extra items. */
+export const READING_BANK_CORE: BankItem[] = [...BASE, ...READING_BANK_EXTRA];
+
+/**
+ * Every grade 3-5 question. New sets go at the end, so the ids of older
+ * questions (their place in this list) stay the same.
+ */
+export const READING_BANK: BankItem[] = [...READING_BANK_CORE, ...READING_BANK_MORE_VOCAB, ...READING_BANK_MORE_READING];
