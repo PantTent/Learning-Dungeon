@@ -4,7 +4,7 @@ import { getLang } from '../i18n';
 import type { Grade } from '../questions/curriculum';
 import { ri } from '../util/rng';
 import { buildJungle } from './world';
-import { animal, FOODS, food, quest, QUESTS, type QuestDef, type RecipeDef, type ShopItem, type WildDef } from './data';
+import { animal, FOODS, food, LANDS, quest, QUESTS, type LandId, type QuestDef, type RecipeDef, type ShopItem, type WildDef } from './data';
 
 export type QuestState = 'new' | 'active' | 'done';
 
@@ -32,12 +32,19 @@ export interface AnimalSave {
   /** Dishes cooked in Chef Raccoon's kitchen. */
   cooked: number;
   tortoiseCalm: boolean;
+  /** Part 3: glowing mushrooms (Forest) and ice crystals (Mountains) found, and the last two bosses. */
+  mushrooms: string[];
+  crystals: string[];
+  mooseCalm: boolean;
+  leopardCalm: boolean;
   /** Charms bought at the shop (they help for good). */
   charms: string[];
   /** Animal facts seen (wild animal ids). */
   facts: string[];
   /** The mayor has said hello. */
   welcomed?: boolean;
+  /** The Winter Festival has been shown. */
+  festival?: boolean;
   settings: LearningSettings;
   learning: LearningStats;
   createdAt: number;
@@ -70,6 +77,10 @@ export function newAnimalSave(name: string, animalId: string, grade: Grade, now 
     fossils: [],
     cooked: 0,
     tortoiseCalm: false,
+    mushrooms: [],
+    crystals: [],
+    mooseCalm: false,
+    leopardCalm: false,
     charms: [],
     facts: [],
     settings,
@@ -98,6 +109,10 @@ export function loadAnimals(): AnimalSave | null {
     s.fossils ??= [];
     s.cooked ??= 0;
     s.tortoiseCalm ??= false;
+    s.mushrooms ??= [];
+    s.crystals ??= [];
+    s.mooseCalm ??= false;
+    s.leopardCalm ??= false;
     s.charms ??= [];
     return s;
   } catch {
@@ -201,7 +216,7 @@ export function calmAmount(s: AnimalSave, movePower: number, correct: boolean, l
 }
 
 /** Hearts a grumpy animal knocks off (stronger in higher levels). */
-export const swipe = (f: Foe) => f.def.swipe + Math.floor((f.level - 1) / 2);
+export const swipe = (f: Foe) => f.def.swipe + Math.floor(f.level / 5);
 
 /** A lion's roar starts the battle a quarter calm. */
 export const startCalm = (s: AnimalSave, f: Foe) => (skill(s) === 'roar' ? Math.round(f.grump * 0.25 * 10) / 10 : 0);
@@ -228,25 +243,49 @@ export function progress(s: AnimalSave, id: QuestDef['id']): number {
   if (id === 'puppies') return Math.min(puppiesFound(s), need);
   if (id === 'fossils') return Math.min(s.fossils.length, need);
   if (id === 'cook') return Math.min(s.cooked, need);
-  return bossCalm(s, id) ? 1 : 0;
+  if (id === 'mushrooms') return Math.min(s.mushrooms.length, need);
+  if (id === 'crystals') return Math.min(s.crystals.length, need);
+  return bossCalm(s, quest(id).boss ? BOSS_OF[id] : id) ? 1 : 0;
 }
+
+/** The boss each boss quest asks you to calm. */
+const BOSS_OF: Partial<Record<QuestDef['id'], string>> = { gorilla: 'gorilla', tortoise: 'tortoise', moose: 'moose', leopard: 'snowleopard' };
 
 /** Rocks in the Jungle that hide a puppy (the other rocks only hide acorns). */
 const PUPPY_ROCKS = new Set(buildJungle().rocks.filter((r) => r.puppy).map((r) => r.id));
 export const puppiesFound = (s: AnimalSave) => s.rescued.filter((id) => PUPPY_ROCKS.has(id)).length;
 
 /** Has this boss been calmed? */
-export function bossCalm(s: AnimalSave, id: string): boolean {
-  return id === 'gorilla' ? s.gorillaCalm : id === 'tortoise' ? s.tortoiseCalm : false;
+export function bossCalm(s: AnimalSave, id: string | undefined): boolean {
+  return { gorilla: s.gorillaCalm, tortoise: s.tortoiseCalm, moose: s.mooseCalm, snowleopard: s.leopardCalm }[id ?? ''] ?? false;
 }
 
 export function setBossCalm(s: AnimalSave, id: string): void {
   if (id === 'gorilla') s.gorillaCalm = true;
   if (id === 'tortoise') s.tortoiseCalm = true;
+  if (id === 'moose') s.mooseCalm = true;
+  if (id === 'snowleopard') s.leopardCalm = true;
 }
 
-/** The Desert opens once the gorilla in the Jungle is calm. */
-export const desertOpen = (s: AnimalSave) => s.gorillaCalm;
+/** Each land opens once the boss of the land before it is calm. */
+export function landOpen(s: AnimalSave, id: LandId): boolean {
+  const after = LANDS.find((l) => l.id === id)?.after;
+  return !after || bossCalm(s, after);
+}
+
+export const desertOpen = (s: AnimalSave) => landOpen(s, 'desert');
+
+/** Can this quest start yet? (Its land must be open.) */
+export const questOpen = (s: AnimalSave, id: QuestDef['id']) => !quest(id).land || landOpen(s, quest(id).land!);
+
+/** Stay warm in the Snowy Mountains. */
+export const warm = (s: AnimalSave) => hasCharm(s, 'scarf');
+
+/** The quest a villager has for you now: the first one not done yet (or their last one). */
+export function currentQuest(s: AnimalSave, giver: string): QuestDef | undefined {
+  const mine = QUESTS.filter((q) => q.giver === giver);
+  return mine.find((q) => s.quests[q.id] !== 'done' && questOpen(s, q.id)) ?? mine.find((q) => s.quests[q.id] !== 'done') ?? mine[mine.length - 1];
+}
 
 export const canTurnIn = (s: AnimalSave, id: QuestDef['id']) => s.quests[id] === 'active' && progress(s, id) >= quest(id).need;
 
@@ -269,6 +308,7 @@ export function turnIn(s: AnimalSave, id: QuestDef['id']): { acorns: number; xp:
     addFood(s, 'pie', 2);
   }
   if (id === 'cook') addFood(s, 'salad');
+  if (id === 'mushrooms') addFood(s, 'soup', 2);
   s.quests[id] = 'done';
   s.acorns += q.acorns;
   return { acorns: q.acorns, xp: q.xp, levels: gainXp(s, q.xp) };

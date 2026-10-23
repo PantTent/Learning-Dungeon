@@ -4,11 +4,11 @@
 import type { Difficulty, Subject } from './types';
 import { getLang, getRegion, type Lang } from '../i18n';
 
-export type Grade = 1 | 2 | 3 | 4 | 5;
+export type Grade = 1 | 2 | 3 | 4 | 5 | 6;
 /** English questions follow Massachusetts grades 1-5. */
 export const GRADES: Grade[] = [1, 2, 3, 4, 5];
-/** French questions follow the Quebec curriculum, 1re to 3e annee. */
-export const GRADES_FR: Grade[] = [1, 2, 3];
+/** French questions follow the Quebec (or Nova Scotia CSAP) programs, 1re to 6e annee. */
+export const GRADES_FR: Grade[] = [1, 2, 3, 4, 5, 6];
 
 export function gradesFor(lang: Lang = getLang()): Grade[] {
   return lang === 'fr' ? GRADES_FR : GRADES;
@@ -56,12 +56,22 @@ export const TOPIC_GROUPS: TopicGroup[] = [
 
 /** Topic groups for the French (Quebec) questions. */
 export const TOPIC_GROUPS_FR: TopicGroup[] = [
-  { id: 'fr-nombres', subject: 'math', label: 'Les nombres', topics: ['e-count', 'e-compare', 'e-place', 'e-skip', 'e-even-odd'] },
-  { id: 'fr-add-sub', subject: 'math', label: 'Additions et soustractions', topics: ['e-add', 'e-sub', 'e-missing', 'e-doubles'] },
-  { id: 'fr-mult', subject: 'math', label: 'Multiplier et partager', topics: ['e-mult', 'e-div'] },
-  { id: 'fr-mesure', subject: 'math', label: "L'argent, l'heure et la mesure", topics: ['e-money', 'e-time', 'e-measure'] },
+  {
+    id: 'fr-nombres', subject: 'math', label: 'Les nombres',
+    topics: ['e-count', 'e-compare', 'e-place', 'e-skip', 'e-even-odd', 'place-value', 'compare', 'rounding', 'patterns', 'factors', 'order-ops', 'exponents', 'integers'],
+  },
+  { id: 'fr-add-sub', subject: 'math', label: 'Additions et soustractions', topics: ['e-add', 'e-sub', 'e-missing', 'e-doubles', 'add-sub'] },
+  {
+    id: 'fr-mult', subject: 'math', label: 'Multiplier et diviser',
+    topics: ['e-mult', 'e-div', 'mult-facts', 'mult-2x1', 'mult-big', 'mult-2x2', 'mult-3x2', 'div-facts', 'div-remainder', 'div-long', 'div-2digit'],
+  },
+  {
+    id: 'fr-fractions', subject: 'math', label: 'Fractions, décimaux et pourcentages',
+    topics: ['fractions-equiv', 'fractions-compare', 'fractions-add', 'fractions-unlike', 'fractions-mult', 'fractions-mixed', 'decimals', 'decimal-ops', 'decimal-muldiv', 'percent', 'ratio'],
+  },
+  { id: 'fr-mesure', subject: 'math', label: "L'argent, l'heure et la mesure", topics: ['e-money', 'e-time', 'e-measure', 'measurement', 'area-perimeter', 'volume', 'angles'] },
   { id: 'fr-formes', subject: 'math', label: 'Formes et fractions', topics: ['e-shapes', 'e-fractions'] },
-  { id: 'fr-problemes', subject: 'math', label: 'Problèmes', topics: ['e-word'] },
+  { id: 'fr-problemes', subject: 'math', label: 'Problèmes', topics: ['e-word', 'word-problems'] },
   { id: 'fr-vocab', subject: 'reading', label: 'Vocabulaire', topics: ['fr-vocabulaire', 'fr-synonymes', 'fr-contraires'] },
   { id: 'fr-sons', subject: 'reading', label: 'Sons et syllabes', topics: ['fr-sons'] },
   { id: 'fr-ortho', subject: 'reading', label: 'Orthographe et homophones', topics: ['fr-orthographe', 'fr-homophones'] },
@@ -104,7 +114,12 @@ const MATH_BY_GRADE: Partial<Record<Grade, string[]>> = {
   ],
 };
 
-/** French math topics by Quebec school year (difficulty 1 = 1re, 2 = 2e, 3 = 3e). */
+/**
+ * French math topics by Quebec school year (Progression des apprentissages):
+ * 1re to 3e use the early questions; 4e to 6e use the same questions as
+ * English grades 3 to 5 (in French), plus percent, exponents and negative
+ * numbers in 5e and 6e.
+ */
 const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
   1: ['e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-shapes', 'e-word'],
   2: [
@@ -114,6 +129,19 @@ const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
   3: [
     'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-even-odd', 'e-money', 'e-time', 'e-shapes',
     'e-mult', 'e-div', 'e-fractions', 'e-measure', 'e-word',
+  ],
+  4: [
+    'place-value', 'compare', 'rounding', 'patterns', 'add-sub', 'mult-facts', 'mult-2x1', 'mult-big', 'div-facts', 'div-remainder',
+    'fractions-equiv', 'fractions-compare', 'decimals', 'decimal-ops', 'measurement', 'area-perimeter', 'volume', 'angles', 'word-problems',
+  ],
+  5: [
+    'place-value', 'rounding', 'factors', 'order-ops', 'exponents', 'add-sub', 'mult-big', 'mult-2x2', 'div-remainder', 'div-long',
+    'fractions-compare', 'fractions-add', 'fractions-mult', 'decimals', 'decimal-ops', 'decimal-muldiv', 'percent', 'measurement',
+    'area-perimeter', 'volume', 'angles', 'word-problems',
+  ],
+  6: [
+    'place-value', 'rounding', 'factors', 'order-ops', 'exponents', 'integers', 'mult-3x2', 'div-long', 'div-2digit', 'fractions-unlike',
+    'fractions-mult', 'fractions-mixed', 'decimal-ops', 'decimal-muldiv', 'percent', 'area-perimeter', 'volume', 'angles', 'word-problems',
   ],
 };
 
@@ -140,6 +168,11 @@ const MATH_BY_GRADE_NS: Partial<Record<Grade, string[]>> = {
     'mult-2x1', 'mult-big', 'mult-2x2', 'div-remainder', 'div-long', 'add-sub', 'place-value', 'rounding', 'compare', 'fractions-equiv',
     'fractions-compare', 'decimals', 'decimal-ops', 'measurement', 'area-perimeter', 'volume', 'word-problems',
   ],
+  // Grade 6 (CSAP 6e): ratio, percent, negative numbers, decimals x and /, angles.
+  6: [
+    'place-value', 'factors', 'order-ops', 'integers', 'mult-3x2', 'div-long', 'fractions-mixed', 'decimals', 'decimal-muldiv', 'percent',
+    'ratio', 'area-perimeter', 'volume', 'angles', 'word-problems',
+  ],
 };
 
 /** Difficulty range for each grade (1 = warm-up, 3 = stretch). */
@@ -155,6 +188,9 @@ const GRADE_BAND_FR: Partial<Record<Grade, [Difficulty, Difficulty]>> = {
   1: [1, 1],
   2: [1, 2],
   3: [2, 3],
+  4: [1, 2],
+  5: [2, 3],
+  6: [3, 3],
 };
 
 export function gradeBand(grade: Grade, lang: Lang = getLang()): [Difficulty, Difficulty] {

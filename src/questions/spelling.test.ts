@@ -9,7 +9,10 @@ describe('spelling tests', () => {
       expect(new Set(list.map((w) => w.toLowerCase())).size).toBe(list.length);
       for (const w of list) expect(w, w).toMatch(/^[a-zA-Zàâçéèêëîïôûùü]+$/);
     }
-    expect(spellWords('fr', 5 as Grade)).toBe(SPELL_WORDS_FR[3]);
+    expect(Object.keys(SPELL_WORDS_FR).sort()).toEqual(['1', '2', '3', '4', '5', '6']);
+    for (const g of [1, 2, 3, 4, 5, 6]) expect(spellWords('fr', g as Grade)).toBe(SPELL_WORDS_FR[g as 1 | 2 | 3 | 4 | 5 | 6]);
+    // No English list for grade 6 yet: it falls back to grade 5.
+    expect(spellWords('en', 6 as unknown as Grade)).toBe(SPELL_WORDS_EN[5]);
   });
 
   it('asks a spelling word out loud, and checks it without caring about capitals', () => {

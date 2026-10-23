@@ -1,4 +1,5 @@
-import { MATH_TOPICS, makeMathQuestion, mathTopicsFor } from './math';
+import { MATH_TOPICS, MATH_TOPICS_FR, makeMathQuestion, mathTopicLevels, mathTopicsFor } from './math';
+import { setUnits } from '../i18n';
 import { QuestionEngine, isCorrect, newLearningStats, defaultLearningSettings, teacherHelp } from './engine';
 import { type Grade } from './curriculum';
 import { gradeRange, ladderFor } from './ladders';
@@ -234,4 +235,148 @@ describe('focus practice', () => {
       e.record(q, i % 4 !== 0);
     }
   });
+});
+
+describe('grade 6 topics', () => {
+  const NEW = ['percent', 'ratio', 'integers', 'decimal-muldiv', 'fractions-mixed', 'exponents'];
+  /** "−5" -> -5, "1,500" -> 1500, "3.25 ft" -> 3.25. */
+  const val = (s: string) => Number(s.replace(/−/g, '-').replace(/,/g, '').replace(/[^\d.-]/g, ''));
+  /** "2 1/4" -> 2.25, "7/4" -> 1.75, "5" -> 5. */
+  const frac = (s: string) => {
+    const m = s.match(/^(?:(\d+) )?(\d+)\/(\d+)$/);
+    return m ? Number(m[1] ?? 0) + Number(m[2]) / Number(m[3]) : Number(s);
+  };
+  const SUP: Record<string, number> = { '²': 2, '³': 3, '⁴': 4, '⁵': 5, '⁶': 6 };
+  const power = (s: string) => {
+    const m = s.match(/^(\d+)([²³⁴⁵⁶])$/)!;
+    return Number(m[1]) ** SUP[m[2]];
+  };
+  const product = (s: string) => s.split(' × ').reduce((p, x) => p * Number(x), 1);
+
+  /** Recompute the right answer from the numbers in the prompt (null = no check for this form). */
+  function check(q: ReturnType<typeof makeMathQuestion>) {
+    const p = q.prompt;
+    const ans = q.input === 'number' ? Number(q.answer) : q.answer;
+    const others = (q.choices ?? []).filter((c) => c !== q.answer);
+    let m: RegExpMatchArray | null;
+    switch (q.topic) {
+      case 'percent':
+        if ((m = p.match(/^What is (\d+)% of ([\d,]+)\?$/))) return expect(ans).toBe((Number(m[1]) * val(m[2])) / 100);
+        if ((m = p.match(/(\d+) squares are colored/))) return expect(ans).toBe(Number(m[1]));
+        if ((m = p.match(/same as (\d+)%/))) {
+          expect(frac(q.answer)).toBeCloseTo(Number(m[1]) / 100, 9);
+          for (const w of others) expect(Math.abs(frac(w) - Number(m[1]) / 100) > 1e-9, w).toBe(true);
+          return;
+        }
+        if ((m = p.match(/^Write (\d+)% as a decimal/))) return expect(val(q.answer)).toBeCloseTo(Number(m[1]) / 100, 9);
+        if ((m = p.match(/costs (\d+) gold\. The shop takes (\d+)% off/))) return expect(ans).toBe(Number(m[1]) * (1 - Number(m[2]) / 100));
+        if ((m = p.match(/has (\d+) knights\. (\d+) of them/))) return expect(ans).toBe((Number(m[2]) * 100) / Number(m[1]));
+        break;
+      case 'ratio':
+        if ((m = p.match(/^There are (\d+) .+ and (\d+) /))) return expect(ans).toBe(`${m[1]}:${m[2]}`);
+        if ((m = p.match(/^For every (\d+) .+ there are (\d+) .+ There are (\d+) /))) return expect(ans).toBe((Number(m[3]) / Number(m[1])) * Number(m[2]));
+        if ((m = p.match(/^(\d+):(\d+) = \?:(\d+)$/))) return expect(ans).toBe((Number(m[1]) * Number(m[3])) / Number(m[2]));
+        if ((m = p.match(/^(\d+):(\d+) = (\d+):\?$/))) return expect(ans).toBe((Number(m[2]) * Number(m[3])) / Number(m[1]));
+        if ((m = p.match(/equivalent to (\d+):(\d+)\?$/))) {
+          const [a, b] = [Number(m[1]), Number(m[2])];
+          const same = (r: string) => {
+            const [x, y] = r.split(':').map(Number);
+            return x * b === y * a;
+          };
+          expect(same(q.answer)).toBe(true);
+          for (const w of others) expect(same(w), w).toBe(false);
+          return;
+        }
+        if ((m = p.match(/^(\d+) potions cost (\d+) gold\. How much does 1/))) return expect(ans).toBe(Number(m[2]) / Number(m[1]));
+        if ((m = p.match(/^(\d+) potions cost (\d+) gold\. How much do (\d+)/))) return expect(ans).toBe((Number(m[2]) / Number(m[1])) * Number(m[3]));
+        if ((m = p.match(/flies (\d+) \w+ in (\d+) hours/))) return expect(ans).toBe(Number(m[1]) / Number(m[2]));
+        break;
+      case 'integers': {
+        const cv = (q.choices ?? []).map(val);
+        if (p.startsWith('Which temperature is COLDER') || p.includes('LEAST?')) return expect(val(q.answer)).toBe(Math.min(...cv));
+        if (p.includes('GREATEST?')) return expect(val(q.answer)).toBe(Math.max(...cv));
+        if ((m = p.match(/^Start at (−?\d+) .+ Move (\d+) steps to the (left|right)/)))
+          return expect(val(q.answer)).toBe(val(m[1]) + (m[3] === 'left' ? -1 : 1) * Number(m[2]));
+        if (p.startsWith('Put these numbers in order')) {
+          const list = p.split('\n')[1].split(', ').map(val).sort((x, y) => x - y);
+          return expect(q.answer.split(', ').map(val)).toEqual(list);
+        }
+        if ((m = p.match(/^It is (−?\d+)°\w outside\. The temperature drops (\d+) degrees/))) return expect(val(q.answer)).toBe(val(m[1]) - Number(m[2]));
+        if ((m = p.match(/it was (−?\d+)°\w\. At noon it was (−?\d+)°/))) return expect(ans).toBe(val(m[2]) - val(m[1]));
+        if ((m = p.match(/^(−?\d+) ([+−]) (\d+) = \?$/))) return expect(val(q.answer)).toBe(val(m[1]) + (m[2] === '+' ? 1 : -1) * Number(m[3]));
+        break;
+      }
+      case 'decimal-muldiv': {
+        let want: number | undefined;
+        if ((m = p.match(/^([\d.,]+) ([×÷]) ([\d,]+) = \?$/))) want = m[2] === '×' ? val(m[1]) * val(m[3]) : val(m[1]) / val(m[3]);
+        if ((m = p.match(/^A rope is ([\d.,]+) \w+ long\. It is cut into (\d+)/))) want = val(m[1]) / Number(m[2]);
+        if (want === undefined) break;
+        expect(val(q.answer)).toBeCloseTo(want, 9);
+        if (q.choices) expect(new Set(q.choices.map(val)).size).toBe(q.choices.length);
+        return;
+      }
+      case 'fractions-mixed':
+        if ((m = p.match(/^Write (\d+)\/(\d+) as a mixed number/))) {
+          const v = Number(m[1]) / Number(m[2]);
+          expect(frac(q.answer)).toBeCloseTo(v, 9);
+          expect(q.answer).toMatch(/^\d+ \d+\/\d+$/);
+          for (const w of others) expect(Math.abs(frac(w) - v) > 1e-9, w).toBe(true);
+          return;
+        }
+        if ((m = p.match(/^(\d+)\/(\d+) makes how many wholes/))) return expect(ans).toBe(Number(m[1]) / Number(m[2]));
+        if ((m = p.match(/^(\d+) (\d+)\/(\d+) = \?\/(\d+)$/))) return expect(ans).toBe(Number(m[1]) * Number(m[3]) + Number(m[2]));
+        if ((m = p.match(/\n(.+)  or  (.+)$/))) {
+          const [a, b] = [frac(m[1]), frac(m[2])];
+          return expect(q.answer).toBe(a - b > 1e-9 ? m[1] : b - a > 1e-9 ? m[2] : 'They are equal');
+        }
+        break;
+      case 'exponents':
+        if ((m = p.match(/^(\d+[²³⁴⁵⁶]) = \?$/))) return expect(ans).toBe(power(m[1]));
+        if ((m = p.match(/^What is (\d+) squared/))) return expect(ans).toBe(Number(m[1]) ** 2);
+        if ((m = p.match(/same as (\d+) × (\d+)\?$/))) {
+          expect(power(q.answer)).toBe(Number(m[1]) * Number(m[2]));
+          for (const w of others) if (/^\d+[²³⁴⁵⁶]$/.test(w)) expect(power(w), w).not.toBe(Number(m[1]) * Number(m[2]));
+          return;
+        }
+        if ((m = p.match(/same as (\d+[²³⁴⁵⁶])\?$/))) {
+          expect(product(q.answer)).toBe(power(m[1]));
+          for (const w of others) expect(w.includes('+') ? Number(w.split(' + ')[0]) * w.split(' + ').length : product(w), w).not.toBe(power(m[1]));
+          return;
+        }
+        if ((m = p.match(/^(\d+)ⁿ = ([\d,]+)\./))) return expect(Number(m[1]) ** Number(ans)).toBe(val(m[2]));
+        if ((m = p.match(/\n(.+)  or  (.+)$/))) {
+          const [a, b] = [power(m[1]), power(m[2])];
+          return expect(q.answer).toBe(a > b ? m[1] : a < b ? m[2] : 'They are equal');
+        }
+        if ((m = p.match(/^(\d+)² \+ (\d+)² = \?$/))) return expect(ans).toBe(Number(m[1]) ** 2 + Number(m[2]) ** 2);
+        break;
+    }
+    throw new Error(`no checker for ${q.topic}: ${p}`);
+  }
+
+  it('every new topic has levels and labels', () => {
+    for (const t of NEW) {
+      expect(MATH_TOPICS[t], t).toBeTruthy();
+      expect(MATH_TOPICS_FR[t], t).toBeTruthy();
+      expect(mathTopicLevels(t)).toEqual([1, 2, 3]);
+    }
+    for (const t of Object.keys(MATH_TOPICS)) expect(MATH_TOPICS_FR[t], t).toBeTruthy();
+  });
+
+  for (const topic of NEW) {
+    it(`${topic} answers are right`, () => {
+      for (const units of ['imperial', 'metric'] as const) {
+        setUnits(units);
+        for (const d of [1, 2, 3] as Difficulty[]) {
+          for (let i = 0; i < 400; i++) {
+            const q = makeMathQuestion(topic, d);
+            check(q);
+            if (q.input === 'number') expect(q.answer, q.prompt).toMatch(/^\d+$/);
+            else expect(q.choices!.length, q.prompt).toBeGreaterThanOrEqual(2);
+          }
+        }
+      }
+      setUnits('imperial');
+    });
+  }
 });

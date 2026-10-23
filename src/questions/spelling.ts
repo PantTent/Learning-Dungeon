@@ -36,8 +36,8 @@ export const SPELL_WORDS_EN: Record<1 | 2 | 3 | 4 | 5, string[]> = {
   ],
 };
 
-/** Quebec-style dictée words, 1re to 3e année. */
-export const SPELL_WORDS_FR: Record<1 | 2 | 3, string[]> = {
+/** Quebec / Nova Scotia (CSAP) style dictée words, 1re to 6e année. */
+export const SPELL_WORDS_FR: Record<1 | 2 | 3 | 4 | 5 | 6, string[]> = {
   1: [
     'papa', 'maman', 'chat', 'chien', 'lit', 'sac', 'vélo', 'école', 'lune', 'robe', 'tomate', 'jupe', 'moto', 'ballon',
     'soleil', 'maison', 'porte', 'table', 'livre', 'pomme', 'rouge', 'bleu', 'jaune', 'petit', 'grand', 'bébé', 'lapin',
@@ -55,11 +55,34 @@ export const SPELL_WORDS_FR: Record<1 | 2 | 3, string[]> = {
     'ordinateur', 'papillon', 'parapluie', 'pharmacie', 'plage', 'quelquefois', 'récréation', 'rivière', 'sapin', 'silence',
     'sorcière', 'téléphone', 'tempête', 'tortue', 'trésor', 'vacances', 'village', 'voyage', 'pourquoi', 'hibou',
   ],
+  4: [
+    'alphabet', 'araignée', 'bibliothèque', 'bouteille', 'champignon', 'chaussette', 'cuisine', 'dinosaure', 'enveloppe',
+    'escalier', 'étoile', 'fenêtre', 'fourchette', 'grenouille', 'hélicoptère', 'horloge', 'insecte', 'jambon', 'kangourou',
+    'légume', 'marteau', 'médecin', 'mouchoir', 'orteil', 'pantalon', 'pyjama', 'raquette', 'squelette', 'tambour',
+    'tracteur', 'triangle', 'tulipe', 'violon', 'souvent', 'parfois', 'longtemps', 'bientôt', 'demain', 'hier', 'ensuite',
+  ],
+  5: [
+    'aéroport', 'ambulance', 'appartement', 'aquarium', 'astronaute', 'aventure', 'boussole', 'calendrier', 'capitaine',
+    'catastrophe', 'cinéma', 'continent', 'électricité', 'exercice', 'explorateur', 'frontière', 'géographie', 'gymnase',
+    'hameçon', 'horizon', 'imagination', 'instrument', 'laboratoire', 'microscope', 'moustique', 'océan', 'orchestre',
+    'paysage', 'pingouin', 'planète', 'population', 'poussière', 'rhinocéros', 'spectacle', 'thermomètre', 'tourbillon',
+    'volcan', 'vraiment', 'malgré', 'pourtant',
+  ],
+  6: [
+    'accueil', 'agriculture', 'architecte', 'atmosphère', 'biodiversité', 'chrysalide', 'circonférence', 'civilisation',
+    'communauté', 'connaissance', 'conséquence', 'démocratie', 'développement', 'écosystème', 'enthousiasme', 'équilibre',
+    'gouvernement', 'hémisphère', 'hypothèse', 'immédiatement', 'inondation', 'kilomètre', 'labyrinthe', 'métamorphose',
+    'néanmoins', 'orthographe', 'parlement', 'patrimoine', 'phénomène', 'photographie', 'pyramide', 'rythme', 'silhouette',
+    'symbole', 'technologie', 'territoire', 'tremblement', 'vocabulaire', 'archipel', 'glacier',
+  ],
 };
 
 export function spellWords(lang: 'en' | 'fr', grade: Grade): string[] {
-  if (lang === 'fr') return SPELL_WORDS_FR[Math.min(3, Math.max(1, grade)) as 1 | 2 | 3];
-  return SPELL_WORDS_EN[grade];
+  // Numeric clamp so this keeps working whatever range Grade covers (1-6).
+  const g = Math.round(Math.min(6, Math.max(1, Number(grade) || 1)));
+  if (lang === 'fr') return SPELL_WORDS_FR[g as 1 | 2 | 3 | 4 | 5 | 6];
+  // English lists stop at grade 5.
+  return SPELL_WORDS_EN[Math.min(5, g) as 1 | 2 | 3 | 4 | 5];
 }
 
 /** Clean up a typed or pasted word list: one word per line or comma, no doubles. */

@@ -1,6 +1,6 @@
-import { ANIMALS, GORILLA, JUNGLE, QUESTS, RECIPES, SHOP } from './data';
+import { ANIMALS, BOSSES, DESERT, FOODS, FOREST, GORILLA, JUNGLE, MOUNTAINS, QUESTS, RECIPES, SHOP } from './data';
 import {
-  buy, canCook, cook, desertOpen, loadAnimals, questReady,
+  buy, canCook, cook, currentQuest, desertOpen, landOpen, loadAnimals, questOpen, questReady, setBossCalm, swipe,
   accept, addFood, calmAmount, canTurnIn, dropsFor, eat, gainXp, makeFoe, maxHearts, moves, newAnimalSave, progress, startCalm, turnIn,
   xpToNext,
 } from './state';
@@ -172,5 +172,53 @@ describe('Animal Kingdom Quest rules', () => {
     expect(s.quests).toMatchObject({ pie: 'done', puppies: 'active', fossils: 'new', cook: 'new', tortoise: 'new' });
     expect(s.charms).toEqual([]);
     expect(s.cooked).toBe(0);
+  });
+
+  it('Part 3: each land opens after the boss before it, and the last quests', () => {
+    const s = newAnimalSave('Zoe', 'snake', 4, 0);
+    expect(landOpen(s, 'jungle')).toBe(true);
+    expect([landOpen(s, 'desert'), landOpen(s, 'forest'), landOpen(s, 'mountains')]).toEqual([false, false, false]);
+    s.gorillaCalm = true;
+    s.tortoiseCalm = true;
+    expect(landOpen(s, 'forest')).toBe(true);
+    expect(landOpen(s, 'mountains')).toBe(false);
+    expect(questOpen(s, 'mushrooms')).toBe(true);
+    expect(questOpen(s, 'crystals')).toBe(false);
+    // Grandma Badger asks for the pie first, then the soup.
+    expect(currentQuest(s, 'badger')!.id).toBe('pie');
+    s.quests.pie = 'done';
+    expect(currentQuest(s, 'badger')!.id).toBe('mushrooms');
+    accept(s, 'mushrooms');
+    s.mushrooms = ['log0', 'log1', 'log2', 'log3', 'log4'];
+    expect(turnIn(s, 'mushrooms')).not.toBeNull();
+    expect(s.foods.soup).toBe(2);
+    expect(questReady(s, 'moose')).toBe(true);
+    accept(s, 'moose');
+    setBossCalm(s, 'moose');
+    expect(canTurnIn(s, 'moose')).toBe(true);
+    expect(landOpen(s, 'mountains')).toBe(true);
+    // The Mayor's crystals come after the gorilla.
+    s.quests.gorilla = 'done';
+    expect(currentQuest(s, 'beaver')!.id).toBe('crystals');
+    accept(s, 'leopard');
+    setBossCalm(s, 'snowleopard');
+    expect(canTurnIn(s, 'leopard')).toBe(true);
+  });
+
+  it('swipes grow slowly with level, so fights stay fair', () => {
+    expect(swipe(makeFoe(JUNGLE[0], 1))).toBe(1);
+    expect(swipe(makeFoe(JUNGLE[0], 4))).toBe(1);
+    expect(swipe(makeFoe(JUNGLE[0], 5))).toBe(2);
+    expect(swipe(makeFoe(JUNGLE[0], 12))).toBe(3);
+  });
+
+  it('every boss and wild animal has a fact, and every food in a recipe or the shop exists', () => {
+    for (const w of [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...Object.values(BOSSES)]) {
+      expect(w.fact.en.length, w.id).toBeGreaterThan(10);
+      expect(w.fact.fr.length, w.id).toBeGreaterThan(10);
+      if (w.drop) expect(FOODS.map((f) => f.id)).toContain(w.drop[0]);
+    }
+    for (const r of RECIPES) for (const id of [r.makes, ...Object.keys(r.needs)]) expect(FOODS.map((f) => f.id)).toContain(id);
+    for (const it of SHOP.filter((i) => i.kind === 'food')) expect(FOODS.map((f) => f.id)).toContain(it.id);
   });
 });

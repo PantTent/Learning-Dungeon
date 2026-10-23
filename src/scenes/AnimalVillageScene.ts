@@ -1,11 +1,22 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, BOSSES, DESERT, DESERT_QUESTS, food, JUNGLE, LANDS, QUESTS, RECIPES, SHOP, type WildDef } from '../animal/data';
-import { buy, canCook, canTurnIn, cook, desertOpen, hasCharm, loadAnimals, maxHearts, progress, puppiesFound, questReady, rest, saveAnimals, type AnimalSave } from '../animal/state';
+import { animal, BOSSES, DESERT, FOREST, food, JUNGLE, LANDS, MOUNTAINS, QUESTS, RECIPES, SHOP, wild, type LandId, type WildDef } from '../animal/data';
+import { buy, canCook, canTurnIn, cook, currentQuest, hasCharm, landOpen, questOpen, loadAnimals, maxHearts, progress, puppiesFound, questReady, rest, saveAnimals, type AnimalSave } from '../animal/state';
 import { ask, dialog, grassTexture, keyVector, questTalk, say, Stick, topBar, tx } from '../animal/ui';
 import { jungleState } from './AnimalJungleScene';
 import { desertState } from './AnimalDesertScene';
+import { forestState } from './AnimalForestScene';
+import { mountainsState } from './AnimalMountainsScene';
+import type { LandState } from './AnimalLandScene';
+
+/** Each land's screen, and what it remembers between battles. */
+const LAND_SCENES: Record<LandId, { key: string; state: LandState }> = {
+  jungle: { key: 'AnimalJungle', state: jungleState },
+  desert: { key: 'AnimalDesert', state: desertState },
+  forest: { key: 'AnimalForest', state: forestState },
+  mountains: { key: 'AnimalMountains', state: mountainsState },
+};
 import { C, H, W, button, panel, txt } from '../ui/widgets';
 
 /** The village helpers stand here. */
@@ -40,7 +51,7 @@ export class AnimalVillageScene extends Phaser.Scene {
     super('AnimalVillage');
   }
 
-  create(data: { fresh?: boolean; from?: 'jungle' | 'desert'; tired?: boolean } = {}) {
+  create(data: { fresh?: boolean; from?: LandId; tired?: boolean } = {}) {
     const s = loadAnimals();
     if (!s) {
       this.scene.start('AnimalSetup', { fresh: true });
@@ -51,7 +62,12 @@ export class AnimalVillageScene extends Phaser.Scene {
     this.target = null;
     playMusic('farm');
     this.drawVillage();
-    const start = data.from === 'jungle' ? { x: W - 80, y: H / 2 + 20 } : data.from === 'desert' ? { x: W / 2, y: H - 60 } : { x: W / 2, y: H / 2 + 60 };
+    const start = {
+      jungle: { x: W - 80, y: H / 2 + 20 },
+      desert: { x: W / 2, y: H - 60 },
+      forest: { x: 80, y: H / 2 + 20 },
+      mountains: { x: W / 2, y: TOP + 40 },
+    }[data.from ?? ('' as LandId)] ?? { x: W / 2, y: H / 2 + 60 };
     this.hero = this.add.image(start.x, start.y, animal(s.animal).sprite).setScale(3.6).setDepth(start.y);
     if (data.from === 'jungle') this.hero.setFlipX(true);
     this.tweens.add({ targets: this.hero, scaleY: 3.4, duration: 450, yoyo: true, repeat: -1 });
@@ -69,6 +85,8 @@ export class AnimalVillageScene extends Phaser.Scene {
       say(this, tr('You got tired and came home to rest. All hearts back!'), C.good);
     } else if (data.fresh) {
       this.time.delayedCall(400, () => this.talk('beaver'));
+    } else if (s.quests.leopard === 'done' && !s.festival) {
+      this.time.delayedCall(600, () => this.festival());
     }
   }
 
@@ -103,13 +121,12 @@ export class AnimalVillageScene extends Phaser.Scene {
     keeper.on('pointerup', () => this.walk(SHOPKEEPER.x - 50, SHOPKEEPER.y, () => this.shop()));
     this.label(SHOPKEEPER.x, SHOPKEEPER.y + 32, tr('Hazel Hedgehog'), 13);
 
-    // The villagers who need help (Auntie Camel waits in the Desert).
-    for (const q of QUESTS) {
-      const sp = NPC_SPOT[q.giver];
-      if (!sp) continue;
+    // The villagers who need help (some helpers live out in the lands).
+    for (const [giver, sp] of Object.entries(NPC_SPOT)) {
+      const q = QUESTS.find((x) => x.giver === giver)!;
       const npc = this.add.image(sp.x, sp.y, q.sprite).setScale(3.6).setFlipX(sp.x > W / 2).setInteractive({ useHandCursor: true }).setDepth(sp.y);
       this.tweens.add({ targets: npc, y: sp.y - 4, duration: 700 + sp.x, yoyo: true, repeat: -1 });
-      npc.on('pointerup', () => this.walk(sp.x + (sp.x > W / 2 ? -60 : 60), sp.y + 10, () => this.talk(q.giver)));
+      npc.on('pointerup', () => this.walk(sp.x + (sp.x > W / 2 ? -60 : 60), sp.y + 10, () => this.talk(giver)));
       this.label(sp.x, sp.y + 34, tx(q.giverName), 14);
     }
     // Rescued puppies play by their mom; calm bosses come to visit.
@@ -119,22 +136,30 @@ export class AnimalVillageScene extends Phaser.Scene {
     }
     if (s.gorillaCalm) this.add.image(590, 372, 'boss_gorilla').setScale(2.2).setDepth(372);
     if (s.tortoiseCalm) this.add.image(250, 210, 'boss_tortoise').setScale(2).setDepth(200);
+    if (s.mooseCalm) this.add.image(140, 352, 'boss_moose').setScale(2).setDepth(352);
+    // The Winter Festival: flags, a snowman and the snow leopard visiting.
+    if (s.leopardCalm) {
+      for (const x of [250, 700]) this.add.image(x, 346, 'prop_bunting').setScale(3).setDepth(346);
+      this.add.image(790, 340, 'prop_snowman').setScale(3).setDepth(340);
+      this.add.image(420, 350, 'boss_snowleopard').setScale(2).setDepth(350);
+    }
 
-    // The four ways out.
+    // The four ways out: open lands get a sign, closed ones a locked gate.
     for (const land of LANDS) {
       const pos = { right: { x: W - 34, y: H / 2 + 24 }, left: { x: 34, y: H / 2 + 24 }, up: { x: W / 2, y: TOP + 14 }, down: { x: W / 2, y: H - 36 } }[land.dir];
-      const open = land.open && (land.id !== 'desert' || desertOpen(s));
-      if (open && land.dir === 'right') {
-        const sign = this.add.image(pos.x - 30, pos.y - 56, 'prop_sign').setScale(3);
-        this.tweens.add({ targets: sign, angle: 4, duration: 800, yoyo: true, repeat: -1 });
-        this.label(pos.x - 60, pos.y - 100, `${tx(land.name)} →`);
-      } else if (open && land.dir === 'down') {
-        this.add.image(pos.x + 70, pos.y - 10, 'prop_desertsign').setScale(3);
-        this.label(pos.x + 70, pos.y - 70, `${tx(land.name)} ↓`);
+      if (landOpen(s, land.id)) {
+        const look = {
+          right: { sign: 'prop_sign', x: pos.x - 30, y: pos.y - 56, ly: pos.y - 100, arrow: '→' },
+          down: { sign: 'prop_desertsign', x: pos.x + 70, y: pos.y - 10, ly: pos.y - 70, arrow: '↓' },
+          left: { sign: 'prop_forestsign', x: pos.x + 30, y: pos.y - 56, ly: pos.y - 100, arrow: '←' },
+          up: { sign: 'prop_snowsign', x: pos.x + 70, y: pos.y + 10, ly: pos.y - 26, arrow: '↑' },
+        }[land.dir];
+        const sign = this.add.image(look.x, look.y, look.sign).setScale(3).setDepth(look.y);
+        if (land.dir === 'right') this.tweens.add({ targets: sign, angle: 4, duration: 800, yoyo: true, repeat: -1 });
+        this.label(look.x + (land.dir === 'right' ? -30 : land.dir === 'left' ? 30 : 0), look.ly, land.dir === 'left' ? `${look.arrow} ${tx(land.name)}` : `${tx(land.name)} ${look.arrow}`);
       } else {
         const gate = this.add.image(pos.x, pos.y, 'prop_gate').setScale(land.dir === 'up' ? 2.2 : 2.6).setInteractive({ useHandCursor: true }).setDepth(pos.y + 40);
-        const msg = land.open ? tr('{land}: opens when the Grumpy Gorilla is calm.', { land: tx(land.name) }) : tr('{land}: coming soon!', { land: tx(land.name) });
-        gate.on('pointerup', () => say(this, msg, '#ffe9a0'));
+        gate.on('pointerup', () => say(this, this.lockedText(land.id), '#ffe9a0'));
         this.label(pos.x + (land.dir === 'left' ? 30 : 0), pos.y + (land.dir === 'down' ? -54 : 40), tx(land.name), 13);
       }
     }
@@ -150,7 +175,8 @@ export class AnimalVillageScene extends Phaser.Scene {
     // Quest marks over the villagers: ! new, ? ready to hand in, ... in progress.
     this.marks.forEach((m) => m.destroy());
     const s = this.s;
-    this.marks = QUESTS.filter((q) => NPC_SPOT[q.giver] && s.quests[q.id] !== 'done' && (s.quests[q.id] !== 'new' || questReady(s, q.id)) && this.questOpen(q.id)).map((q) => {
+    const now = Object.keys(NPC_SPOT).map((giver) => currentQuest(s, giver)!);
+    this.marks = now.filter((q) => s.quests[q.id] !== 'done' && (s.quests[q.id] !== 'new' || questReady(s, q.id)) && questOpen(s, q.id)).map((q) => {
       const sp = NPC_SPOT[q.giver];
       const ready = canTurnIn(s, q.id);
       const mark = s.quests[q.id] === 'new' ? '!' : ready ? '?' : '…';
@@ -160,9 +186,10 @@ export class AnimalVillageScene extends Phaser.Scene {
     });
   }
 
-  /** Desert quests start once the Desert is open. */
-  private questOpen(id: string) {
-    return !['fossils', 'tortoise'].includes(id) || desertOpen(this.s);
+  /** Why a land's gate is still locked. */
+  private lockedText(id: LandId) {
+    const land = LANDS.find((l) => l.id === id)!;
+    return tr('{land}: opens when the {boss} is calm.', { land: tx(land.name), boss: tx(wild(land.after!).name) });
   }
 
   private walk(x: number, y: number, then?: () => void) {
@@ -194,25 +221,59 @@ export class AnimalVillageScene extends Phaser.Scene {
     this.hero.x = Phaser.Math.Clamp(this.hero.x + vx * speed, 20, W - 10);
     this.hero.y = Phaser.Math.Clamp(this.hero.y + vy * speed, TOP, H - 10);
     this.hero.setDepth(this.hero.y);
-    // Walking off the edge along a path: into a land.
-    if (this.hero.x >= W - 14 && Math.abs(this.hero.y - (H / 2 + 24)) < 70) this.toLand('jungle');
-    if (this.hero.y >= H - 14 && Math.abs(this.hero.x - W / 2) < 60) {
-      if (desertOpen(this.s)) this.toLand('desert');
-      else if (t > this.bumped) {
-        this.bumped = t + 3000;
-        this.hero.y -= 30;
-        say(this, tr('{land}: opens when the Grumpy Gorilla is calm.', { land: tx(LANDS.find((l) => l.id === 'desert')!.name) }), '#ffe9a0');
-      }
-    }
+    // Walking off an edge along a path: into a land (or bump into its locked gate).
+    const onPathX = Math.abs(this.hero.y - (H / 2 + 24)) < 70;
+    const onPathY = Math.abs(this.hero.x - W / 2) < 60;
+    if (this.hero.x >= W - 14 && onPathX) this.toLand('jungle', t);
+    if (this.hero.y >= H - 14 && onPathY) this.toLand('desert', t);
+    if (this.hero.x <= 24 && onPathX) this.toLand('forest', t);
+    if (this.hero.y <= TOP + 2 && onPathY) this.toLand('mountains', t);
   }
 
-  private toLand(land: 'jungle' | 'desert') {
+  private toLand(land: LandId, t: number) {
     if (this.busy) return;
+    if (!landOpen(this.s, land)) {
+      if (t > this.bumped) {
+        this.bumped = t + 3000;
+        say(this, this.lockedText(land), '#ffe9a0');
+      }
+      // Step back from the gate.
+      const back = { jungle: [-30, 0], desert: [0, -30], forest: [30, 0], mountains: [0, 30] }[land];
+      this.hero.x += back[0];
+      this.hero.y += back[1];
+      return;
+    }
     this.busy = true;
     saveAnimals(this.s);
-    (land === 'jungle' ? jungleState : desertState).fresh = true;
+    const to = LAND_SCENES[land];
+    to.state.fresh = true;
     this.cameras.main.fadeOut(300);
-    this.time.delayedCall(320, () => this.scene.start(land === 'jungle' ? 'AnimalJungle' : 'AnimalDesert'));
+    this.time.delayedCall(320, () => this.scene.start(to.key));
+  }
+
+  /** The Winter Festival: the happy ending (for now!). */
+  private festival() {
+    const s = this.s;
+    s.festival = true;
+    saveAnimals(s);
+    this.busy = true;
+    sfx('victory');
+    const c = this.add.container(0, 0).setDepth(3000);
+    c.add(this.add.rectangle(0, 0, W, H, 0, 0.6).setOrigin(0).setInteractive());
+    c.add(panel(this, 90, 60, W - 180, H - 100, 0x1d1730, 0x9ad0ff));
+    c.add(txt(this, W / 2, 96, tr('The Winter Festival!'), 32, '#ffd24a').setOrigin(0.5));
+    ['boss_gorilla', 'boss_tortoise', 'boss_moose', 'boss_snowleopard'].forEach((b, i) => {
+      const img = this.add.image(220 + i * 175, 210, b).setScale(2.6);
+      this.tweens.add({ targets: img, y: 196, duration: 400 + i * 80, yoyo: true, repeat: -1 });
+      c.add(img);
+    });
+    c.add(this.add.image(W / 2, 300, animal(s.animal).sprite).setScale(4.4));
+    c.add(txt(this, W / 2, 360, tr('Every grumpy animal in the kingdom is happy again, thanks to you, {name}! The whole village is dancing in the snow.', { name: s.name }), 18, C.text, { align: 'center', wordWrap: { width: W - 260 } }).setOrigin(0.5, 0));
+    c.add(txt(this, W / 2, 428, tr('You can keep playing: calm more animals, cook, and fill the Animal Book!'), 15, '#9ad0ff', { align: 'center', wordWrap: { width: W - 260 } }).setOrigin(0.5, 0));
+    c.add(button(this, W / 2, H - 70, 220, 46, tr('Hooray!'), () => {
+      c.destroy();
+      this.busy = false;
+    }, { size: 20, color: 0x2f9a4a }));
   }
 
   private restHere() {
@@ -225,7 +286,7 @@ export class AnimalVillageScene extends Phaser.Scene {
 
   /** A villager: offer their quest, cheer you on, or take the finished quest. */
   private talk(giver: string) {
-    const q = QUESTS.find((x) => x.giver === giver)!;
+    const q = currentQuest(this.s, giver)!;
     const s = this.s;
     this.busy = true;
     const done = () => {
@@ -241,41 +302,45 @@ export class AnimalVillageScene extends Phaser.Scene {
       ]);
       return;
     }
-    if (!this.questOpen(q.id)) {
-      dialog(this, q.sprite, tx(q.giverName), tr('I will need your help in the Desert one day. It opens when the Grumpy Gorilla is calm!'), [{ label: tr('Okay!'), fn: done }]);
+    if (!questOpen(s, q.id)) {
+      const land = LANDS.find((l) => l.id === q.land)!;
+      dialog(this, q.sprite, tx(q.giverName), tr('I will need your help in the {land} one day. It opens when the {boss} is calm!', { land: tx(land.name), boss: tx(wild(land.after!).name) }), [{ label: tr('Okay!'), fn: done }]);
       return;
     }
     questTalk(this, s, q, done);
   }
 
+  /** All the quests, in two columns. */
   private questBoard() {
     const s = this.s;
     this.busy = true;
     const c = this.add.container(0, 0).setDepth(3000);
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.6).setOrigin(0).setInteractive());
-    c.add(panel(this, 100, 70, W - 200, H - 100, 0x3a2614, 0xd0a468));
-    c.add(txt(this, W / 2, 94, tr('Quest board'), 26, '#ffd24a').setOrigin(0.5));
+    c.add(panel(this, 40, 64, W - 80, H - 84, 0x3a2614, 0xd0a468));
+    c.add(txt(this, W / 2, 88, tr('Quest board'), 26, '#ffd24a').setOrigin(0.5));
+    const where: Partial<Record<LandId, string>> = { desert: tr('(at the Desert oasis)'), forest: tr('(in the Enchanted Forest)'), mountains: tr('(in the Snowy Mountains)') };
     QUESTS.forEach((q, i) => {
-      const y = 124 + i * 54;
+      const x = 70 + Math.floor(i / 5) * 445;
+      const y = 116 + (i % 5) * 64;
       const st = s.quests[q.id];
-      c.add(this.add.image(152, y + 18, q.sprite).setScale(2.4));
-      c.add(txt(this, 186, y, `${tx(q.title)}  ·  ${tx(q.giverName)}`, 17, st === 'done' ? C.good : '#ffffff'));
-      const where = DESERT_QUESTS.includes(q.id) ? ` ${tr('(at the Desert oasis)')}` : '';
+      const at = q.where ? ` ${where[q.where]}` : '';
+      c.add(this.add.image(x + 20, y + 20, q.sprite).setScale(2.2));
+      c.add(txt(this, x + 48, y, tx(q.title), 15, st === 'done' ? C.good : '#ffffff', { wordWrap: { width: 380 } }));
       const line =
         st === 'done'
           ? tr('Done! Thank you!')
-          : !this.questOpen(q.id)
-            ? tr('Later: after the gorilla is calm.')
+          : !questOpen(s, q.id)
+            ? tr('Later: when the {land} opens.', { land: tx(LANDS.find((l) => l.id === q.land)!.name) })
             : st === 'new' && !questReady(s, q.id)
               ? tr('Later: when you reach level {lv} or finish the other quests.', { lv: q.boss!.level })
               : st === 'new'
-                ? tr('Talk to {who} to start.', { who: tx(q.giverName) }) + where
+                ? tr('Talk to {who} to start.', { who: tx(q.giverName) }) + at
                 : canTurnIn(s, q.id)
-                  ? tr('Ready! Go see {who}.', { who: tx(q.giverName) }) + where
-                  : tr('{n} of {need}', { n: progress(s, q.id), need: q.need });
-      c.add(txt(this, 186, y + 24, line, 14, st === 'done' ? C.good : canTurnIn(s, q.id) ? '#ffd24a' : C.dim));
+                  ? tr('Ready! Go see {who}.', { who: tx(q.giverName) }) + at
+                  : `${tx(q.giverName)}: ${tr('{n} of {need}', { n: progress(s, q.id), need: q.need })}`;
+      c.add(txt(this, x + 48, y + 22, line, 12, st === 'done' ? C.good : canTurnIn(s, q.id) ? '#ffd24a' : C.dim, { wordWrap: { width: 380 } }));
     });
-    c.add(button(this, W / 2, H - 56, 180, 42, tr('Close'), () => {
+    c.add(button(this, W / 2, H - 46, 180, 40, tr('Close'), () => {
       c.destroy();
       this.busy = false;
     }, { size: 18, color: 0x3a3450 }));
@@ -383,7 +448,7 @@ export class AnimalVillageScene extends Phaser.Scene {
       c.destroy();
       this.busy = false;
     };
-    const fact = this.add.text(W / 2, H - 98, '', { fontFamily: 'sans-serif', fontSize: '15px', color: '#9ad0ff', align: 'center', wordWrap: { width: W - 260 } }).setOrigin(0.5);
+    const fact = this.add.text(W / 2, H - 82, '', { fontFamily: 'sans-serif', fontSize: '15px', color: '#9ad0ff', align: 'center', wordWrap: { width: W - 260 } }).setOrigin(0.5);
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.6).setOrigin(0).setInteractive());
     c.add(panel(this, 70, 60, W - 140, H - 84, 0x2a2430, 0xc8c8d8));
     c.add(txt(this, W / 2, 86, tr('Museum'), 28, '#ffd24a').setOrigin(0.5));
@@ -394,20 +459,21 @@ export class AnimalVillageScene extends Phaser.Scene {
       if (i < s.fossils.length) c.add(this.add.image(x, 124, 'item_fossil').setScale(2.8));
       else c.add(txt(this, x, 124, '?', 20, C.dim).setOrigin(0.5));
     }
-    const all: WildDef[] = [...JUNGLE, ...DESERT, ...Object.values(BOSSES)];
+    const all: WildDef[] = [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...Object.values(BOSSES)];
     c.add(txt(this, 110, 160, tr('Animal Book: {n} of {all} animals calmed. Tap one to read about it.', { n: all.filter((a) => s.facts.includes(a.id)).length, all: all.length }), 16, '#ffe9a0'));
+    // Twelve to a row; tap one to read its name and fact.
     all.forEach((a, i) => {
-      const x = 130 + (i % 10) * 78;
-      const y = 228 + Math.floor(i / 10) * 86;
+      const x = 118 + (i % 12) * 66;
+      const y = 206 + Math.floor(i / 12) * 64;
       const met = s.facts.includes(a.id);
       const big = !!BOSSES[a.id];
-      const img = this.add.image(x, y, a.sprite).setScale(big ? 1.6 : 3).setInteractive({ useHandCursor: true });
+      c.add(this.add.rectangle(x, y, 58, 56, met ? 0x3a3450 : 0x1a1420).setStrokeStyle(2, met ? 0x9a8ac8 : 0x4a3a5a));
+      const img = this.add.image(x, y, a.sprite).setScale(big ? 1.4 : 2.6).setInteractive({ useHandCursor: true });
       if (!met) img.setTintFill(0x14101e).setAlpha(0.8);
       img.on('pointerup', () => fact.setText(met ? `${tx(a.name)}: ${tx(a.fact)}` : tr('Calm this animal to learn about it!')));
       c.add(img);
-      c.add(txt(this, x, y + 32, met ? tx(a.name) : '?', 11, met ? '#ffffff' : C.dim, { align: 'center', wordWrap: { width: 74 } }).setOrigin(0.5, 0));
     });
     c.add(fact);
-    c.add(button(this, W / 2, H - 50, 180, 40, tr('Close'), close, { size: 18, color: 0x3a3450 }));
+    c.add(button(this, W / 2, H - 44, 180, 38, tr('Close'), close, { size: 18, color: 0x3a3450 }));
   }
 }

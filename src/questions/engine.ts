@@ -7,6 +7,7 @@ import { spellOut, spellWords } from './spelling';
 import { sizedQuestion, type GroupOptions } from './custom';
 import type { Lang } from '../i18n';
 import { READING_BANK } from './readingBank';
+import { READING_BANK_FR_UPPER } from './readingBankFrUpper';
 import { READING_BANK_FR, READING_LESSONS_FR } from './readingBankFr';
 import { READING_BANK_EARLY } from './readingBankEarly';
 import { getLang, type Lang as LangT } from '../i18n';
@@ -57,7 +58,12 @@ export interface LearningSettings {
   spellWords?: string[];
   /** Grown-up choices per topic group: question types, number sizes (see custom.ts). */
   options?: Record<string, GroupOptions>;
+  /** Topic groups that existed when these settings were saved (new ones get turned on). */
+  knownGroups?: string[];
 }
+
+/** Topic groups added after the first version (older saves turn them on). */
+const NEW_GROUPS = ['fr-fractions'];
 
 export function newLearningStats(): LearningStats {
   return {
@@ -74,15 +80,19 @@ export function newLearningStats(): LearningStats {
 export function defaultLearningSettings(lang: Lang = 'en'): LearningSettings {
   // Spelling tests are picked on purpose (they need sound), so they start off.
   const groups = allGroupIds(lang).filter((g) => !SPELLING_GROUPS.includes(g));
-  return { mathPercent: 60, readAloud: false, grade: defaultGrade(lang), groups, focus: { multiply: [], divide: [] }, lang };
+  return { mathPercent: 60, readAloud: false, grade: defaultGrade(lang), groups, focus: { multiply: [], divide: [] }, lang, knownGroups: allGroupIds(lang) };
 }
 
 /** Fill in settings added after a save was created. */
 export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings {
   const lang: Lang = s.lang === 'fr' ? 'fr' : 'en';
   const d = defaultLearningSettings(lang);
-  const valid = new Set(allGroupIds(lang));
+  const all = allGroupIds(lang);
+  const valid = new Set(all);
   const groups = (s.groups ?? []).filter((g) => valid.has(g));
+  // Groups added since this save was made start turned on (except spelling tests).
+  const known = new Set(s.knownGroups ?? all.filter((g) => !NEW_GROUPS.includes(g)));
+  for (const g of all) if (!known.has(g) && !groups.includes(g) && !SPELLING_GROUPS.includes(g) && groups.length) groups.push(g);
   return {
     mathPercent: s.mathPercent ?? d.mathPercent,
     readAloud: s.readAloud ?? d.readAloud,
@@ -93,6 +103,7 @@ export function upgradeSettings(s: Partial<LearningSettings>): LearningSettings 
     levels: s.levels ?? {},
     spellWords: s.spellWords ?? [],
     options: s.options ?? {},
+    knownGroups: all,
   };
 }
 
@@ -148,7 +159,15 @@ export function normalize(ans: string): string {
 }
 
 export function isCorrect(q: Question, given: string): boolean {
+  // A tapped choice must be exactly that choice: in French "34,5" and "345"
+  // are different answers, so commas only get ignored for typed numbers.
+  if (q.input === 'choice') return sameChoice(given, q.answer);
   return normalize(given) === normalize(q.answer);
+}
+
+function sameChoice(a: string, b: string): boolean {
+  const tidy = (s: string) => s.trim().toLowerCase().replace(/[\u00a0\u202f]/g, ' ').replace(/[’`]/g, "'").replace(/\s+/g, ' ');
+  return tidy(a) === tidy(b);
 }
 
 /** The grade a group is on now, and the grades it can move between. */
@@ -280,7 +299,7 @@ export class QuestionEngine {
       return this.mathQuestion(pick(topics), step.d);
     }
     if (SPELLING_GROUPS.includes(groupId)) return this.spellingQuestion(step);
-    return this.readingQuestion(step.d, new Set(topics), step.early);
+    return this.readingQuestion(step.d, new Set(topics), step.early, step.upper);
   }
 
   /** Times tables picked for a group (the 1-digit number, or the divisor). */
@@ -333,9 +352,13 @@ export class QuestionEngine {
     return makeMathQuestion(topic, d, factors);
   }
 
-  private readingQuestion(d: Difficulty, topics: Set<string>, early = false): Question {
+  private readingQuestion(d: Difficulty, topics: Set<string>, early = false, upper = false): Question {
     const recent = new Set(this.stats.recent);
-    const { bank, prefix } = early ? { bank: READING_BANK_EARLY, prefix: 're' } : readingBank(this.settings.lang);
+    const { bank, prefix } = early
+      ? { bank: READING_BANK_EARLY, prefix: 're' }
+      : upper
+        ? { bank: READING_BANK_FR_UPPER, prefix: 'ru' }
+        : readingBank(this.settings.lang);
     const all = bank.map((item, i) => ({ item, i })).filter((x) => topics.has(x.item.topic));
     const id = (x: { i: number }) => `${prefix}:${x.i}`;
     let pool = all.filter((x) => x.item.difficulty === d && !recent.has(id(x)));

@@ -17,6 +17,11 @@ const DESERT_LAND: LandConfig = {
   bossLevel: 7,
   bossQuest: 'tortoise',
   exit: 'top',
+  ground: 'desert',
+  sign: 'prop_desertsign',
+  hidden: { quest: 'fossils', list: 'fossils', icon: 'item_fossil', dust: [0xe8c98a, 0xc8a060] },
+  strong: ['push', 'sniff'],
+  bossProp: 'prop_well',
   tree: (i) => (i % 3 === 2 ? { sprite: 'prop_desertrock', scale: 3 } : { sprite: 'prop_cactus', scale: 3 }),
   fruitTree: 'prop_palm',
   fruit: 'date',
@@ -44,6 +49,8 @@ const DESERT_LAND: LandConfig = {
     foundAcorns: tr('No fossil here, but you found 8 acorns!'),
     bossRoar: tr('HMPF! This is MY well! Go away, little one!'),
     bossNotYet: tr('(This tortoise is too grumpy for now. Talk to Auntie Camel at the oasis first.)'),
+    springLabel: tr('Oasis: rest here'),
+    springRest: tr('A cool drink at the oasis. All hearts back!'),
   }),
 };
 

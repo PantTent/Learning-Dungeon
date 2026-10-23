@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, quest, type QuestDef, type WildDef } from '../animal/data';
-import { addFood, bossCalm, canTurnIn, hasCharm, loadAnimals, rest, saveAnimals, skill, type AnimalSave } from '../animal/state';
+import { animal, quest, type LandId, type QuestDef, type SkillId, type WildDef } from '../animal/data';
+import { addFood, bossCalm, canTurnIn, hasCharm, loadAnimals, rest, saveAnimals, skill, warm, type AnimalSave } from '../animal/state';
 import { ask, dialog, grassTexture, keyVector, questTalk, say, Stick, topBar, tx } from '../animal/ui';
 import { blocked, type LandMap, type Pt } from '../animal/world';
 import type { BattleData } from './AnimalBattleScene';
@@ -38,7 +38,7 @@ export const newLandState = (): LandState => ({ fresh: true, wilds: [], fruitAt:
 /** Everything that makes one land different from another. */
 export interface LandConfig {
   key: string;
-  land: 'jungle' | 'desert';
+  land: LandId;
   map: LandMap;
   state: LandState;
   wilds: WildDef[];
@@ -47,12 +47,28 @@ export interface LandConfig {
   boss: WildDef;
   bossLevel: number;
   bossQuest: QuestDef['id'];
-  /** Where the path home is: the left edge (Jungle) or the top (Desert). */
-  exit: 'left' | 'top';
+  /** Which edge the path home is on. */
+  exit: 'left' | 'top' | 'right' | 'bottom';
+  ground: 'jungle' | 'desert' | 'forest' | 'snow';
+  /** Sign by the path home. */
+  sign: string;
+  /** What the rocks (or mounds, logs, snow piles) hide, and the quest that wants it. */
+  hidden: { quest: QuestDef['id']; list?: 'fossils' | 'mushrooms' | 'crystals'; icon?: string; dust: number[] };
+  /** Skills that break a rock with one question (a wrong answer still works). */
+  strong: SkillId[];
+  /** The rest spot (oasis, spring): water color. */
+  spring?: number;
+  /** Something next to the boss (the tortoise's well). */
+  bossProp?: string;
+  /** Too cold without a warm scarf: lose a heart now and then. */
+  cold?: boolean;
+  decorCount?: number;
   /** Look of the trees (or cacti and rocks). */
   tree: (i: number) => { sprite: string; scale: number };
   fruitTree: string;
   fruit: string;
+  /** A little picture by fruit trees that look like the other trees. */
+  fruitBadge?: string;
   /** Rocks (Jungle) or sand mounds (Desert). */
   rock: string;
   rockCracked: string;
@@ -83,7 +99,13 @@ export interface LandText {
   foundAcorns: string;
   bossRoar: string;
   bossNotYet: string;
+  springLabel?: string;
+  springRest?: string;
+  cold?: string;
 }
+
+/** One step toward each edge. */
+const DIR = { left: { x: -1, y: 0 }, right: { x: 1, y: 0 }, top: { x: 0, y: -1 }, bottom: { x: 0, y: 1 } };
 
 let uid = 1;
 const HERO_R = 16;
@@ -111,6 +133,8 @@ export class AnimalLandScene extends Phaser.Scene {
   private helperMark?: Phaser.GameObjects.Text;
   /** Rested at the oasis since you last walked away from it. */
   private rested = false;
+  /** When the cold next nips you (Snowy Mountains, no scarf). */
+  private chillAt = 0;
 
   constructor(cfg: LandConfig) {
     super(cfg.key);
@@ -131,7 +155,7 @@ export class AnimalLandScene extends Phaser.Scene {
 
   /** Rocks or mounds that are still there. */
   private isOpen(id: string) {
-    return this.cfg.land === 'jungle' ? this.s.rescued.includes(id) : this.s.dug.includes(id);
+    return this.cfg.hidden.list ? this.s.dug.includes(id) : this.s.rescued.includes(id);
   }
 
   create(data: { result?: 'calm' | 'tired' | 'ran'; wild?: number } = {}) {
@@ -144,6 +168,7 @@ export class AnimalLandScene extends Phaser.Scene {
     this.busy = false;
     this.target = null;
     this.rested = false;
+    this.chillAt = this.time.now + 20000;
     this.rocks.clear();
     this.gold.clear();
     this.pups = [];
@@ -201,19 +226,17 @@ export class AnimalLandScene extends Phaser.Scene {
     const m = this.map;
     const cfg = this.cfg;
     const text = cfg.text();
-    this.add.tileSprite(0, 0, m.w, m.h, grassTexture(this, cfg.land === 'desert' ? 'desert' : 'jungle')).setOrigin(0).setTileScale(3);
-    // The path home.
-    if (cfg.exit === 'left') {
-      this.add.rectangle(0, m.start.y - 30, 160, 60, 0xb88a50).setOrigin(0, 0);
-      this.add.image(60, m.start.y - 70, 'prop_sign').setScale(3).setFlipX(true).setDepth(m.start.y);
-      this.label(70, m.start.y - 120, text.home);
-    } else {
-      this.add.rectangle(m.start.x - 30, 0, 60, 160, 0xc89a60).setOrigin(0, 0);
-      this.add.image(m.start.x + 80, 160, 'prop_desertsign').setScale(3).setDepth(160);
-      this.label(m.start.x + 80, 110, text.home);
-    }
+    this.add.tileSprite(0, 0, m.w, m.h, grassTexture(this, cfg.ground)).setOrigin(0).setTileScale(3);
+    // The path home, with a sign beside it.
+    const d = DIR[cfg.exit];
+    const pathColor = { jungle: 0xb88a50, desert: 0xc89a60, forest: 0x7a5a3a, snow: 0xc8d8e8 }[cfg.ground];
+    if (d.x) this.add.rectangle(d.x < 0 ? 0 : m.w - 160, m.start.y - 30, 160, 60, pathColor).setOrigin(0, 0);
+    else this.add.rectangle(m.start.x - 30, d.y < 0 ? 0 : m.h - 160, 60, 160, pathColor).setOrigin(0, 0);
+    const signAt = d.x ? { x: m.start.x - d.x * 30, y: m.start.y - 70 } : { x: m.start.x + 80, y: m.start.y - d.y * 70 };
+    this.add.image(signAt.x, signAt.y, cfg.sign).setScale(3).setFlipX(d.x < 0).setDepth(signAt.y);
+    this.label(signAt.x, signAt.y - 50, text.home);
     // Ground plants and pebbles (just pretty).
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < (cfg.decorCount ?? 90); i++) {
       const x = (i * 337) % m.w;
       const y = (i * 211) % m.h;
       this.add.image(x, y, cfg.decor[i % cfg.decor.length]).setScale(2.6).setDepth(y - 20).setAlpha(0.95);
@@ -226,6 +249,7 @@ export class AnimalLandScene extends Phaser.Scene {
     for (const f of m.fruit) {
       const img = this.add.image(f.x, f.y, cfg.fruitTree).setScale(3.2).setOrigin(0.5, 0.75).setDepth(f.y + 10).setInteractive({ useHandCursor: true });
       img.on('pointerup', () => this.walkNear(f, () => this.climb(f.id)));
+      if (cfg.fruitBadge) this.add.image(f.x + 30, f.y + 16, cfg.fruitBadge).setScale(2.4).setDepth(f.y + 12);
     }
     for (const r of m.rocks) {
       if (this.isOpen(r.id)) continue;
@@ -253,13 +277,21 @@ export class AnimalLandScene extends Phaser.Scene {
         this.gold.set(gd.id, img);
       }
     }
-    // The oasis, and Auntie Camel beside it.
+    // The rest spot (oasis or spring), and the helper beside it.
     if (m.oasis) {
       const o = m.oasis;
-      this.add.ellipse(o.x, o.y, o.r * 2.2, o.r * 1.3, 0x4a90e0).setStrokeStyle(5, 0x2a6ab0).setDepth(o.y - 40);
-      this.add.ellipse(o.x - 30, o.y - 16, 60, 16, 0xb8e0ff, 0.6).setDepth(o.y - 39);
-      this.add.image(o.x + o.r + 30, o.y - 30, 'prop_palm').setScale(3.2).setOrigin(0.5, 0.75).setDepth(o.y);
-      this.label(o.x, o.y + o.r * 0.65 + 10, tr('Oasis: rest here'));
+      const water = cfg.spring ?? 0x4a90e0;
+      this.add.ellipse(o.x, o.y, o.r * 2.2, o.r * 1.3, water).setStrokeStyle(5, Phaser.Display.Color.ValueToColor(water).darken(25).color).setDepth(o.y - 40);
+      this.add.ellipse(o.x - 30, o.y - 16, 60, 16, 0xffffff, 0.45).setDepth(o.y - 39);
+      if (cfg.land === 'desert') this.add.image(o.x + o.r + 30, o.y - 30, 'prop_palm').setScale(3.2).setOrigin(0.5, 0.75).setDepth(o.y);
+      if (cfg.cold) {
+        // Steam rising from the hot spring.
+        for (let i = 0; i < 3; i++) {
+          const puff = this.add.ellipse(o.x - 40 + i * 40, o.y - 10, 26, 18, 0xffffff, 0.5).setDepth(o.y);
+          this.tweens.add({ targets: puff, y: o.y - 70, alpha: 0, duration: 1800, delay: i * 600, repeat: -1 });
+        }
+      }
+      this.label(o.x, o.y + o.r * 0.65 + 10, text.springLabel ?? '');
     }
     if (m.helper) {
       const q = this.helperQuest();
@@ -271,11 +303,12 @@ export class AnimalLandScene extends Phaser.Scene {
     }
     // The boss, far from the village.
     if (!bossCalm(s, cfg.boss.id)) {
-      if (cfg.land === 'desert') this.add.image(m.boss.x, m.boss.y + 50, 'prop_well').setScale(3).setDepth(m.boss.y - 10);
-      this.boss = this.add.image(m.boss.x, m.boss.y, cfg.boss.sprite).setScale(3.4).setFlipX(cfg.exit === 'left').setDepth(m.boss.y);
+      if (cfg.bossProp) this.add.image(m.boss.x, m.boss.y + 50, cfg.bossProp).setScale(3).setDepth(m.boss.y - 10);
+      // The boss faces the way you come from.
+      this.boss = this.add.image(m.boss.x, m.boss.y, cfg.boss.sprite).setScale(3.4).setFlipX(m.start.x < m.boss.x).setDepth(m.boss.y);
       this.tweens.add({ targets: this.boss, scaleY: 3.55, duration: 700, yoyo: true, repeat: -1 });
       this.label(m.boss.x, m.boss.y - 80, tx(cfg.boss.name));
-    } else if (cfg.land === 'desert') this.add.image(m.boss.x, m.boss.y, 'prop_well').setScale(3).setDepth(m.boss.y);
+    } else if (cfg.bossProp) this.add.image(m.boss.x, m.boss.y, cfg.bossProp).setScale(3).setDepth(m.boss.y);
   }
 
   private label(x: number, y: number, s: string) {
@@ -359,10 +392,25 @@ export class AnimalLandScene extends Phaser.Scene {
       }
     }
     if (vx || vy) this.step(vx * speed, vy * speed);
+    this.chill(t);
     this.moveWilds(dt);
     this.checkTouches(t);
     this.followPups();
     this.pointPaw();
+  }
+
+  /** Brrr! Without a warm scarf the mountain cold takes a heart now and then (never the last one). */
+  private chill(t: number) {
+    if (!this.cfg.cold || warm(this.s) || t < this.chillAt) return;
+    this.chillAt = t + 20000;
+    if (this.s.hearts > 1) {
+      this.s.hearts--;
+      saveAnimals(this.s);
+      this.refresh();
+      this.hero.setTint(0x9ad0ff);
+      this.time.delayedCall(400, () => this.hero.clearTint());
+    }
+    say(this, this.cfg.text().cold ?? '', '#9ad0ff');
   }
 
   private solidRocks(): Set<string> {
@@ -384,8 +432,9 @@ export class AnimalLandScene extends Phaser.Scene {
     this.trail.unshift({ x: this.hero.x, y: this.hero.y });
     if (this.trail.length > 80) this.trail.pop();
     // Back to the village along the path.
-    if (this.cfg.exit === 'left' && this.hero.x < 26 && Math.abs(this.hero.y - m.start.y) < 60) this.home();
-    if (this.cfg.exit === 'top' && this.hero.y < 26 && Math.abs(this.hero.x - m.start.x) < 60) this.home();
+    const d = DIR[this.cfg.exit];
+    const atEdge = d.x ? (d.x < 0 ? this.hero.x < 26 : this.hero.x > m.w - 26) && Math.abs(this.hero.y - m.start.y) < 60 : (d.y < 0 ? this.hero.y < 26 : this.hero.y > m.h - 26) && Math.abs(this.hero.x - m.start.x) < 60;
+    if (atEdge) this.home();
   }
 
   private followPups() {
@@ -487,7 +536,8 @@ export class AnimalLandScene extends Phaser.Scene {
         rest(this.s);
         saveAnimals(this.s);
         sfx('heal');
-        say(this, tr('A cool drink at the oasis. All hearts back!'), C.good);
+        this.chillAt = this.time.now + 20000;
+        say(this, this.cfg.text().springRest ?? '', C.good);
         this.refresh();
       } else if (!at && !near(m.oasis, m.oasis.r + 160)) this.rested = false;
     }
@@ -528,9 +578,10 @@ export class AnimalLandScene extends Phaser.Scene {
     if (!img || this.busy) return;
     this.busy = true;
     const text = this.cfg.text();
-    const jungle = this.cfg.land === 'jungle';
-    // Elephants push rocks; in the sand, dogs are great diggers too.
-    const strong = skill(this.s) === 'push' || (!jungle && skill(this.s) === 'sniff');
+    const hid = this.cfg.hidden;
+    const jungle = !hid.list;
+    // Elephants push rocks; in sand and snow, dogs are great diggers too.
+    const strong = this.cfg.strong.includes(skill(this.s));
     const breakIt = () => {
       const peek = img.getData('peek') as Phaser.GameObjects.Image | undefined;
       peek?.destroy();
@@ -539,19 +590,19 @@ export class AnimalLandScene extends Phaser.Scene {
       if (jungle) this.s.rescued.push(id);
       else {
         this.s.dug.push(id);
-        this.add.image(r.x, r.y, 'prop_dug').setScale(3).setDepth(r.y - 20);
+        this.add.image(r.x, r.y, this.cfg.rockCracked).setScale(3).setDepth(r.y - 20).setAlpha(0.8);
       }
       this.cameras.main.shake(200, 0.01);
       sfx('chest');
-      const em = this.add.particles(r.x, r.y, 'dot', { speed: { min: 60, max: 220 }, lifespan: 600, scale: { start: 1.6, end: 0 }, tint: jungle ? [0x9a948c, 0x6e6862] : [0xe8c98a, 0xc8a060], emitting: false }).setDepth(r.y + 20);
+      const em = this.add.particles(r.x, r.y, 'dot', { speed: { min: 60, max: 220 }, lifespan: 600, scale: { start: 1.6, end: 0 }, tint: hid.dust, emitting: false }).setDepth(r.y + 20);
       em.explode(26);
       if (r.puppy) {
         if (jungle) {
           this.cfg.state.following++;
           this.addPup();
         } else {
-          this.s.fossils.push(id);
-          const f = this.add.image(r.x, r.y - 20, 'item_fossil').setScale(3).setDepth(r.y + 30);
+          this.s[hid.list!].push(id);
+          const f = this.add.image(r.x, r.y - 20, hid.icon!).setScale(3).setDepth(r.y + 30);
           this.tweens.add({ targets: f, y: r.y - 90, alpha: 0, duration: 1400, onComplete: () => f.destroy() });
         }
         say(this, text.foundHidden, C.good);
@@ -588,8 +639,9 @@ export class AnimalLandScene extends Phaser.Scene {
     const backAway = { label: tr('Back away'), color: 0x3a3450, fn: () => {
       this.busy = false;
       this.graceUntil = this.time.now + 3000;
-      if (cfg.exit === 'left') this.hero.x -= 120;
-      else this.hero.y -= 120;
+      const d = DIR[cfg.exit];
+      this.hero.x += d.x * 120;
+      this.hero.y += d.y * 120;
     } };
     // No fighting a boss by surprise: its quest comes when you are ready.
     if (s.quests[cfg.bossQuest] !== 'active') {
@@ -601,7 +653,8 @@ export class AnimalLandScene extends Phaser.Scene {
     dialog(this, cfg.boss.sprite, tx(cfg.boss.name), text.bossRoar + warn, [
       backAway,
       { label: tr('Calm it down!'), color: 0xb02a4a, fn: () => {
-        cfg.state.pos = cfg.exit === 'left' ? { x: this.hero.x - 100, y: this.hero.y } : { x: this.hero.x, y: this.hero.y - 100 };
+        const d = DIR[cfg.exit];
+        cfg.state.pos = { x: this.hero.x + d.x * 100, y: this.hero.y + d.y * 100 };
         cfg.state.wilds.forEach((x) => (x.img = undefined));
         const data: BattleData = { foe: cfg.boss.id, level: cfg.bossLevel, land: cfg.land };
         this.scene.start('AnimalBattle', data);
@@ -614,11 +667,11 @@ export class AnimalLandScene extends Phaser.Scene {
     if (!this.paw) return;
     const s = this.s;
     const m = this.map;
-    const jungle = this.cfg.land === 'jungle';
-    const hiddenQuest = jungle ? 'puppies' : 'fossils';
+    const hiddenQuest = this.cfg.hidden.quest;
     let goal: Pt | undefined;
     const rocks = m.rocks.filter((r) => r.puppy && this.rocks.has(r.id));
-    const homeSpot = this.cfg.exit === 'left' ? { x: 0, y: m.start.y } : { x: m.start.x, y: 0 };
+    const d = DIR[this.cfg.exit];
+    const homeSpot = { x: d.x ? (d.x < 0 ? 0 : m.w) : m.start.x, y: d.y ? (d.y < 0 ? 0 : m.h) : m.start.y };
     const nearest = (list: Pt[]) =>
       list.reduce((a, b) => (Phaser.Math.Distance.Between(this.hero.x, this.hero.y, a.x, a.y) < Phaser.Math.Distance.Between(this.hero.x, this.hero.y, b.x, b.y) ? a : b));
     if (s.quests[hiddenQuest] !== 'done' && rocks.length) goal = nearest(rocks);

@@ -63,7 +63,8 @@ describe('Nova Scotia school program', () => {
     setLang('fr');
     const settings = { ...defaultLearningSettings('fr'), grade: 3 as Grade, mathPercent: 100 };
     const e = new QuestionEngine(newLearningStats(), settings);
-    const ok = new Set(mathTopicsForGrade(3, 'fr'));
+    // Grade 3, or one grade up when the child does very well.
+    const ok = new Set([...mathTopicsForGrade(3, 'fr'), ...mathTopicsForGrade(4, 'fr')]);
     for (let i = 0; i < 200; i++) {
       const q = e.next();
       if (q.subject === 'math') expect(ok.has(q.topic) || q.topic.startsWith('e-'), q.topic).toBe(true);

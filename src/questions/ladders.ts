@@ -7,6 +7,7 @@ import { getRegion, type Lang } from '../i18n';
 import { mathTopicLevels } from './math';
 import { READING_BANK } from './readingBank';
 import { READING_BANK_FR } from './readingBankFr';
+import { READING_BANK_FR_UPPER } from './readingBankFrUpper';
 import { READING_BANK_EARLY } from './readingBankEarly';
 import { topicGroups, type Grade } from './curriculum';
 import type { Difficulty } from './types';
@@ -19,6 +20,8 @@ export interface Step {
   g: Grade;
   /** English reading for grades 1-2 (its own question set). */
   early?: boolean;
+  /** French reading for 4e-6e (its own question set). */
+  upper?: boolean;
 }
 
 const st = (topics: string | string[], d: Difficulty, g: Grade): Step => ({ topics: typeof topics === 'string' ? [topics] : topics, d, g });
@@ -172,10 +175,59 @@ const NS_MATH_FR: Record<string, Step[]> = {
   'fr-problemes': [st('e-word', 1, 1), st('e-word', 2, 2), st('e-word', 3, 3)],
 };
 
+/**
+ * French 4e to 6e (Quebec): the grade 3-5 questions (in French), then percent,
+ * exponents and negative numbers. Added after the 1re-3e steps.
+ */
+const FR_UPPER: Record<string, Step[]> = {
+  'fr-nombres': [
+    st(['place-value', 'compare', 'patterns', 'rounding'], 2, 4),
+    st(['place-value', 'rounding', 'factors', 'order-ops', 'exponents'], 2, 5),
+    st(['factors', 'order-ops', 'exponents', 'integers'], 3, 6),
+  ],
+  'fr-add-sub': [st('add-sub', 2, 4), st('add-sub', 3, 5)],
+  'fr-mult': [
+    st(['mult-facts', 'mult-2x1'], 1, 4),
+    st(['mult-big', 'div-facts', 'div-remainder'], 2, 4),
+    st(['mult-2x2', 'div-long', 'div-remainder'], 3, 5),
+    st(['mult-3x2', 'div-2digit', 'div-long'], 3, 6),
+  ],
+  'fr-fractions': [
+    st(['fractions-equiv', 'fractions-compare', 'decimals', 'decimal-ops'], 2, 4),
+    st(['fractions-add', 'fractions-mult', 'decimal-ops', 'decimal-muldiv', 'percent'], 3, 5),
+    st(['fractions-unlike', 'fractions-mixed', 'decimal-muldiv', 'percent'], 3, 6),
+  ],
+  'fr-mesure': [st(['measurement', 'area-perimeter', 'angles'], 2, 4), st(['area-perimeter', 'volume', 'angles'], 2, 5), st(['area-perimeter', 'volume', 'angles'], 3, 6)],
+  'fr-problemes': [st('word-problems', 2, 4), st('word-problems', 3, 5), st('word-problems', 3, 6)],
+};
+
+/** French 4e to 6e in Nova Scotia (CSAP): ratio and percent in 6e, no exponents. */
+const NS_UPPER_FR: Record<string, Step[]> = {
+  'fr-nombres': [
+    st(['place-value', 'compare', 'patterns', 'rounding'], 2, 4),
+    st(['place-value', 'rounding', 'compare'], 3, 5),
+    st(['factors', 'order-ops', 'integers'], 3, 6),
+  ],
+  'fr-add-sub': [st('add-sub', 2, 4), st('add-sub', 3, 5)],
+  'fr-mult': [
+    st(['mult-facts', 'mult-2x1'], 1, 4),
+    st(['mult-big', 'div-facts', 'div-remainder'], 2, 4),
+    st(['mult-2x2', 'div-long', 'div-remainder'], 2, 5),
+    st(['mult-3x2', 'div-long'], 3, 6),
+  ],
+  'fr-fractions': [
+    st(['fractions-equiv', 'decimals', 'decimal-ops'], 2, 4),
+    st(['fractions-equiv', 'fractions-compare', 'decimals', 'decimal-ops'], 3, 5),
+    st(['fractions-mixed', 'decimal-muldiv', 'percent', 'ratio'], 3, 6),
+  ],
+  'fr-mesure': [st(['measurement', 'area-perimeter', 'e-time'], 2, 4), st(['area-perimeter', 'volume', 'measurement'], 3, 5), st(['angles', 'area-perimeter', 'volume'], 3, 6)],
+  'fr-problemes': [st('word-problems', 2, 4), st('word-problems', 3, 5), st('word-problems', 3, 6)],
+};
+
 /** Spelling tests: word lists from grade 1 up, in both languages. */
 const SPELLING: Record<string, Step[]> = {
   spell: [st('spell-1', 1, 1), st('spell-2', 1, 2), st('spell-3', 1, 3), st('spell-4', 2, 4), st('spell-5', 3, 5)],
-  'fr-dictee': [st('dictee-1', 1, 1), st('dictee-2', 2, 2), st('dictee-3', 3, 3)],
+  'fr-dictee': [st('dictee-1', 1, 1), st('dictee-2', 2, 2), st('dictee-3', 3, 3), st('dictee-4', 1, 4), st('dictee-5', 2, 5), st('dictee-6', 3, 6)],
 };
 
 function hasReading(lang: Lang, topic: string, d: Difficulty): boolean {
@@ -196,9 +248,18 @@ function generic(groupId: string, lang: Lang): Step[] {
     }
   }
   for (const d of [1, 2, 3] as Difficulty[]) {
-    const topics = group.topics.filter((t) => (group.subject === 'math' ? mathTopicLevels(t).includes(d) : hasReading(lang, t, d)));
+    // (French math groups also hold the 4e-6e topics; those have their own steps.)
+    const early = (t: string) => lang === 'en' || t.startsWith('e-');
+    const topics = group.topics.filter((t) => (group.subject === 'math' ? early(t) && mathTopicLevels(t).includes(d) : hasReading(lang, t, d)));
     // In French the difficulty is the school year; English reading spans grades 3-5.
     if (topics.length) steps.push({ topics, d, g: (lang === 'fr' ? d : d + 2) as Grade });
+  }
+  // French reading goes on to 4e-6e with its own set.
+  if (lang === 'fr' && group.subject === 'reading') {
+    for (const d of [1, 2, 3] as Difficulty[]) {
+      const topics = group.topics.filter((t) => READING_BANK_FR_UPPER.some((b) => b.topic === t && b.difficulty === d));
+      if (topics.length) steps.push({ topics, d, g: (d + 3) as Grade, upper: true });
+    }
   }
   return steps;
 }
@@ -211,7 +272,8 @@ export function ladderFor(groupId: string, lang: Lang): Step[] {
   let steps = cache.get(key);
   if (!steps) {
     const math = ns ? (lang === 'en' ? NS_MATH : NS_MATH_FR) : lang === 'en' ? EN_MATH : {};
-    steps = SPELLING[groupId] ?? math[groupId] ?? generic(groupId, lang);
+    const upper = lang === 'fr' ? (ns ? NS_UPPER_FR : FR_UPPER)[groupId] ?? [] : [];
+    steps = SPELLING[groupId] ?? [...(math[groupId] ?? generic(groupId, lang)), ...upper];
     cache.set(key, steps);
   }
   return steps;

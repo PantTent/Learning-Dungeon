@@ -190,6 +190,74 @@ export function buildDesert(): LandMap {
   return { ...m, oasis, helper };
 }
 
+/**
+ * The Enchanted Forest, west of the village: you come in on the right and
+ * the grumpy moose waits on the far left. Hollow logs hide glowing
+ * mushrooms; a fairy spring is the place to rest.
+ */
+export function buildForest(): LandMap {
+  const w = 2600;
+  const h = 1500;
+  const oasis = { x: w - 520, y: 330, r: 80 };
+  const helper = { x: oasis.x + 150, y: oasis.y + 30 };
+  const m = layout({
+    seed: 20261024,
+    w,
+    h,
+    start: { x: w - 90, y: h / 2 },
+    boss: { x: 180, y: h / 2 },
+    glade: { x: 1100, y: 1180, r: 150 },
+    burrows: { outside: { x: 1100, y: 960 }, inside: { x: 1100, y: 1120 } },
+    stump: { x: 1100, y: 1230, id: 'stump3' },
+    ids: { rock: 'log', fruit: 'hive', gold: 'fgold' },
+    rocks: 8,
+    hidden: 5,
+    fruit: 6,
+    golden: 5,
+    spawns: 14,
+    trees: 70,
+    // Stronger animals live further from the village (to the left).
+    levelAt: (p) => 7 + Math.min(2, Math.floor((1 - p.x / w) * 3)),
+    keep: [{ ...oasis, r: oasis.r + 60 }, { ...helper, r: 60 }],
+  });
+  m.trees.push({ ...oasis });
+  return { ...m, oasis, helper };
+}
+
+/**
+ * The Snowy Mountains, north of the village: you come in at the bottom and
+ * climb to the snow leopard at the top. Snow piles hide ice crystals; a hot
+ * spring warms you up.
+ */
+export function buildMountains(): LandMap {
+  const w = 2000;
+  const h = 2300;
+  const oasis = { x: w / 2 - 320, y: h - 460, r: 85 };
+  const helper = { x: oasis.x + 160, y: oasis.y + 20 };
+  const m = layout({
+    seed: 20261025,
+    w,
+    h,
+    start: { x: w / 2, y: h - 90 },
+    boss: { x: w / 2, y: 200 },
+    glade: { x: 1600, y: 1000, r: 150 },
+    burrows: { outside: { x: 1380, y: 1000 }, inside: { x: 1540, y: 1000 } },
+    stump: { x: 1620, y: 1000, id: 'stump4' },
+    ids: { rock: 'snow', fruit: 'pine', gold: 'mgold' },
+    rocks: 8,
+    hidden: 5,
+    fruit: 6,
+    golden: 5,
+    spawns: 14,
+    trees: 55,
+    // Stronger animals live higher up (toward the top).
+    levelAt: (p) => 10 + Math.min(2, Math.floor((1 - p.y / h) * 3)),
+    keep: [{ ...oasis, r: oasis.r + 60 }, { ...helper, r: 60 }],
+  });
+  m.trees.push({ ...oasis });
+  return { ...m, oasis, helper };
+}
+
 /** Can a body of radius `r` stand here (not inside a tree or a rock that is still there)? */
 export function blocked(m: LandMap, p: Pt, r: number, rocksLeft: Set<string>): boolean {
   if (p.x < r || p.y < r || p.x > m.w - r || p.y > m.h - r) return true;

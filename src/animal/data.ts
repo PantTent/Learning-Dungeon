@@ -106,6 +106,11 @@ export const FOODS: FoodDef[] = [
   { id: 'juice', name: t('Cactus Juice', 'Jus de cactus'), icon: 'food_juice', heal: 7 },
   { id: 'bread', name: t('Banana Bread', 'Pain aux bananes'), icon: 'food_bread', heal: 10 },
   { id: 'salad', name: t('Fruit Salad', 'Salade de fruits'), icon: 'food_salad', heal: 14 },
+  { id: 'honey', name: t('Honey', 'Miel'), icon: 'food_honey', heal: 6 },
+  { id: 'pinenuts', name: t('Pine Nuts', 'Noix de pin'), icon: 'food_pinenuts', heal: 5 },
+  { id: 'cocoa', name: t('Hot Cocoa', 'Chocolat chaud'), icon: 'food_cocoa', heal: 8 },
+  { id: 'honeycake', name: t('Honey Cake', 'Gâteau au miel'), icon: 'food_honeycake', heal: 18 },
+  { id: 'soup', name: t('Mushroom Soup', 'Soupe aux champignons'), icon: 'food_soup', heal: 24 },
   { id: 'pie', name: t('Apple Pie', 'Tarte aux pommes'), icon: 'food_pie', heal: 99 },
 ];
 
@@ -120,6 +125,7 @@ export const RECIPES: RecipeDef[] = [
   { id: 'juice', makes: 'juice', needs: { cactusfruit: 2 } },
   { id: 'bread', makes: 'bread', needs: { banana: 2, date: 1 } },
   { id: 'salad', makes: 'salad', needs: { berries: 1, apple: 1, banana: 1 } },
+  { id: 'honeycake', makes: 'honeycake', needs: { honey: 1, date: 1, berries: 1 } },
 ];
 
 /** Hazel Hedgehog's shop: foods, and charms that help for good. */
@@ -139,6 +145,8 @@ export const SHOP: ShopItem[] = [
   { id: 'date', kind: 'food', icon: 'food_date', name: t('Dates', 'Dattes'), info: t('+4 hearts', '+4 cœurs'), price: 12 },
   { id: 'heart', kind: 'charm', icon: 'item_charm_heart', name: t('Heart Charm', 'Breloque cœur'), info: t('+4 hearts for good', '+4 cœurs pour toujours'), price: 150 },
   { id: 'clover', kind: 'charm', icon: 'item_charm_clover', name: t('Clover Charm', 'Breloque trèfle'), info: t('Every move calms a bit more', 'Chaque geste calme un peu plus'), price: 200 },
+  { id: 'cocoa', kind: 'food', icon: 'food_cocoa', name: t('Hot Cocoa', 'Chocolat chaud'), info: t('+8 hearts, and warms you up', '+8 cœurs, et ça réchauffe'), price: 15 },
+  { id: 'scarf', kind: 'charm', icon: 'item_charm_scarf', name: t('Warm Scarf', 'Foulard chaud'), info: t('Stay warm in the Snowy Mountains', 'Reste au chaud dans les montagnes'), price: 100 },
   { id: 'boot', kind: 'charm', icon: 'item_charm_boot', name: t('Speedy Charm', 'Breloque rapide'), info: t('Walk faster everywhere', 'Marche plus vite partout'), price: 120 },
 ];
 
@@ -195,16 +203,50 @@ export const TORTOISE: WildDef = {
   fact: t('Desert tortoises can live more than 50 years, and they dig burrows to escape the heat.', 'Les tortues du désert peuvent vivre plus de 50 ans et creusent des terriers pour fuir la chaleur.'),
 };
 
+/** Wild animals of the Enchanted Forest (levels 7 to 9). */
+export const FOREST: WildDef[] = [
+  { id: 'squirrel', name: t('Squirrel', 'Écureuil'), sprite: 'wild_squirrel', grump: 9, swipe: 1, drop: ['pinenuts', 0.4], xp: 26, fact: t('Squirrels bury nuts for winter and forget some, which grow into new trees!', 'Les écureuils enterrent des noix pour l’hiver et en oublient : elles deviennent de nouveaux arbres!') },
+  { id: 'bat', name: t('Bat', 'Chauve-souris'), sprite: 'wild_bat', grump: 9, swipe: 1, xp: 26, fact: t('Bats are the only mammals that can really fly.', 'Les chauves-souris sont les seuls mammifères qui volent vraiment.') },
+  { id: 'skunk', name: t('Skunk', 'Mouffette'), sprite: 'wild_skunk', grump: 9, swipe: 1, drop: ['berries', 0.4], xp: 27, fact: t('A skunk stamps its feet as a warning before it sprays.', 'La mouffette tape des pattes pour avertir avant de lancer son odeur.') },
+  { id: 'deer', name: t('Deer', 'Cerf'), sprite: 'wild_deer', grump: 10, swipe: 1, drop: ['berries', 0.5], xp: 29, fact: t('A deer grows brand new antlers every year.', 'Le cerf a de nouveaux bois qui repoussent chaque année.') },
+  { id: 'porcupine', name: t('Porcupine', 'Porc-épic'), sprite: 'wild_porcupine', grump: 10, swipe: 1, xp: 29, fact: t('A porcupine has about 30,000 quills!', 'Un porc-épic a environ 30 000 piquants!') },
+  { id: 'boar', name: t('Wild Boar', 'Sanglier'), sprite: 'wild_boar', grump: 10, swipe: 2, drop: ['honey', 0.35], xp: 30, fact: t('Wild boars have a great sense of smell and dig for roots with their snouts.', 'Les sangliers ont un très bon odorat et fouillent la terre avec leur groin.') },
+  { id: 'wolf', name: t('Wolf', 'Loup'), sprite: 'wild_wolf', grump: 11, swipe: 2, xp: 32, fact: t('Wolves live in families called packs and howl to talk to each other.', 'Les loups vivent en familles appelées meutes et hurlent pour se parler.') },
+  { id: 'bearcub', name: t('Bear Cub', 'Ourson'), sprite: 'wild_bearcub', grump: 11, swipe: 2, drop: ['honey', 0.6], xp: 33, fact: t('Black bears sleep through most of the winter in a den.', 'Les ours noirs dorment presque tout l’hiver dans une tanière.') },
+];
+
+export const MOOSE: WildDef = {
+  id: 'moose', name: t('Grumpy Moose', 'Orignal grognon'), sprite: 'boss_moose', grump: 20, swipe: 1, xp: 240,
+  fact: t('A moose is the biggest kind of deer, and it is a great swimmer!', 'L’orignal est le plus grand des cerfs, et il nage très bien!'),
+};
+
+/** Wild animals of the Snowy Mountains (levels 10 to 12). */
+export const MOUNTAINS: WildDef[] = [
+  { id: 'pika', name: t('Pika', 'Pica'), sprite: 'wild_pika', grump: 11, swipe: 1, drop: ['pinenuts', 0.45], xp: 36, fact: t('Pikas gather piles of grass in summer to eat in winter.', 'Les picas ramassent des tas d’herbe l’été pour manger l’hiver.') },
+  { id: 'marmot', name: t('Marmot', 'Marmotte'), sprite: 'wild_marmot', grump: 11, swipe: 1, drop: ['pinenuts', 0.45], xp: 36, fact: t('Marmots whistle loudly to warn their family of danger.', 'Les marmottes sifflent fort pour avertir leur famille d’un danger.') },
+  { id: 'arcticfox', name: t('Arctic Fox', 'Renard arctique'), sprite: 'wild_arcticfox', grump: 11, swipe: 1, xp: 37, fact: t('An arctic fox’s fur turns white in winter to hide in the snow.', 'La fourrure du renard arctique devient blanche l’hiver pour se cacher dans la neige.') },
+  { id: 'snowyowl', name: t('Snowy Owl', 'Harfang des neiges'), sprite: 'wild_snowyowl', grump: 12, swipe: 1, xp: 39, fact: t('Snowy owls hunt in the daytime, unlike most owls.', 'Le harfang des neiges chasse le jour, contrairement à la plupart des hiboux.') },
+  { id: 'goat', name: t('Mountain Goat', 'Chèvre des montagnes'), sprite: 'wild_goat', grump: 12, swipe: 1, drop: ['berries', 0.4], xp: 39, fact: t('Mountain goats can climb very steep cliffs with their grippy hooves.', 'Les chèvres des montagnes grimpent des falaises très raides grâce à leurs sabots qui agrippent.') },
+  { id: 'eagle', name: t('Eagle', 'Aigle'), sprite: 'wild_eagle', grump: 12, swipe: 1, xp: 40, fact: t('An eagle can spot a rabbit from more than a mile (2 km) away.', 'Un aigle peut voir un lapin à plus de 2 km.') },
+  { id: 'ibex', name: t('Ibex', 'Bouquetin'), sprite: 'wild_ibex', grump: 13, swipe: 1, xp: 42, fact: t('An ibex’s curved horns keep growing its whole life.', 'Les cornes courbées du bouquetin poussent toute sa vie.') },
+  { id: 'yak', name: t('Yak', 'Yack'), sprite: 'wild_yak', grump: 13, swipe: 1, drop: ['pinenuts', 0.5], xp: 42, fact: t('A yak’s long, shaggy coat keeps it warm high up in the cold mountains.', 'Le long poil du yack le garde au chaud tout en haut des montagnes froides.') },
+];
+
+export const SNOW_LEOPARD: WildDef = {
+  id: 'snowleopard', name: t('Grumpy Snow Leopard', 'Léopard des neiges grognon'), sprite: 'boss_snowleopard', grump: 18, swipe: 1, xp: 320,
+  fact: t('A snow leopard wraps its long, fluffy tail around itself like a scarf to stay warm.', 'Le léopard des neiges s’enroule dans sa longue queue touffue comme dans un foulard pour avoir chaud.'),
+};
+
 /** Every boss, and the quest that asks you to calm it. */
-export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE };
+export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE, moose: MOOSE, snowleopard: SNOW_LEOPARD };
 
 export function wild(id: string): WildDef {
-  return BOSSES[id] ?? [...JUNGLE, ...DESERT].find((w) => w.id === id) ?? JUNGLE[0];
+  return BOSSES[id] ?? [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS].find((w) => w.id === id) ?? JUNGLE[0];
 }
 
 /** The village helpers and their quests. */
 export interface QuestDef {
-  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise';
+  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise' | 'mushrooms' | 'moose' | 'crystals' | 'leopard';
   giver: string;
   giverName: Text;
   sprite: string;
@@ -221,7 +263,13 @@ export interface QuestDef {
    * who feels ready can still ask for it early.
    */
   boss?: { level: number; after: QuestDef['id'][] };
+  /** The land that must be open before this quest starts. */
+  land?: LandId;
+  /** The quest giver lives out in this land (not in the village). */
+  where?: LandId;
 }
+
+export type LandId = 'jungle' | 'desert' | 'forest' | 'mountains';
 
 export const QUESTS: QuestDef[] = [
   {
@@ -251,7 +299,7 @@ export const QUESTS: QuestDef[] = [
     title: t('Desert fossils', 'Les fossiles du désert'),
     ask: t('Dinosaur fossils are hidden under the sand mounds in the Desert! Could you dig up 5 of them for my museum? Answer a question at each mound to dig.', 'Des fossiles de dinosaures sont cachés sous les buttes de sable du désert! Peux-tu m’en déterrer 5 pour mon musée? Réponds à une question à chaque butte pour creuser.'),
     thanks: t('Marvelous! Look at these bones! My museum is complete. Come and visit any time.', 'Merveilleux! Regarde ces os! Mon musée est complet. Viens le visiter quand tu veux.'),
-    need: 5, acorns: 70, xp: 90,
+    need: 5, acorns: 70, xp: 90, land: 'desert',
   },
   {
     id: 'cook', giver: 'raccoon', giverName: t('Chef Raccoon', 'Chef Raton'), sprite: 'npc_chef_raccoon',
@@ -265,29 +313,58 @@ export const QUESTS: QuestDef[] = [
     title: t('The grumpy old tortoise', 'La vieille tortue grognonne'),
     ask: t('A grumpy old tortoise is sitting on the desert well and will not let anyone drink! Please calm her down. She is at the bottom of the Desert.', 'Une vieille tortue grognonne est assise sur le puits du désert et empêche tout le monde de boire! Calme-la, s’il te plaît. Elle est tout au fond du désert.'),
     thanks: t('Water for everyone again! Thank you, brave friend. The whole desert is cheering for you!', 'De l’eau pour tout le monde! Merci, brave ami. Tout le désert t’acclame!'),
-    need: 1, acorns: 150, xp: 160,
+    need: 1, acorns: 150, xp: 160, land: 'desert', where: 'desert',
     boss: { level: 8, after: ['fossils', 'cook'] },
   },
+  {
+    id: 'mushrooms', giver: 'badger', giverName: t('Grandma Badger', 'Grand-maman Blaireau'), sprite: 'npc_badger',
+    title: t('Glowing mushroom soup', 'Soupe aux champignons lumineux'),
+    ask: t('I want to make my famous soup, but it needs glowing mushrooms from the Enchanted Forest. They hide inside hollow logs. Could you find 5?', 'Je veux faire ma fameuse soupe, mais il me faut des champignons lumineux de la forêt enchantée. Ils se cachent dans des troncs creux. Peux-tu en trouver 5?'),
+    thanks: t('They glow so prettily! Here are two bowls of warm mushroom soup. They heal a lot of hearts!', 'Ils brillent si joliment! Voici deux bols de soupe chaude. Ils redonnent beaucoup de cœurs!'),
+    need: 5, acorns: 100, xp: 160, land: 'forest',
+  },
+  {
+    id: 'moose', giver: 'stag', giverName: t('Old Stag', 'Vieux Cerf'), sprite: 'npc_stag',
+    title: t('The grumpy moose', 'L’orignal grognon'),
+    ask: t('A huge grumpy moose is stomping around the far side of the forest and scaring everyone away from the fairy spring. Can you calm him down?', 'Un énorme orignal grognon piétine au fond de la forêt et fait peur à tout le monde. Peux-tu le calmer?'),
+    thanks: t('The forest is peaceful again. Thank you, young friend! The path to the Snowy Mountains is open now.', 'La forêt est calme de nouveau. Merci, jeune ami! Le chemin des montagnes enneigées est ouvert.'),
+    need: 1, acorns: 200, xp: 240, land: 'forest', where: 'forest',
+    boss: { level: 10, after: ['mushrooms'] },
+  },
+  {
+    id: 'crystals', giver: 'beaver', giverName: t('Mayor Beaver', 'Maire Castor'), sprite: 'npc_mayor_beaver',
+    title: t('Crystals for the Winter Festival', 'Des cristaux pour la fête d’hiver'),
+    ask: t('We are planning a Winter Festival! We need 5 sparkly ice crystals to decorate. They are buried under snow piles in the Snowy Mountains. Brrr, bring a warm scarf!', 'Nous préparons une fête d’hiver! Il nous faut 5 cristaux de glace pour décorer. Ils sont sous des tas de neige dans les montagnes. Brrr, apporte un foulard chaud!'),
+    thanks: t('Beautiful! The festival will sparkle. Now only one thing is missing...', 'Magnifique! La fête va briller. Il ne manque plus qu’une chose...'),
+    need: 5, acorns: 120, xp: 200, land: 'mountains',
+  },
+  {
+    id: 'leopard', giver: 'goat', giverName: t('Grandpa Goat', 'Grand-papa Bouc'), sprite: 'npc_goat',
+    title: t('The grumpy snow leopard', 'Le léopard des neiges grognon'),
+    ask: t('A grumpy snow leopard lives at the top of the mountain. She is so grumpy that nobody can come to the Winter Festival! Will you calm her?', 'Un léopard des neiges grognon vit en haut de la montagne. Il est si grognon que personne ne peut venir à la fête d’hiver! Vas-tu le calmer?'),
+    thanks: t('You did it! Everyone can come to the Winter Festival now. You are the hero of the whole kingdom!', 'Tu as réussi! Tout le monde peut venir à la fête d’hiver. Tu es le héros de tout le royaume!'),
+    need: 1, acorns: 300, xp: 320, land: 'mountains', where: 'mountains',
+    boss: { level: 13, after: ['crystals'] },
+  },
 ];
-
-/** Which quests belong to the village, and which to the Desert oasis. */
-export const DESERT_QUESTS: QuestDef['id'][] = ['tortoise'];
 
 export function quest(id: QuestDef['id']): QuestDef {
   return QUESTS.find((q) => q.id === id)!;
 }
 
-/** The four lands around the village. The Desert opens once the gorilla is calm. */
+/** The four lands around the village. Each opens once the boss of the land before it is calm. */
 export interface LandDef {
-  id: string;
+  id: LandId;
   name: Text;
   dir: 'right' | 'down' | 'left' | 'up';
   open: boolean;
+  /** The boss that must be calm before this land opens. */
+  after?: string;
 }
 
 export const LANDS: LandDef[] = [
   { id: 'jungle', name: t('Jungle', 'Jungle'), dir: 'right', open: true },
-  { id: 'desert', name: t('Desert', 'Désert'), dir: 'down', open: true },
-  { id: 'forest', name: t('Enchanted Forest', 'Forêt enchantée'), dir: 'left', open: false },
-  { id: 'mountains', name: t('Snowy Mountains', 'Montagnes enneigées'), dir: 'up', open: false },
+  { id: 'desert', name: t('Desert', 'Désert'), dir: 'down', open: true, after: 'gorilla' },
+  { id: 'forest', name: t('Enchanted Forest', 'Forêt enchantée'), dir: 'left', open: true, after: 'tortoise' },
+  { id: 'mountains', name: t('Snowy Mountains', 'Montagnes enneigées'), dir: 'up', open: true, after: 'moose' },
 ];

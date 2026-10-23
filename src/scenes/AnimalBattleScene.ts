@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { playMusic, sfx } from '../audio/audio';
 import { tr } from '../i18n';
-import { animal, BOSSES, food, wild, type MoveDef } from '../animal/data';
+import { animal, BOSSES, food, wild, type LandId, type MoveDef } from '../animal/data';
 import {
   addFood, calmAmount, dropsFor, gainXp, loadAnimals, makeFoe, maxHearts, moves, saveAnimals, setBossCalm, skill, startCalm, swipe, xpFor,
   type AnimalSave, type Foe,
@@ -11,12 +11,15 @@ import { Bar, C, H, W, button, panel, txt } from '../ui/widgets';
 
 const HERO = { x: 720, y: 300 };
 
+/** The screen for each land. */
+const LAND_SCENE: Record<LandId, string> = { jungle: 'AnimalJungle', desert: 'AnimalDesert', forest: 'AnimalForest', mountains: 'AnimalMountains' };
+
 /** Which animal, how strong, and the land to go back to afterwards. */
 export interface BattleData {
   foe: string;
   level: number;
   wild?: number;
-  land?: 'jungle' | 'desert';
+  land?: LandId;
 }
 const FOE = { x: 250, y: 290 };
 
@@ -62,12 +65,19 @@ export class AnimalBattleScene extends Phaser.Scene {
     const big = !!BOSSES[data.foe];
     playMusic(big ? 'boss' : 'battle');
 
-    const desert = data.land === 'desert';
-    this.add.tileSprite(0, 0, W, H, grassTexture(this, desert ? 'desert' : 'jungle')).setOrigin(0).setTileScale(3);
-    this.add.rectangle(0, 0, W, 150, desert ? 0xc88a40 : 0x1f4a1a, desert ? 0.35 : 0.55).setOrigin(0);
+    // The background matches the land the battle is in.
+    const land = data.land ?? 'jungle';
+    const look = {
+      jungle: { ground: 'jungle', sky: 0x1f4a1a, alpha: 0.55, trees: ['prop_jtree'] },
+      desert: { ground: 'desert', sky: 0xc88a40, alpha: 0.35, trees: ['prop_palm', 'prop_cactus', 'prop_cactus'] },
+      forest: { ground: 'forest', sky: 0x1a2a3a, alpha: 0.6, trees: ['prop_oak', 'prop_oak', 'prop_honeytree'] },
+      mountains: { ground: 'snow', sky: 0x8aa8c8, alpha: 0.45, trees: ['prop_pine', 'prop_pine', 'prop_snowrock'] },
+    }[land] as { ground: 'jungle' | 'desert' | 'forest' | 'snow'; sky: number; alpha: number; trees: string[] };
+    this.add.tileSprite(0, 0, W, H, grassTexture(this, look.ground)).setOrigin(0).setTileScale(3);
+    this.add.rectangle(0, 0, W, 150, look.sky, look.alpha).setOrigin(0);
     for (let i = 0; i < 8; i++) {
-      if (desert) this.add.image(60 + i * 125, 118, i % 3 ? 'prop_cactus' : 'prop_palm').setScale(i % 3 ? 3 : 3.2).setAlpha(0.95);
-      else this.add.image(60 + i * 125, 110, 'prop_jtree').setScale(3.4).setAlpha(0.9);
+      const tree = look.trees[i % look.trees.length];
+      this.add.image(60 + i * 125, 110, tree).setScale(tree === 'prop_cactus' || tree === 'prop_snowrock' ? 3 : 3.3).setAlpha(0.95);
     }
     this.add.ellipse(FOE.x, FOE.y + 50, 110, 22, 0x000000, 0.3);
     this.add.ellipse(HERO.x, HERO.y + 46, 90, 18, 0x000000, 0.3);
@@ -93,7 +103,11 @@ export class AnimalBattleScene extends Phaser.Scene {
         ? tr('The Grumpy Gorilla beats his chest! Calm him down!')
         : data.foe === 'tortoise'
           ? tr('The Grumpy Old Tortoise snaps and stomps! Calm her down!')
-          : tr('A grumpy {name} appears! Calm it down!', { name: tx(this.foe.def.name) });
+          : data.foe === 'moose'
+            ? tr('The Grumpy Moose shakes his giant antlers! Calm him down!')
+            : data.foe === 'snowleopard'
+              ? tr('The Grumpy Snow Leopard growls from the snowy cliff! Calm her down!')
+              : tr('A grumpy {name} appears! Calm it down!', { name: tx(this.foe.def.name) });
     this.say(intro);
     if (this.foe.calm) this.time.delayedCall(700, () => this.say(tr('Your friendly roar makes it a little calmer!')));
     this.cameras.main.fadeIn(250);
@@ -248,7 +262,7 @@ export class AnimalBattleScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(200);
     c.add(this.add.rectangle(0, 0, W, H, 0, 0.55).setOrigin(0).setInteractive());
     c.add(panel(this, W / 2 - 320, 70, 640, 400, 0x1d1730, 0xff7ab8));
-    c.add(txt(this, W / 2, 104, this.data0.foe === 'gorilla' ? tr('The gorilla is smiling again!') : this.data0.foe === 'tortoise' ? tr('The old tortoise is smiling again!') : tr('The {name} is happy now!', { name: tx(this.foe.def.name) }), 28, '#ffb8e0').setOrigin(0.5));
+    c.add(txt(this, W / 2, 104, this.data0.foe === 'gorilla' ? tr('The gorilla is smiling again!') : this.data0.foe === 'tortoise' ? tr('The old tortoise is smiling again!') : this.data0.foe === 'moose' ? tr('The moose is smiling again!') : this.data0.foe === 'snowleopard' ? tr('The snow leopard is purring happily!') : tr('The {name} is happy now!', { name: tx(this.foe.def.name) }), 28, '#ffb8e0').setOrigin(0.5));
     c.add(this.add.image(W / 2, 180, this.foe.def.sprite).setScale(boss ? 3.4 : 5));
     let y = 240;
     c.add(txt(this, W / 2, y, tr('+{xp} XP   +{a} acorns', { xp, a: drops.acorns }), 20, '#ffe9a0').setOrigin(0.5));
@@ -286,6 +300,6 @@ export class AnimalBattleScene extends Phaser.Scene {
   private back(result: 'calm' | 'tired' | 'ran') {
     saveAnimals(this.s);
     this.cameras.main.fadeOut(250);
-    this.time.delayedCall(260, () => this.scene.start(this.data0.land === 'desert' ? 'AnimalDesert' : 'AnimalJungle', { result, wild: this.data0.wild }));
+    this.time.delayedCall(260, () => this.scene.start(LAND_SCENE[this.data0.land ?? 'jungle'], { result, wild: this.data0.wild }));
   }
 }
