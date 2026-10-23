@@ -8,6 +8,7 @@ import { topicLabel } from '../questions/labels';
 import { fmtNum, getLang, speechLang, tr } from '../i18n';
 import { C, H, W, button, panel, txt } from './widgets';
 import { PaperPanel } from './paperPanel';
+import { showWrongExplanation } from './explainPanel';
 
 const debugHook: { q?: Question; choicePos: { x: number; y: number }[] } = { choicePos: [] };
 (window as unknown as { __ld: typeof debugHook }).__ld = debugHook;
@@ -19,13 +20,21 @@ let speechToken = 0;
  * the voice speaks, then comes back. The Android app has no browser voice,
  * so it uses the phone's own text-to-speech.
  */
-export function speak(text: string, duck = false) {
+export function speak(text: string, duck = false, onEnd?: () => void) {
   const token = ++speechToken;
-  const up = () => duck && token === speechToken && duckMusic(false);
+  let ended = false;
+  const up = () => {
+    if (duck && token === speechToken) duckMusic(false);
+    // Tell the caller the voice is done (not when a newer voice cut it off).
+    if (!ended && token === speechToken) {
+      ended = true;
+      onEnd?.();
+    }
+  };
   if (duck) {
     duckMusic(true);
     // If the device never says it finished, bring the music back anyway.
-    setTimeout(up, 1500 + text.length * 180);
+    setTimeout(() => duck && token === speechToken && duckMusic(false), 1500 + text.length * 180);
   }
   const words = speechText(text);
   if (inApp()) {
@@ -310,6 +319,18 @@ export class QuestionPanel {
 
   private showResult(correct: boolean, given: string) {
     const { scene, q } = this;
+    if (!correct) {
+      // Wrong: a voice explains it (with a picture for simple math), and the
+      // child can't skip ahead until the explanation is done.
+      const vals = { given: display(given, q), answer: display(q.answer, q) };
+      const r = this.opts.result;
+      const line = r ? r.wrong.replace('{given}', vals.given).replace('{answer}', vals.answer) : tr('You said: {given}\nRight answer: {answer}\n(Half damage this time)', vals);
+      showWrongExplanation(scene, q, vals.given, vals.answer, line, () => {
+        this.root.destroy();
+        this.opts.done(false);
+      });
+      return;
+    }
     const res = scene.add.container(0, 0).setDepth(3100).setScrollFactor(0);
     res.add(scene.add.rectangle(0, 0, W, H, 0x000000, 0.5).setOrigin(0).setInteractive());
     res.add(panel(scene, 110, 90, W - 220, H - 180, correct ? 0x123a22 : 0x3a1a22, correct ? 0x5ef07a : 0xff8a6b));

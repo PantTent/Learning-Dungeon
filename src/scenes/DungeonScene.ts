@@ -63,6 +63,11 @@ export class DungeonScene extends Phaser.Scene {
   /** Direction held on the on-screen joystick (0, 0 = not pushed). */
   private stick = { dx: 0, dy: 0 };
   private stickParts: Phaser.GameObjects.GameObject[] = [];
+  /** Let go of the joystick (when a menu opens on top, it never sees the finger lift). */
+  private resetStick: () => void = () => (this.stick = { dx: 0, dy: 0 });
+  /** "Open Shop" style button next to the thing the hero stands by. */
+  private prompt?: Phaser.GameObjects.Container;
+  private promptKey = '';
 
   constructor() {
     super('Dungeon');
@@ -470,6 +475,11 @@ export class DungeonScene extends Phaser.Scene {
       this.stick = { dx: 0, dy: 0 };
       knob.setPosition(cx, cy);
     };
+    this.resetStick = () => {
+      held = null;
+      this.stick = { dx: 0, dy: 0 };
+      knob.setPosition(cx, cy);
+    };
     zone.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
       held = ptr.id;
       this.path = [];
@@ -532,11 +542,14 @@ export class DungeonScene extends Phaser.Scene {
     if (this.busy) return;
     this.busy = true;
     this.path = [];
+    this.resetStick();
+    this.hidePrompt();
     this.scene.pause();
     this.scene.launch(key, { onClose: () => {
       this.busy = false;
       this.scene.resume();
       this.refreshHud();
+      this.checkNearby();
     } });
   }
 
@@ -622,6 +635,54 @@ export class DungeonScene extends Phaser.Scene {
 
   private pendingUse: Pt | null = null;
 
+  /** What a button next to this thing says (undefined = nothing to use there). */
+  private useLabel(pt: Pt): string | undefined {
+    const m = this.world.map;
+    const c = m.camp;
+    const is = (o?: Pt) => !!o && o.x === pt.x && o.y === pt.y;
+    if (c && is(c.merchant)) return tr('Open Shop');
+    if (c && is(c.fire)) return tr('Travel');
+    if (c && is(c.fountain)) return tr('Drink');
+    if (c && this.hasDummy() && is(c.dummy)) return tr('Practice');
+    if (m.boss && Math.abs(m.boss.x - pt.x) <= 1 && Math.abs(m.boss.y - pt.y) <= 1) return tr('Fight!');
+    if (m.chests.some((ch) => is(ch)) && !this.world.openedChests.has(`${pt.x},${pt.y}`)) return tr('Open chest');
+    return undefined;
+  }
+
+  /** Show a button above something the hero is next to; tap it to use it. */
+  private offerUse(pt: Pt) {
+    const label = this.useLabel(pt);
+    if (!label) return;
+    const key = `${pt.x},${pt.y}`;
+    if (this.prompt && this.promptKey === key) return;
+    this.hidePrompt();
+    this.promptKey = key;
+    const m = this.world.map;
+    // Over the middle of the big boss, or just above the thing.
+    const at = m.boss && Math.abs(m.boss.x - pt.x) <= 1 && Math.abs(m.boss.y - pt.y) <= 1 ? { x: m.boss.x, y: m.boss.y - 1 } : pt;
+    const b = button(this, at.x * TS + TS / 2, at.y * TS - 18, 150, 40, label, () => {
+      this.hidePrompt();
+      this.use(pt);
+    }, { size: 16, color: 0x2f9a4a });
+    b.setDepth(1500);
+    this.tweens.add({ targets: b, y: b.y - 5, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.prompt = b;
+  }
+
+  private hidePrompt() {
+    this.prompt?.destroy();
+    this.prompt = undefined;
+    this.promptKey = '';
+  }
+
+  /** After each step: a button for anything usable right next to the hero. */
+  private checkNearby() {
+    const here = this.world.player;
+    const near = [{ x: here.x + 1, y: here.y }, { x: here.x - 1, y: here.y }, { x: here.x, y: here.y + 1 }, { x: here.x, y: here.y - 1 }].find((n) => this.isObstacle(n) && this.useLabel(n));
+    if (near) this.offerUse(near);
+    else this.hidePrompt();
+  }
+
   private neighborsOf(pt: Pt): Pt[] {
     const m = this.world.map;
     if (m.boss && Math.abs(m.boss.x - pt.x) <= 1 && Math.abs(m.boss.y - pt.y) <= 1) {
@@ -666,7 +727,9 @@ export class DungeonScene extends Phaser.Scene {
     if (dx || dy) {
       const n = { x: this.world.player.x + dx, y: this.world.player.y + dy };
       if (this.isObstacle(n)) {
-        this.use(n);
+        // Walking into the shop, fire, chest...: offer a button instead of opening it
+        // (holding the joystick would open it again and again).
+        this.offerUse(n);
         return;
       }
       if (this.world.map.tiles[n.y]?.[n.x] === FLOOR) {
@@ -685,6 +748,7 @@ export class DungeonScene extends Phaser.Scene {
       if (this.pendingUse) {
         const u = this.pendingUse;
         this.pendingUse = null;
+        this.hidePrompt();
         this.use(u);
       }
       return;
@@ -709,6 +773,7 @@ export class DungeonScene extends Phaser.Scene {
           this.path = [];
           return;
         }
+        this.checkNearby();
         this.step();
       },
     });
