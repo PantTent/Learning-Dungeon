@@ -140,10 +140,10 @@ export interface GroupReport {
 export const RECENT = 20;
 /**
  * Moving between grades, by percent right since the last move:
- * under 75% (after at least 10 answers) drops a grade, and 95% or more over
+ * under 70% (after at least 10 answers) drops a grade, and 95% or more over
  * the last 20 answers moves up a grade.
  */
-export const DROP_BELOW = 0.75;
+export const DROP_BELOW = 0.7;
 export const DROP_AFTER = 10;
 export const CLIMB_AT = 0.95;
 export const CLIMB_AFTER = 20;
@@ -397,7 +397,7 @@ export class QuestionEngine {
     const [lo, hi] = gradeBand(this.settings.grade, this.settings.lang);
     s.level[q.subject] = clamp(s.level[q.subject] + (correct ? 0.12 : -0.22), lo, hi + 0.49);
 
-    // Move the group down a grade when it's under 75% right, up a grade at 95%+.
+    // Move the group down a grade when it's under 70% right, up a grade at 95%+.
     if (q.group) {
       const { range, grade, pinned } = gradeState(s, this.settings, q.group);
       s.gradeAt ??= {};

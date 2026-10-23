@@ -29,7 +29,7 @@ describe('skill ladders', () => {
     const e = new QuestionEngine(stats, settings);
     const first = e.next();
     expect(ladderFor('multiply', 'en').filter((s) => s.g === 4).flatMap((s) => s.topics)).toContain(first.topic);
-    // 10 answers under 75% right: down one grade.
+    // 10 answers under 70% right: down one grade.
     for (let i = 0; i < 10; i++) e.record(e.next(), i < 5);
     expect(groupReport(stats, settings, 'multiply').grade).toBe(3);
     for (let i = 0; i < 40; i++) e.record(e.next(), false);
@@ -40,7 +40,20 @@ describe('skill ladders', () => {
     expect(groupReport(stats, settings, 'multiply').grade).toBe(1);
   });
 
-  it('stays on a grade between 75% and 95%, and climbs after 20 answers at 95%+', () => {
+  it('drops a grade under 70% right, but not at exactly 70%', () => {
+    const at = (rights: number) => {
+      const stats = newLearningStats();
+      stats.gradeAt = { multiply: 4 };
+      const settings = { ...defaultLearningSettings(), grade: 4 as Grade, groups: ['multiply'], mathPercent: 100 };
+      const e = new QuestionEngine(stats, settings);
+      for (let i = 0; i < 10; i++) e.record(e.next(), i < rights);
+      return groupReport(stats, settings, 'multiply').grade;
+    };
+    expect(at(7)).toBe(4);
+    expect(at(6)).toBe(3);
+  });
+
+  it('stays on a grade between 70% and 95%, and climbs after 20 answers at 95%+', () => {
     const stats = newLearningStats();
     stats.gradeAt = { multiply: 3 };
     const settings = { ...defaultLearningSettings(), grade: 4 as Grade, groups: ['multiply'], mathPercent: 100 };
@@ -107,7 +120,7 @@ describe('skill ladders', () => {
 });
 
 describe('adapting to the child', () => {
-  it('a weak group stays on grade 1 adding & subtracting until it is above 75%', () => {
+  it('a group on grade 1 stays there at 80% right and climbs at 95%', () => {
     const stats = newLearningStats();
     stats.gradeAt = { 'add-sub': 1 };
     const settings = { ...defaultLearningSettings('en'), grade: 4 as Grade, groups: ['add-sub'], mathPercent: 100 };
