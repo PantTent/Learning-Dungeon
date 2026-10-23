@@ -118,15 +118,15 @@ const MATH_BY_GRADE_FR: Partial<Record<Grade, string[]>> = {
 };
 
 /**
- * Nova Scotia math by grade (same in English and French schools). Money starts
- * in grade 3, fractions in grade 3, times tables to 5 x 5 in grade 3, adding
- * fractions and angles wait until after grade 5.
+ * Nova Scotia math by grade. Measuring with cm and m starts in grade 3 (grade 2
+ * uses everyday objects), money is grade 3 in English only, fractions start in
+ * grade 3, times tables go to 5 x 5 in grade 3, and adding fractions and
+ * angles wait until after grade 5.
  */
 const MATH_BY_GRADE_NS: Partial<Record<Grade, string[]>> = {
   1: ['e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-shapes', 'e-word'],
   2: [
-    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-even-odd', 'e-time', 'e-shapes',
-    'e-measure', 'e-word',
+    'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-doubles', 'e-even-odd', 'e-time', 'e-shapes', 'e-word',
   ],
   3: [
     'e-count', 'e-add', 'e-sub', 'e-missing', 'e-compare', 'e-place', 'e-skip', 'e-even-odd', 'e-money', 'e-time', 'e-shapes',
@@ -164,7 +164,8 @@ export function gradeBand(grade: Grade, lang: Lang = getLang()): [Difficulty, Di
 
 export function mathTopicsForGrade(grade: Grade, lang: Lang = getLang()): string[] {
   const g = fitGrade(grade, lang);
-  if (getRegion() === 'ns') return MATH_BY_GRADE_NS[g]!;
+  // The French (CSAP) program has no money questions; the English one counts coins in grade 3.
+  if (getRegion() === 'ns') return MATH_BY_GRADE_NS[g]!.filter((t) => lang === 'en' || t !== 'e-money');
   return (lang === 'fr' ? MATH_BY_GRADE_FR : MATH_BY_GRADE)[g]!;
 }
 

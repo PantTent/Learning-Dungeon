@@ -139,7 +139,7 @@ const NS_MATH: Record<string, Step[]> = {
   ],
   measure: [
     st('e-shapes', 1, 1),
-    st(['e-measure', 'e-time', 'e-shapes'], 2, 2),
+    st(['e-time', 'e-shapes'], 2, 2),
     st(['e-measure', 'e-time', 'e-shapes', 'measurement'], 3, 3),
     st(['measurement', 'area-perimeter', 'e-time'], 2, 4),
     st(['area-perimeter', 'volume', 'measurement'], 3, 5),
@@ -153,7 +153,7 @@ const NS_MATH: Record<string, Step[]> = {
   ],
 };
 
-/** Nova Scotia math ladders in French (CSAP, 1re to 3e annee). */
+/** Nova Scotia math ladders in French (CSAP programs, 1re to 3e annee, checked against the 2016 documents). */
 const NS_MATH_FR: Record<string, Step[]> = {
   'fr-nombres': [
     st(['e-count', 'e-compare', 'e-skip'], 1, 1),
@@ -166,7 +166,8 @@ const NS_MATH_FR: Record<string, Step[]> = {
     st(['e-add', 'e-sub', 'e-missing'], 3, 3),
   ],
   'fr-mult': [st(['e-mult', 'e-div'], 3, 3)],
-  'fr-mesure': [st(['e-time', 'e-measure'], 2, 2), st(['e-money', 'e-time', 'e-measure'], 2, 3), st(['e-money', 'e-time', 'e-measure'], 3, 3)],
+  // Measuring in 2e uses everyday objects (no cm yet) and money is not in the CSAP program.
+  'fr-mesure': [st('e-time', 2, 2), st(['e-time', 'e-measure'], 3, 3)],
   'fr-formes': [st('e-shapes', 1, 1), st('e-shapes', 2, 2), st(['e-shapes', 'e-fractions'], 3, 3)],
   'fr-problemes': [st('e-word', 1, 1), st('e-word', 2, 2), st('e-word', 3, 3)],
 };

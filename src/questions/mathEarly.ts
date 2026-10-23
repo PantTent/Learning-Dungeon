@@ -449,7 +449,8 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
   'e-compare': {
     levels: [1, 2, 3],
     gen: (d) => {
-      const max = d === 1 ? (chance(0.6) ? 20 : 50) : d === 2 ? 100 : 999;
+      // Nova Scotia 1re compares numbers up to 20.
+      const max = d === 1 ? (chance(0.6) || getRegion() === 'ns' ? 20 : 50) : d === 2 ? 100 : 999;
       const low = d === 3 ? 100 : 1;
       const make = (): [number, number] => {
         const a = ri(low, max);
@@ -813,7 +814,12 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
   'e-time': {
     levels: [2, 3],
     gen: (d) => {
-      const forms = d === 2 ? ['later', 'later', 'mh', 'mhalf', 'dw', 'my'] : ['later', 'earlier', 'hd', 'mq', 'sum', 'sum', 'until', 'until'];
+      // Nova Scotia: days and months in 2e; minutes, seconds and the passage of time in 3e.
+      const ns = getRegion() === 'ns';
+      const forms =
+        d === 2
+          ? ns ? ['dw', 'my'] : ['later', 'later', 'mh', 'mhalf', 'dw', 'my']
+          : ns ? ['later', 'earlier', 'mh', 'sm', 'hd', 'sum', 'until'] : ['later', 'earlier', 'hd', 'mq', 'sum', 'sum', 'until', 'until'];
       const t = pick(forms);
       if (t === 'later') {
         const h = ri(1, 10);
@@ -870,6 +876,7 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
         mq: [15, 'How many minutes are in a quarter hour?', "Combien de minutes y a-t-il dans un quart d'heure?", 'A quarter hour is 60 ÷ 4 = 15 minutes.', "Un quart d'heure, c'est 60 ÷ 4 = 15 minutes.", 'A quarter is one of four equal parts. Split the minutes of one hour into four equal parts.', "Un quart, c'est une de quatre parts égales. Partage les minutes d'une heure en quatre parts égales."],
         dw: [7, 'How many days are in a week?', 'Combien de jours y a-t-il dans une semaine?', 'Monday to Sunday: there are 7 days in a week.', 'Du lundi au dimanche : il y a 7 jours dans une semaine.', 'Say the days: Monday, Tuesday, Wednesday... up to Sunday. Count them on your fingers.', 'Dis les jours : lundi, mardi, mercredi... jusqu’à dimanche. Compte-les sur tes doigts.'],
         my: [12, 'How many months are in a year?', 'Combien de mois y a-t-il dans une année?', 'January to December: there are 12 months in a year.', 'De janvier à décembre : il y a 12 mois dans une année.', 'Say the months from January to December and count them on your fingers.', 'Dis les mois de janvier à décembre et compte-les sur tes doigts.'],
+        sm: [60, 'How many seconds are in 1 minute?', 'Combien de secondes y a-t-il dans 1 minute?', 'There are 60 seconds in 1 minute.', 'Il y a 60 secondes dans 1 minute.', 'The thin second hand goes all the way around the clock in one minute. Count by fives at each number.', 'La trotteuse fait tout le tour de l’horloge en une minute. Compte par bonds de cinq à chaque nombre.'],
         hd: [24, 'How many hours are in 1 day?', 'Combien d’heures y a-t-il dans 1 journée?', 'The short hand goes around twice: 12 + 12 = 24 hours.', 'La petite aiguille fait deux tours : 12 + 12 = 24 heures.', 'The short hand goes around the clock two times in one day. How many numbers are on the clock?', 'La petite aiguille fait deux fois le tour de l’horloge en une journée. Combien de nombres y a-t-il sur l’horloge?'],
       };
       const [ans, pe, pf, ee, ef, te, tf] = FACTS[t];
@@ -1048,8 +1055,43 @@ export const EARLY_GENERATORS: Record<string, { levels: Difficulty[]; gen: Gen }
     levels: [2, 3],
     gen: (d) => {
       if (getUnits() === 'imperial') return measureUS(d);
-      const forms = d === 2 ? ['cmm', 'unit', 'unit', 'long', 'short', 'diff'] : ['unit', 'kmm', 'mcm', 'add', 'add', 'diff'];
+      // Nova Scotia 3e: cm and m, g and kg, and perimeter.
+      const ns = getRegion() === 'ns';
+      const forms = d === 2 ? ['cmm', 'unit', 'unit', 'long', 'short', 'diff'] : ns ? ['mcm', 'add', 'diff', 'gkg', 'perim', 'perim'] : ['unit', 'kmm', 'mcm', 'add', 'add', 'diff'];
       const t = pick(forms);
+      if (t === 'gkg') {
+        const k = ri(1, 5);
+        return num(
+          `gkg:${k}`,
+          k === 1 ? L('How many grams are in 1 kilogram?', 'Combien de grammes y a-t-il dans 1 kilogramme?') : L(`How many grams are in ${k} kilograms?`, `Combien de grammes y a-t-il dans ${k} kilogrammes?`),
+          1000 * k,
+          L(`1 kg = ${f(1000)} g, so ${k} kg = ${f(1000 * k)} g.`, `1 kg = ${f(1000)} g, donc ${k} kg = ${f(1000 * k)} g.`),
+          L('"Kilo" means a thousand. A kilogram is a thousand grams. Count by thousands, once for each kilogram.', '« Kilo » veut dire mille. Un kilogramme, c’est mille grammes. Compte par milliers, une fois pour chaque kilogramme.'),
+        );
+      }
+      if (t === 'perim') {
+        if (chance(0.5)) {
+          const w = ri(2, 12);
+          let h = ri(2, 12);
+          if (h === w) h = w + 1;
+          return num(
+            `perim:r${w},${h}`,
+            L(`A rectangle is ${w} cm long and ${h} cm wide. What is its perimeter, in cm?`, `Un rectangle mesure ${w} cm de long et ${h} cm de large. Quel est son périmètre, en cm?`),
+            2 * (w + h),
+            L(`${w} + ${h} + ${w} + ${h} = ${2 * (w + h)}. The perimeter is ${2 * (w + h)} cm.`, `${w} + ${h} + ${w} + ${h} = ${2 * (w + h)}. Le périmètre est de ${2 * (w + h)} cm.`),
+            L('The perimeter is the distance all the way around. A rectangle has 4 sides: 2 long ones and 2 short ones. Add all 4.', 'Le périmètre, c’est la distance tout autour. Un rectangle a 4 côtés : 2 longs et 2 courts. Additionne les 4.'),
+          );
+        }
+        const [x, y, z] = [ri(3, 15), ri(3, 15), ri(3, 15)].sort((m, n) => m - n);
+        const c = Math.min(z, x + y - 1);
+        return num(
+          `perim:t${x},${y},${c}`,
+          L(`A triangle has sides of ${x} cm, ${y} cm and ${c} cm. What is its perimeter, in cm?`, `Un triangle a des côtés de ${x} cm, ${y} cm et ${c} cm. Quel est son périmètre, en cm?`),
+          x + y + c,
+          L(`${x} + ${y} + ${c} = ${x + y + c}. The perimeter is ${x + y + c} cm.`, `${x} + ${y} + ${c} = ${x + y + c}. Le périmètre est de ${x + y + c} cm.`),
+          L('The perimeter is the distance all the way around. Add the length of every side.', 'Le périmètre, c’est la distance tout autour. Additionne la longueur de chaque côté.'),
+        );
+      }
       if (t === 'cmm')
         return num(
           'cmm',

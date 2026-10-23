@@ -71,6 +71,30 @@ describe('Nova Scotia school program', () => {
     }
   });
 
+  it('follows the CSAP programs for 1re to 3e annee', () => {
+    setLang('fr');
+    // No money in the French program, no cm or m before 3e.
+    for (const g of [1, 2, 3] as Grade[]) expect(mathTopicsForGrade(g, 'fr')).not.toContain('e-money');
+    expect(mathTopicsForGrade(2, 'fr')).not.toContain('e-measure');
+    expect(ladderFor('fr-mesure', 'fr').flatMap((s) => s.topics)).not.toContain('e-money');
+    for (let i = 0; i < 300; i++) {
+      // 1re: comparing numbers up to 20.
+      const c = makeMathQuestion('e-compare', 1);
+      for (const n of (c.prompt.match(/\d+/g) ?? []).map(Number)) expect(n, c.prompt).toBeLessThanOrEqual(20);
+      // 2e: days in a week and months in a year only.
+      const t = makeMathQuestion('e-time', 2);
+      expect(['7', '12'], t.prompt).toContain(t.answer);
+      // 3e: perimeters add up every side.
+      const m = makeMathQuestion('e-measure', 3);
+      if (m.prompt.includes('périmètre')) {
+        const sides = (m.prompt.match(/\d+/g) ?? []).map(Number);
+        const total = sides.length === 2 ? 2 * (sides[0] + sides[1]) : sides.reduce((a, b) => a + b, 0);
+        expect(Number(m.answer), m.prompt).toBe(total);
+      }
+      if (m.prompt.includes('grammes')) expect(Number(m.answer) % 1000).toBe(0);
+    }
+  });
+
   it('uses metric units and the right names', () => {
     setLang('en');
     expect(getUnits()).toBe('metric');
