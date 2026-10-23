@@ -2,7 +2,7 @@ import os
 """Build pixelData.ts from sprite sources, then validate + render sheets."""
 import sys, re, json, importlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import src_pal, src_chars, src_creatures, src_tiles, src_icons, src_forest, src_farm, src_magic, src_space, src_animals, src_desert, src_forest_snow, src_seashore, src_savanna
+import src_pal, src_chars, src_creatures, src_tiles, src_icons, src_forest, src_farm, src_magic, src_space, src_animals, src_desert, src_forest_snow, src_seashore, src_savanna, src_outer, src_farm2
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'src', 'art', 'pixelData.ts')
 PAL = src_pal.PAL
@@ -36,7 +36,7 @@ def prep(name, rows, w, h, outline):
     return {'w': w, 'h': h, 'palette': {c: PAL[c] for c in used}, 'rows': rows}
 
 ALL = {}
-for mod in (src_chars, src_creatures, src_tiles, src_icons, src_forest, src_farm, src_magic, src_space, src_animals, src_desert, src_forest_snow, src_seashore, src_savanna):
+for mod in (src_chars, src_creatures, src_tiles, src_icons, src_forest, src_farm, src_magic, src_space, src_animals, src_desert, src_forest_snow, src_seashore, src_savanna, src_outer, src_farm2):
     for name, spec in mod.SPRITES.items():
         rows = spec['rows'] if isinstance(spec, dict) else spec
         outline = spec.get('outline', True) if isinstance(spec, dict) else True

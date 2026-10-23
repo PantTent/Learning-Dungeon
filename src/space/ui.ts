@@ -46,7 +46,8 @@ export function mineralRow(scene: Phaser.Scene, x: number, y: number, counts: Re
   let cx = 0;
   for (const m of MINERALS) {
     const n = counts[m.id] ?? 0;
-    if (!n && !opts.all) continue;
+    // Titanium and platinum only show up once you have some.
+    if (!n && (!opts.all || m.outer)) continue;
     c.add(scene.add.image(cx + 9, 0, `min_${m.id}`).setScale(size / 10));
     const short = opts.have && (opts.have[m.id] ?? 0) < n;
     const label = txt(scene, cx + 20, 0, `${Math.floor(n)} ${m.symbol}`, size, short ? '#ff8a6b' : C.text).setOrigin(0, 0.5);

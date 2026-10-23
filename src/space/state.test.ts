@@ -1,6 +1,7 @@
 import {
-  addCargo, adminCost, alienReward, base, canAfford, cargoCap, cargoTotal, fuelCap, mineYield, newSpace, partCost, produce,
-  rollMineral, shieldHits, travel, tripCheck, unload, upgradeAdmin, upgradePart, upgradePlant,
+  addCargo, adminCost, alienReward, base, buildScope, canAfford, cargoCap, cargoTotal, claimMission, fuelCap, MAX_ADMIN, mineYield,
+  MISSIONS, newSpace, nextMission, partCost, plantRate, produce, rollMineral, SCOPE_COST, shieldHits, travel, tripCheck, tripFuel, unload,
+  upgradeAdmin, upgradePart, upgradePlant,
 } from './state';
 import { MINERAL_IDS, PLANETS, STARTS, toF } from './data';
 
@@ -96,12 +97,57 @@ describe('Learning Space rules', () => {
     expect(tripCheck(s, 'mars', 15 * MIN).world).toBe(2);
   });
 
-  it('the gas giants and Pluto are not open yet', () => {
+  it('far planets need a strong ship, and the fuel always fits in the tanks', () => {
     const s = newSpace('Ava', 4, 'earth', 0);
-    Object.assign(s.ship, { engine: 10, tank: 10 });
+    Object.assign(s.ship, { engine: 3, tank: 3 });
+    s.bases.earth.adminLv = 5;
     produce(s, 1000 * MIN);
-    expect(tripCheck(s, 'jupiter', 1000 * MIN).closed).toBe(true);
-    expect(tripCheck(s, 'jupiter', 1000 * MIN).ok).toBe(false);
+    // Jupiter as World 2 still needs a level 4 ship.
+    const j = tripCheck(s, 'jupiter', 1000 * MIN);
+    expect(j.world).toBe(2);
+    expect(j.engine).toBe(4);
+    expect(j.ok).toBe(false);
+    Object.assign(s.ship, { engine: 4, tank: 4 });
+    expect(travel(s, 'jupiter', 1000 * MIN)).toBe(true);
+    for (const p of PLANETS) expect(tripFuel(Math.max(9, p.reach))).toBeLessThanOrEqual(fuelCap(MAX_ADMIN));
+    expect(tripCheck(s, 'pluto', 1000 * MIN).engine).toBe(8);
+  });
+
+  it('moons double a fuel plant: ice on Ganymede, methane lakes on Titan', () => {
+    const s = newSpace('Ava', 4, 'earth', 0);
+    s.at = 'jupiter';
+    s.bases.jupiter = { loxLv: 1, ch4Lv: 1, adminLv: 1, lox: 0, ch4: 0, paidTo: 0 };
+    expect(plantRate(s, 'lox')).toBe(2 * plantRate(s, 'ch4'));
+    s.at = 'saturn';
+    expect(plantRate(s, 'ch4')).toBe(2 * plantRate(s, 'lox'));
+  });
+
+  it('titanium and platinum only come from the outer solar system, and the top ship levels need them', () => {
+    for (let i = 0; i < 2000; i++) expect(['ti', 'pt']).not.toContain(rollMineral());
+    const far = new Set(Array.from({ length: 3000 }, () => rollMineral(true)));
+    expect(far.has('ti') && far.has('pt')).toBe(true);
+    expect(partCost('engine', 6).ti).toBeUndefined();
+    expect(partCost('engine', 7).ti).toBe(2);
+    expect(partCost('engine', 9).pt).toBe(2);
+  });
+
+  it('missions give their reward once, and the telescope is the last one', () => {
+    const s = newSpace('Ava', 4, 'earth', 0);
+    expect(nextMission(s)?.id).toBe('world2');
+    expect(claimMission(s, 'world2')).toBe(false);
+    s.world = 2;
+    expect(claimMission(s, 'world2')).toBe(true);
+    expect(s.minerals.fe).toBe(10);
+    expect(claimMission(s, 'world2')).toBe(false);
+    expect(MISSIONS[MISSIONS.length - 1].id).toBe('scope');
+    // The telescope: only on Pluto, and it costs a lot.
+    Object.assign(s.minerals, { al: 100, au: 100, ti: 100, pt: 100 });
+    expect(buildScope(s)).toBe(false);
+    s.at = 'pluto';
+    expect(buildScope(s)).toBe(true);
+    expect(s.minerals.pt).toBe(100 - SCOPE_COST.pt);
+    expect(buildScope(s)).toBe(false);
+    expect(MISSIONS.find((m) => m.id === 'scope')!.done(s)).toBe(true);
   });
 
   it('Venus shields are stronger', () => {

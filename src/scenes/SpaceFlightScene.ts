@@ -4,7 +4,7 @@ import { tr } from '../i18n';
 import { mineral, planet, startOf } from '../space/data';
 import { planetTexture, starTexture } from '../space/draw';
 import {
-  addCargo, alienHits, alienReward, cargoCap, cargoTotal, loadSpace, loseHalfCargo, mineYield, rollMineral, saveSpace, shieldHits,
+  addCargo, alienHits, alienReward, cargoCap, cargoTotal, isOuter, loadSpace, loseHalfCargo, mineYield, rollMineral, saveSpace, shieldHits,
   shipSpeed, type SpaceSave,
 } from '../space/state';
 import { ask, keyVector, mineralCard, mineralRow, say, Stick, tx } from '../space/ui';
@@ -65,10 +65,15 @@ export class SpaceFlightScene extends Phaser.Scene {
     this.stars2 = this.add.tileSprite(0, 0, W, H, starTexture(this, 'stars2', 25)).setOrigin(0).setScrollFactor(0).setTileScale(2).setDepth(-9).setAlpha(0.7);
     // The home planet, huge, along the bottom of the screen.
     // (Turned so its sunny side, not a pole, faces up.)
-    const home = this.add.image(W / 2, H + 330, planetTexture(this, s.at, 96)).setScrollFactor(0).setScale(10).setAngle(70).setDepth(-5);
+    const home = this.add.image(W / 2, H + 330, planetTexture(this, s.at, 96, false)).setScrollFactor(0).setScale(10).setAngle(70).setDepth(-5);
     this.tweens.add({ targets: home, angle: 76, duration: 60000, yoyo: true, repeat: -1 });
     // A thin glowing line of air above planets that have an atmosphere.
-    if (s.at !== 'mercury') this.add.circle(W / 2, H + 330, 486).setStrokeStyle(6, planet(s.at).colors[2], 0.35).setScrollFactor(0).setDepth(-4);
+    // Far out, your space station floats nearby.
+    if (planet(s.at).site.kind === 'station') {
+      const st = this.add.image(WORLD.w / 2 + 260, WORLD.h - 330, 'station_far').setScale(4).setDepth(10);
+      this.tweens.add({ targets: st, y: st.y - 12, duration: 3000, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    }
+    if (s.at !== 'mercury' && s.at !== 'pluto') this.add.circle(W / 2, H + 330, 486).setStrokeStyle(6, planet(s.at).colors[2], 0.35).setScrollFactor(0).setDepth(-4);
 
     this.cameras.main.setBounds(0, 0, WORLD.w, WORLD.h);
     this.ship = this.add.image(WORLD.w / 2, WORLD.h - 200, startOf(s.start).sprite).setScale(3).setAngle(-90).setDepth(50);
@@ -106,7 +111,7 @@ export class SpaceFlightScene extends Phaser.Scene {
       const onShip = this.ship && Phaser.Math.Distance.Between(this.ship.x, this.ship.y, x, y) < 400;
       if (!near && !onShip) break;
     }
-    const m = rollMineral();
+    const m = rollMineral(isOuter(this.s.at));
     // Rare, rich asteroids glow and give three times as much.
     const rich = Math.random() < 0.08;
     const img = this.add.image(x, y, `rock_${m}`).setScale(rich ? 4.6 : 3.6).setDepth(20).setAngle(Math.random() * 360);

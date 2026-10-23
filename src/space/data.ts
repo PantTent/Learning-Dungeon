@@ -27,8 +27,20 @@ export interface PlanetDef {
   /** Facts for grades 1-2 and for grades 3-5. */
   young: Text[];
   older: Text[];
-  /** Can a base be built here yet (the gas giants and Pluto come later). */
-  open: boolean;
+  /** Engine and fuel tank level needed for the first trip here (far planets need more). */
+  reach: number;
+  /** Where the base is: on the ground, on a moon, or a space station. */
+  site: Site;
+}
+
+export interface Site {
+  kind: 'surface' | 'moon' | 'station';
+  name: Text;
+  /** About the place (shown in the Command Center). */
+  fact?: Text;
+  /** A fuel plant that makes double here. */
+  bonus?: 'lox' | 'ch4';
+  bonusInfo?: Text;
 }
 
 const t = (en: string, fr: string): Text => ({ en, fr });
@@ -44,7 +56,8 @@ export const PLANETS: PlanetDef[] = [
     moons: 0,
     colors: [0x9a948c, 0x6e6862, 0xc4bdb2],
     size: 0.6,
-    open: true,
+    reach: 1,
+    site: { kind: 'surface', name: t('Mercury Base', 'Base de Mercure') },
     young: [
       t('Mercury is the closest planet to the Sun.', 'Mercure est la planète la plus proche du Soleil.'),
       t('Mercury is the smallest planet.', 'Mercure est la plus petite planète.'),
@@ -66,7 +79,8 @@ export const PLANETS: PlanetDef[] = [
     moons: 0,
     colors: [0xe8c27a, 0xc89650, 0xf4e0a8],
     size: 0.95,
-    open: true,
+    reach: 1,
+    site: { kind: 'surface', name: t('Venus Base', 'Base de Vénus') },
     young: [
       t('Venus is the hottest planet, even hotter than Mercury.', 'Vénus est la planète la plus chaude, encore plus que Mercure.'),
       t('Venus is covered in thick yellow clouds.', 'Vénus est couverte d’épais nuages jaunes.'),
@@ -88,7 +102,8 @@ export const PLANETS: PlanetDef[] = [
     moons: 1,
     colors: [0x2f6fd0, 0x3fa64a, 0xf2f6ff],
     size: 1,
-    open: true,
+    reach: 1,
+    site: { kind: 'surface', name: t('Earth Base', 'Base terrestre') },
     young: [
       t('Earth is the only planet we know that has life.', 'La Terre est la seule planète connue où il y a de la vie.'),
       t('Most of Earth is covered by water.', 'La plus grande partie de la Terre est couverte d’eau.'),
@@ -110,7 +125,8 @@ export const PLANETS: PlanetDef[] = [
     moons: 2,
     colors: [0xc8582a, 0x8a3a1c, 0xe8a070],
     size: 0.7,
-    open: true,
+    reach: 1,
+    site: { kind: 'surface', name: t('Mars Base', 'Base martienne') },
     young: [
       t('Mars is called the Red Planet.', 'Mars est surnommée la planète rouge.'),
       t('Mars has two small moons, Phobos and Deimos.', 'Mars a deux petites lunes : Phobos et Déimos.'),
@@ -132,7 +148,14 @@ export const PLANETS: PlanetDef[] = [
     moons: 95,
     colors: [0xd8b088, 0xa86a40, 0xf0e0c8],
     size: 2.2,
-    open: false,
+    reach: 4,
+    site: {
+      kind: 'moon',
+      name: t('Ganymede Moon Base', 'Base lunaire de Ganymède'),
+      fact: t('Jupiter has no ground to land on, so your base is on Ganymede, the biggest moon in the solar system.', 'Jupiter n’a pas de sol pour se poser : ta base est sur Ganymède, la plus grosse lune du système solaire.'),
+      bonus: 'lox',
+      bonusInfo: t('Ganymede is covered in ice. Ice is water, and water has oxygen in it: your oxygen plant makes double here!', 'Ganymède est couverte de glace. La glace, c’est de l’eau, et l’eau contient de l’oxygène : ton usine d’oxygène produit le double ici!'),
+    },
     young: [
       t('Jupiter is the biggest planet.', 'Jupiter est la plus grosse planète.'),
       t('Jupiter has a giant storm called the Great Red Spot.', 'Jupiter a une tempête géante appelée la Grande Tache rouge.'),
@@ -154,7 +177,14 @@ export const PLANETS: PlanetDef[] = [
     moons: 274,
     colors: [0xe8d098, 0xb89860, 0xf8ecc8],
     size: 1.9,
-    open: false,
+    reach: 5,
+    site: {
+      kind: 'moon',
+      name: t('Titan Moon Base', 'Base lunaire de Titan'),
+      fact: t('Your base is on Titan, Saturn’s biggest moon. It is the only moon with thick air.', 'Ta base est sur Titan, la plus grosse lune de Saturne. C’est la seule lune qui a une atmosphère épaisse.'),
+      bonus: 'ch4',
+      bonusInfo: t('Titan has lakes and rain of liquid methane: your methane plant makes double here!', 'Sur Titan, il y a des lacs et de la pluie de méthane liquide : ton usine de méthane produit le double ici!'),
+    },
     young: [
       t('Saturn has beautiful rings.', 'Saturne a de magnifiques anneaux.'),
       t('Saturn’s rings are made of ice and rock.', 'Les anneaux de Saturne sont faits de glace et de roche.'),
@@ -176,7 +206,12 @@ export const PLANETS: PlanetDef[] = [
     moons: 28,
     colors: [0x8ad8e0, 0x5ab0c0, 0xc8f0f4],
     size: 1.4,
-    open: false,
+    reach: 6,
+    site: {
+      kind: 'station',
+      name: t('Uranus Space Station', 'Station spatiale d’Uranus'),
+      fact: t('Uranus has no solid ground, so your base is a space station that goes around (orbits) the planet.', 'Uranus n’a pas de sol solide : ta base est une station spatiale qui tourne autour de la planète (en orbite).'),
+    },
     young: [
       t('Uranus is a blue-green ice giant.', 'Uranus est une géante de glace bleu-vert.'),
       t('Uranus spins on its side.', 'Uranus tourne couchée sur le côté.'),
@@ -198,7 +233,12 @@ export const PLANETS: PlanetDef[] = [
     moons: 16,
     colors: [0x3a5ad8, 0x2a3aa0, 0x8aa8ff],
     size: 1.35,
-    open: false,
+    reach: 7,
+    site: {
+      kind: 'station',
+      name: t('Neptune Space Station', 'Station spatiale de Neptune'),
+      fact: t('From your station you can see Triton, Neptune’s biggest moon. It goes around Neptune backwards!', 'De ta station, tu vois Triton, la plus grosse lune de Neptune. Elle tourne autour de Neptune à l’envers!'),
+    },
     young: [
       t('Neptune is the farthest planet from the Sun.', 'Neptune est la planète la plus éloignée du Soleil.'),
       t('Neptune is a deep blue color.', 'Neptune est d’un bleu foncé.'),
@@ -220,7 +260,12 @@ export const PLANETS: PlanetDef[] = [
     moons: 5,
     colors: [0xd8c0a0, 0x9a7a60, 0xf4ece0],
     size: 0.45,
-    open: false,
+    reach: 8,
+    site: {
+      kind: 'surface',
+      name: t('Pluto Base', 'Base de Pluton'),
+      fact: t('Your base sits on Pluto’s icy heart, a giant plain of frozen nitrogen. Its moon Charon is half as big as Pluto.', 'Ta base est sur le cœur glacé de Pluton, une immense plaine d’azote gelé. Sa lune Charon est moitié moins grosse que Pluton.'),
+    },
     young: [
       t('Pluto is a dwarf planet.', 'Pluton est une planète naine.'),
       t('Pluto has a big heart-shaped patch of ice.', 'Pluton a une grande tache de glace en forme de cœur.'),
@@ -298,6 +343,8 @@ export interface MineralDef {
   /** How common it is in asteroids. */
   weight: number;
   color: number;
+  /** Only found past the asteroid belt (around the giant planets and Pluto). */
+  outer?: boolean;
 }
 
 export const MINERALS: MineralDef[] = [
@@ -355,6 +402,26 @@ export const MINERALS: MineralDef[] = [
     weight: 5,
     color: 0xffd24a,
   },
+  {
+    id: 'ti',
+    symbol: 'Ti',
+    name: t('Titanium', 'Titane'),
+    why: t('Ti is short for titanium. It is named after the Titans, the giants of old Greek stories.', 'Ti est l’abréviation de titane. Son nom vient des Titans, les géants des vieilles histoires grecques.'),
+    use: t('Titanium is as strong as steel but much lighter. It is perfect for fast engines.', 'Le titane est aussi solide que l’acier, mais beaucoup plus léger. Il est parfait pour les moteurs rapides.'),
+    weight: 12,
+    color: 0x9ab8d8,
+    outer: true,
+  },
+  {
+    id: 'pt',
+    symbol: 'Pt',
+    name: t('Platinum', 'Platine'),
+    why: t('Pt is short for platinum, from platina, a Spanish word for "little silver".', 'Pt est l’abréviation de platine, qui vient de platina, un mot espagnol qui veut dire « petit argent ».'),
+    use: t('Platinum is very rare. It helps make clean fuel and is used in telescopes and science tools.', 'Le platine est très rare. Il aide à fabriquer du carburant propre et sert dans les télescopes et les outils de science.'),
+    weight: 5,
+    color: 0xe8ecf4,
+    outer: true,
+  },
 ];
 
 export const MINERAL_IDS = MINERALS.map((m) => m.id);
@@ -384,16 +451,26 @@ export const PARTS: PartDef[] = [
 
 /** Base buildings. */
 export interface BuildingDef {
-  id: 'lox' | 'ch4' | 'admin' | 'pad' | 'launch';
+  id: 'lox' | 'ch4' | 'admin' | 'pad' | 'launch' | 'scope';
   name: Text;
   info: Text;
   sprite: string;
+  /** Sprite on a space station. */
+  station?: string;
 }
 
 export const BUILDINGS: BuildingDef[] = [
-  { id: 'admin', name: t('Command Center', 'Centre de commande'), info: t('Upgrade your base and see your planet.', 'Améliore ta base et découvre ta planète.'), sprite: 'base_admin' },
-  { id: 'lox', name: t('Oxygen Plant', 'Usine d’oxygène'), info: t('Makes liquid oxygen (LOX), written O2: two oxygen atoms stuck together.', 'Fabrique de l’oxygène liquide (LOX), écrit O2 : deux atomes d’oxygène collés ensemble.'), sprite: 'base_lox' },
-  { id: 'ch4', name: t('Methane Plant', 'Usine de méthane'), info: t('Makes methane, written CH4: one carbon atom and four hydrogen atoms.', 'Fabrique du méthane, écrit CH4 : un atome de carbone et quatre atomes d’hydrogène.'), sprite: 'base_methane' },
-  { id: 'pad', name: t('Ship Upgrade Pad', 'Atelier du vaisseau'), info: t('Use minerals to make your ship better.', 'Utilise des minéraux pour améliorer ton vaisseau.'), sprite: 'base_pad' },
-  { id: 'launch', name: t('Launch Pad', 'Rampe de lancement'), info: t('Fly to space, or travel to another planet.', 'Envole-toi dans l’espace ou voyage vers une autre planète.'), sprite: 'base_launch' },
+  { id: 'admin', name: t('Command Center', 'Centre de commande'), info: t('Upgrade your base and see your planet.', 'Améliore ta base et découvre ta planète.'), sprite: 'base_admin', station: 'station_admin' },
+  { id: 'lox', name: t('Oxygen Plant', 'Usine d’oxygène'), info: t('Makes liquid oxygen (LOX), written O2: two oxygen atoms stuck together.', 'Fabrique de l’oxygène liquide (LOX), écrit O2 : deux atomes d’oxygène collés ensemble.'), sprite: 'base_lox', station: 'station_lox' },
+  { id: 'ch4', name: t('Methane Plant', 'Usine de méthane'), info: t('Makes methane, written CH4: one carbon atom and four hydrogen atoms.', 'Fabrique du méthane, écrit CH4 : un atome de carbone et quatre atomes d’hydrogène.'), sprite: 'base_methane', station: 'station_methane' },
+  { id: 'pad', name: t('Ship Upgrade Pad', 'Atelier du vaisseau'), info: t('Use minerals to make your ship better.', 'Utilise des minéraux pour améliorer ton vaisseau.'), sprite: 'base_pad', station: 'station_pad' },
+  { id: 'launch', name: t('Launch Pad', 'Rampe de lancement'), info: t('Fly to space, or travel to another planet.', 'Envole-toi dans l’espace ou voyage vers une autre planète.'), sprite: 'base_launch', station: 'station_launch' },
 ];
+
+/** Built only on Pluto, at the edge of the solar system: the last big project. */
+export const SCOPE: BuildingDef = {
+  id: 'scope',
+  name: t('Deep Space Telescope', 'Télescope de l’espace lointain'),
+  info: t('A giant telescope to look past the solar system, at the stars beyond.', 'Un télescope géant pour regarder au-delà du système solaire, vers les autres étoiles.'),
+  sprite: 'base_scope',
+};

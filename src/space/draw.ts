@@ -26,12 +26,12 @@ const shade = (c: number, t: number) => (t >= 0 ? mix(c, 0xffffff, t) : mix(c, 0
  * A round planet `size` pixels wide (Saturn gets its rings: the texture is
  * wider). Returns the texture key.
  */
-export function planetTexture(scene: Phaser.Scene, id: string, size = 48): string {
-  const key = `planet_${id}_${size}`;
+export function planetTexture(scene: Phaser.Scene, id: string, size = 48, rings = true): string {
+  const key = `planet_${id}_${size}${rings ? '' : '_bare'}`;
   if (scene.textures.exists(key)) return key;
   const def = planet(id);
   const [c1, c2, c3] = def.colors;
-  const ringed = id === 'saturn';
+  const ringed = id === 'saturn' && rings;
   const w = ringed ? Math.round(size * 2.1) : size;
   const tex = scene.textures.createCanvas(key, w, size)!;
   const ctx = tex.getContext();
@@ -125,6 +125,15 @@ export const SURFACES: Record<string, Surface> = {
   venus: { skyTop: 0xc8783a, skyBottom: 0xf0c070, ground: [0xb88a48, 0x94683a, 0xd0a868], sun: 0, stars: false },
   earth: { skyTop: 0x4a90e0, skyBottom: 0xb8e0ff, ground: [0x5aa040, 0x3f8030, 0x7cc050], sun: 20, stars: false },
   mars: { skyTop: 0xc89060, skyBottom: 0xf0c890, ground: [0xb8542a, 0x8a3a1c, 0xd0784a], sun: 14, stars: false },
+  // Ganymede: dirty ice under a black sky, with Jupiter huge overhead.
+  jupiter: { skyTop: 0x020208, skyBottom: 0x0c0c1c, ground: [0x8a8478, 0x6a6458, 0xd8d8d4], sun: 6, stars: true },
+  // Titan: a thick orange haze hides the sky.
+  saturn: { skyTop: 0x7a4a18, skyBottom: 0xd09048, ground: [0x7a5a30, 0x5a4022, 0x9a7a4a], sun: 0, stars: false },
+  // The space stations: a metal deck, open space all around.
+  uranus: { skyTop: 0x010106, skyBottom: 0x080818, ground: [0x6a7080, 0x4a5060, 0x9aa0b0], sun: 4, stars: true },
+  neptune: { skyTop: 0x010106, skyBottom: 0x060a1c, ground: [0x6a7080, 0x4a5060, 0x9aa0b0], sun: 3, stars: true },
+  // Pluto: pale nitrogen ice, a tiny far-away Sun.
+  pluto: { skyTop: 0x010104, skyBottom: 0x0a0812, ground: [0xe0d4c0, 0xc0b098, 0xf8f4ec], sun: 3, stars: true },
 };
 
 export function surfaceOf(id: string): Surface {
@@ -138,6 +147,30 @@ export function groundTexture(scene: Phaser.Scene, id: string): string {
   const [a, b, c] = surfaceOf(id).ground;
   const tex = scene.textures.createCanvas(key, 32, 32)!;
   const ctx = tex.getContext();
+  if (planet(id).site.kind === 'station') {
+    // Metal deck plates with seams and rivets.
+    ctx.fillStyle = hex(a);
+    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = hex(c);
+    ctx.fillRect(0, 0, 32, 1);
+    ctx.fillRect(0, 0, 1, 32);
+    ctx.fillRect(0, 16, 32, 1);
+    ctx.fillStyle = hex(b);
+    ctx.fillRect(0, 15, 32, 1);
+    ctx.fillRect(0, 31, 32, 1);
+    ctx.fillRect(31, 0, 1, 32);
+    ctx.fillRect(15, 0, 1, 16);
+    ctx.fillStyle = hex(c);
+    ctx.fillRect(16, 0, 1, 16);
+    for (const [x, y] of [[3, 3], [12, 3], [3, 12], [12, 12], [20, 4], [28, 4], [20, 12], [28, 12], [5, 20], [26, 20], [5, 28], [26, 28]]) {
+      ctx.fillStyle = hex(c);
+      ctx.fillRect(x, y, 1, 1);
+      ctx.fillStyle = hex(b);
+      ctx.fillRect(x + 1, y + 1, 1, 1);
+    }
+    tex.refresh();
+    return key;
+  }
   const rand = rng(`ground-${id}`);
   ctx.fillStyle = hex(a);
   ctx.fillRect(0, 0, 32, 32);

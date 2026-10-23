@@ -100,6 +100,7 @@ export class SpaceMapScene extends Phaser.Scene {
       line(tr('From you today: {d}', { d: getUnits() === 'imperial' ? tr('{n} million miles', { n: mi }) : tr('{n} million km', { n: km }) }), '#ffe9a0', 13);
     }
     line(tr('Moons: {n}', { n: p.moons }), '#ffe9a0', 13);
+    if (p.site.kind !== 'surface') line(tr('Base: {name}', { name: tx(p.site.name) }), '#7fd3ff', 13);
     for (const f of s.settings.grade <= 2 ? p.young : p.older) line(`• ${tx(f)}`);
 
     // Travel.
@@ -109,11 +110,6 @@ export class SpaceMapScene extends Phaser.Scene {
       return;
     }
     const t = tripCheck(s, p.id);
-    if (t.closed) {
-      const later = p.kind === 'giant' ? tr('Coming in a later update: build a base on one of its moons!') : p.kind === 'ice' ? tr('Coming in a later update: build a space station here!') : tr('Coming in a later update: a base on this dwarf planet!');
-      c.add(txt(this, x0 + 16, y, later, 15, '#ffb36b', { wordWrap: { width: W - x0 - 42 } }));
-      return;
-    }
     const b = base(s);
     const ok = (good: boolean) => (good ? '✔' : '✘');
     const need = [
