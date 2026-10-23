@@ -31,6 +31,7 @@ import { H, W } from './ui/widgets';
 import { unlockAudio } from './audio/audio';
 import { inApp } from './util/platform';
 import { installErrorCatcher } from './ui/errorPanel';
+import { installPlayTimer } from './ui/playTimer';
 
 // Catch crashes before the game starts, so one error never freezes the game.
 const watchGame = installErrorCatcher();
@@ -48,6 +49,8 @@ const game = new Phaser.Game({
 });
 
 watchGame(game);
+// The grown-up's play timer (counts down only while a game is open).
+installPlayTimer(game);
 
 // Browsers only allow sound after the player taps or presses a key.
 window.addEventListener('pointerdown', unlockAudio);

@@ -333,7 +333,7 @@ export class SpaceFlightScene extends Phaser.Scene {
     const r = this.nearest();
     const close = r && this.near(r);
     if (close && !this.mineBtn) {
-      this.mineBtn = button(this, W - 120, H - 80, 200, 70, tr('Mine!'), () => {
+      this.mineBtn = button(this, W - 120, H - 116, 200, 70, tr('Mine!'), () => {
         const k = this.nearest();
         if (k && this.near(k)) this.mine(k);
       }, { size: 28, color: 0xb07a10 }).setScrollFactor(0).setDepth(1001);

@@ -6,6 +6,8 @@ import { topicLabel } from '../questions/labels';
 import { LANGS, fmtDec, fmtNum, setLang, tr, type Lang } from '../i18n';
 import { loadProfiles, saveProfile, type Profile } from '../state/profile';
 import { C, H, W, button, panel, txt } from '../ui/widgets';
+import { openPlaytimePanel } from '../ui/playtimePanel';
+import { clockText, isLocked, loadPlayTime } from '../util/playtime';
 
 /** Top of the scrolling topic list (the panels sit above it). */
 const TOP = 246;
@@ -52,13 +54,18 @@ export class ParentScene extends Phaser.Scene {
     const profiles = loadProfiles();
     c.add(txt(this, 24, 14, tr('Parent Dashboard'), 28, '#ffd24a'));
     c.add(button(this, W - 80, 34, 120, 46, tr('Back'), () => this.scene.start('Title'), { size: 20, color: 0x3a3450 }));
+    // Play time for all the games (minutes).
+    const pt = loadPlayTime();
+    c.add(button(this, 340, 34, 140, 42, !pt.on ? tr('Play timer') : isLocked(pt) ? tr('Time is up') : tr('Timer: {time}', { time: clockText(pt.leftMs) }), () => {
+      openPlaytimePanel(this, () => this.draw());
+    }, { size: 15, color: pt.on ? 0x2e5a7a : 0x6a4a2a }));
     if (!profiles.length) {
       c.add(txt(this, W / 2, H / 2, tr('No heroes yet. Create one from the title screen!'), 22, C.dim).setOrigin(0.5));
       return;
     }
     this.index = Math.min(this.index, profiles.length - 1);
     profiles.forEach((p, i) => {
-      c.add(button(this, 360 + i * 140, 34, 130, 42, p.name, () => {
+      c.add(button(this, 490 + i * 112, 34, 104, 42, p.name, () => {
         this.index = i;
         this.scrollY = 0;
         this.draw();

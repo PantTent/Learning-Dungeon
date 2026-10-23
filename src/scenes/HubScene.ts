@@ -18,6 +18,8 @@ import { loadProfiles } from '../state/profile';
 import { androidBrowser, APK_URL } from '../util/platform';
 import { openTransferPanel } from '../ui/transferPanel';
 import { openReportPanel } from '../ui/errorPanel';
+import { openPlaytimePanel } from '../ui/playtimePanel';
+import { clockText, isLocked, loadPlayTime } from '../util/playtime';
 
 /** First screen: pick which game to play. Every game is free to try; the full games can be unlocked. */
 export class HubScene extends Phaser.Scene {
@@ -27,7 +29,7 @@ export class HubScene extends Phaser.Scene {
     super('Hub');
   }
 
-  create() {
+  create(data: { timeUp?: boolean } = {}) {
     playMusic('title');
     menuBackground(this);
     this.own = loadOwnership();
@@ -37,6 +39,10 @@ export class HubScene extends Phaser.Scene {
       this.input.enabled = false;
       openReportPanel(() => (this.input.enabled = true));
     }, { size: 13, color: 0x5a3a2e });
+    // The grown-up's play timer.
+    const pt = loadPlayTime();
+    const timerLabel = !pt.on ? tr('Play timer') : isLocked(pt) ? tr('Time is up') : `⏱ ${clockText(pt.leftMs)}`;
+    button(this, W - 76, 104, 130, 32, timerLabel, () => this.timerSettings(), { size: 14, color: pt.on ? (isLocked(pt) ? 0x8a3a3a : 0x2e5a7a) : 0x3a3450 });
     langButton(this, 104, 24, 188, 34, () => this.scene.restart());
     unitsButton(this, 104, 62, 188, 32);
     regionButton(this, 104, 98, 188, 32, () => this.scene.restart());
@@ -65,6 +71,30 @@ export class HubScene extends Phaser.Scene {
     if (androidBrowser()) {
       button(this, 118, H - 32, 210, 40, tr('Get the Android app'), () => window.open(APK_URL, '_blank'), { size: 15, color: 0x2e5a7a });
     }
+    if (data.timeUp || isLocked(pt)) this.timeUp(!!data.timeUp);
+  }
+
+  private timerSettings() {
+    parentGate(this, () => {
+      openPlaytimePanel(this, () => this.scene.restart());
+    });
+  }
+
+  /** Play time is used up: the games wait until a grown-up adds more. */
+  private timeUp(justEnded: boolean) {
+    if (justEnded) sfx('levelup');
+    const c = this.add.container(0, 0).setDepth(5000);
+    c.add(this.add.rectangle(0, 0, W, H, 0, 0.75).setOrigin(0).setInteractive());
+    c.add(panel(this, W / 2 - 300, 90, 600, 340, 0x1d1730, 0xffd24a));
+    c.add(txt(this, W / 2, 140, '⏱', 54).setOrigin(0.5));
+    c.add(txt(this, W / 2, 206, tr("Time's up!"), 40, '#ffd24a').setOrigin(0.5).setStroke('#5a2a00', 8));
+    c.add(txt(this, W / 2, 262, justEnded ? tr('Great playing! Your game is saved.') : tr('There is no play time left.'), 20, C.text).setOrigin(0.5));
+    c.add(txt(this, W / 2, 300, tr('Ask a grown-up to add more play time.'), 18, C.dim).setOrigin(0.5));
+    c.add(button(this, W / 2 - 110, 370, 180, 48, tr('OK'), () => c.destroy(), { size: 20, color: 0x2f9a4a }));
+    c.add(button(this, W / 2 + 110, 370, 200, 48, tr('Grown-ups'), () => {
+      c.destroy();
+      this.timerSettings();
+    }, { size: 18, color: 0x3a3450 }));
   }
 
   private card(g: GameInfo, x: number, y: number, w: number, h: number) {
@@ -101,6 +131,10 @@ export class HubScene extends Phaser.Scene {
   }
 
   private play(g: GameInfo) {
+    if (isLocked(loadPlayTime())) {
+      this.timeUp(false);
+      return;
+    }
     sfx('click');
     this.scene.start(g.scene!);
   }
