@@ -28,6 +28,8 @@ export interface LandMap {
   /** Desert only: the oasis pond (rest here) and Auntie Camel beside it. */
   oasis?: Pt & { r: number };
   helper?: Pt;
+  /** Seashore only: the sea starts here (you cannot walk into it). */
+  waterY?: number;
 }
 /** The Jungle map (kept as its own name for older code). */
 export type JungleMap = LandMap;
@@ -258,9 +260,46 @@ export function buildMountains(): LandMap {
   return { ...m, oasis, helper };
 }
 
+/**
+ * The Sunny Seashore, reached by boat: you land on the left, the sea runs
+ * along the bottom, and the grumpy octopus splashes at the far end. Sand
+ * nests hide baby sea turtles; a lagoon is the place to rest.
+ */
+export function buildSeashore(): LandMap {
+  const w = 2600;
+  const waterY = 1260;
+  const h = 1500;
+  const oasis = { x: 520, y: 330, r: 80 };
+  const helper = { x: oasis.x + 160, y: oasis.y + 20 };
+  // Laid out on the dry sand only; the sea is added below it.
+  const m = layout({
+    seed: 20261026,
+    w,
+    h: waterY - 40,
+    start: { x: 90, y: 620 },
+    boss: { x: w - 240, y: waterY - 200 },
+    glade: { x: 1500, y: 260, r: 150 },
+    burrows: { outside: { x: 1500, y: 480 }, inside: { x: 1500, y: 320 } },
+    stump: { x: 1500, y: 230, id: 'stump5' },
+    ids: { rock: 'nest', fruit: 'coco', gold: 'sgold' },
+    rocks: 8,
+    hidden: 5,
+    fruit: 6,
+    golden: 5,
+    spawns: 14,
+    trees: 45,
+    // Stronger animals live further along the beach (to the right).
+    levelAt: (p) => 13 + Math.min(2, Math.floor((p.x / w) * 3)),
+    keep: [{ ...oasis, r: oasis.r + 60 }, { ...helper, r: 60 }],
+  });
+  m.trees.push({ ...oasis });
+  return { ...m, h, oasis, helper, waterY };
+}
+
 /** Can a body of radius `r` stand here (not inside a tree or a rock that is still there)? */
 export function blocked(m: LandMap, p: Pt, r: number, rocksLeft: Set<string>): boolean {
   if (p.x < r || p.y < r || p.x > m.w - r || p.y > m.h - r) return true;
+  if (m.waterY !== undefined && p.y > m.waterY - r) return true;
   if (m.trees.some((t) => dist(t, p) < t.r + r - 8)) return true;
   return m.rocks.some((k) => rocksLeft.has(k.id) && dist(k, p) < 36 + r);
 }

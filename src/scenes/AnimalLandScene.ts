@@ -49,11 +49,11 @@ export interface LandConfig {
   bossQuest: QuestDef['id'];
   /** Which edge the path home is on. */
   exit: 'left' | 'top' | 'right' | 'bottom';
-  ground: 'jungle' | 'desert' | 'forest' | 'snow';
+  ground: 'jungle' | 'desert' | 'forest' | 'snow' | 'beach';
   /** Sign by the path home. */
   sign: string;
   /** What the rocks (or mounds, logs, snow piles) hide, and the quest that wants it. */
-  hidden: { quest: QuestDef['id']; list?: 'fossils' | 'mushrooms' | 'crystals'; icon?: string; dust: number[] };
+  hidden: { quest: QuestDef['id']; list?: 'fossils' | 'mushrooms' | 'crystals' | 'turtles'; icon?: string; dust: number[]; toSea?: boolean };
   /** Skills that break a rock with one question (a wrong answer still works). */
   strong: SkillId[];
   /** The rest spot (oasis, spring): water color. */
@@ -63,6 +63,10 @@ export interface LandConfig {
   /** Too cold without a warm scarf: lose a heart now and then. */
   cold?: boolean;
   decorCount?: number;
+  /** Something at the path home (the Seashore's boat). */
+  exitProp?: string;
+  /** Big things to look at (they do not block the way), next to the rest spot. */
+  landmark?: { sprite: string; dx: number; dy: number };
   /** Look of the trees (or cacti and rocks). */
   tree: (i: number) => { sprite: string; scale: number };
   fruitTree: string;
@@ -229,12 +233,22 @@ export class AnimalLandScene extends Phaser.Scene {
     this.add.tileSprite(0, 0, m.w, m.h, grassTexture(this, cfg.ground)).setOrigin(0).setTileScale(3);
     // The path home, with a sign beside it.
     const d = DIR[cfg.exit];
-    const pathColor = { jungle: 0xb88a50, desert: 0xc89a60, forest: 0x7a5a3a, snow: 0xc8d8e8 }[cfg.ground];
+    const pathColor = { jungle: 0xb88a50, desert: 0xc89a60, forest: 0x7a5a3a, snow: 0xc8d8e8, beach: 0x9a7a50 }[cfg.ground];
+    // The sea along the bottom, with gentle waves.
+    if (m.waterY !== undefined) {
+      this.add.rectangle(0, m.waterY, m.w, m.h - m.waterY, 0x3a8ad0).setOrigin(0).setDepth(m.waterY - 5);
+      this.add.rectangle(0, m.waterY, m.w, 14, 0xe8f6ff, 0.9).setOrigin(0).setDepth(m.waterY - 4);
+      for (let x = 40; x < m.w; x += 160) {
+        const wave = this.add.ellipse(x, m.waterY + 50 + ((x / 160) % 3) * 50, 70, 10, 0xbfe4ff, 0.7).setDepth(m.waterY - 3);
+        this.tweens.add({ targets: wave, x: x + 40, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      }
+    }
     if (d.x) this.add.rectangle(d.x < 0 ? 0 : m.w - 160, m.start.y - 30, 160, 60, pathColor).setOrigin(0, 0);
     else this.add.rectangle(m.start.x - 30, d.y < 0 ? 0 : m.h - 160, 60, 160, pathColor).setOrigin(0, 0);
     const signAt = d.x ? { x: m.start.x - d.x * 30, y: m.start.y - 70 } : { x: m.start.x + 80, y: m.start.y - d.y * 70 };
     this.add.image(signAt.x, signAt.y, cfg.sign).setScale(3).setFlipX(d.x < 0).setDepth(signAt.y);
     this.label(signAt.x, signAt.y - 50, text.home);
+    if (cfg.exitProp) this.add.image(m.start.x - 20, m.start.y + 70, cfg.exitProp).setScale(3).setDepth(m.start.y + 70);
     // Ground plants and pebbles (just pretty).
     for (let i = 0; i < (cfg.decorCount ?? 90); i++) {
       const x = (i * 337) % m.w;
@@ -292,6 +306,7 @@ export class AnimalLandScene extends Phaser.Scene {
         }
       }
       this.label(o.x, o.y + o.r * 0.65 + 10, text.springLabel ?? '');
+      if (cfg.landmark) this.add.image(o.x + cfg.landmark.dx, o.y + cfg.landmark.dy, cfg.landmark.sprite).setScale(3).setOrigin(0.5, 1).setDepth(o.y + cfg.landmark.dy);
     }
     if (m.helper) {
       const q = this.helperQuest();
@@ -603,7 +618,11 @@ export class AnimalLandScene extends Phaser.Scene {
         } else {
           this.s[hid.list!].push(id);
           const f = this.add.image(r.x, r.y - 20, hid.icon!).setScale(3).setDepth(r.y + 30);
-          this.tweens.add({ targets: f, y: r.y - 90, alpha: 0, duration: 1400, onComplete: () => f.destroy() });
+          if (hid.toSea && this.map.waterY !== undefined) {
+            // A baby turtle waddles all the way down to the sea.
+            this.tweens.add({ targets: f, angle: { from: -8, to: 8 }, duration: 200, yoyo: true, repeat: -1 });
+            this.tweens.add({ targets: f, y: this.map.waterY + 40, duration: Math.max(1200, (this.map.waterY - r.y) * 6), onUpdate: () => f.setDepth(f.y + 10), onComplete: () => this.tweens.add({ targets: f, alpha: 0, duration: 500, onComplete: () => f.destroy() }) });
+          } else this.tweens.add({ targets: f, y: r.y - 90, alpha: 0, duration: 1400, onComplete: () => f.destroy() });
         }
         say(this, text.foundHidden, C.good);
       } else {

@@ -1,4 +1,4 @@
-import { ANIMALS, BOSSES, DESERT, FOODS, FOREST, GORILLA, JUNGLE, MOUNTAINS, QUESTS, RECIPES, SHOP } from './data';
+import { ANIMALS, BOSSES, DESERT, FOODS, FOREST, GORILLA, JUNGLE, MOUNTAINS, QUESTS, RECIPES, SEASHORE, SHOP } from './data';
 import {
   buy, canCook, cook, currentQuest, desertOpen, landOpen, loadAnimals, questOpen, questReady, setBossCalm, swipe,
   accept, addFood, calmAmount, canTurnIn, dropsFor, eat, gainXp, makeFoe, maxHearts, moves, newAnimalSave, progress, startCalm, turnIn,
@@ -213,12 +213,29 @@ describe('Animal Kingdom Quest rules', () => {
   });
 
   it('every boss and wild animal has a fact, and every food in a recipe or the shop exists', () => {
-    for (const w of [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...Object.values(BOSSES)]) {
+    for (const w of [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE, ...Object.values(BOSSES)]) {
       expect(w.fact.en.length, w.id).toBeGreaterThan(10);
       expect(w.fact.fr.length, w.id).toBeGreaterThan(10);
       if (w.drop) expect(FOODS.map((f) => f.id)).toContain(w.drop[0]);
     }
     for (const r of RECIPES) for (const id of [r.makes, ...Object.keys(r.needs)]) expect(FOODS.map((f) => f.id)).toContain(id);
     for (const it of SHOP.filter((i) => i.kind === 'food')) expect(FOODS.map((f) => f.id)).toContain(it.id);
+  });
+
+  it('Part 4: the Seashore opens after the snow leopard; turtles, then the octopus', () => {
+    const s = newAnimalSave('Max', 'cat', 4, 0);
+    expect(landOpen(s, 'seashore')).toBe(false);
+    s.leopardCalm = true;
+    expect(landOpen(s, 'seashore')).toBe(true);
+    for (const q of ['pie', 'puppies'] as const) s.quests[q] = 'done';
+    expect(currentQuest(s, 'dogmom')!.id).toBe('turtles');
+    accept(s, 'turtles');
+    s.turtles = ['nest0', 'nest1', 'nest2', 'nest3', 'nest4'];
+    expect(turnIn(s, 'turtles')).not.toBeNull();
+    expect(questReady(s, 'octopus')).toBe(true);
+    accept(s, 'octopus');
+    setBossCalm(s, 'octopus');
+    expect(canTurnIn(s, 'octopus')).toBe(true);
+    expect(SEASHORE.length).toBe(8);
   });
 });

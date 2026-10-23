@@ -111,6 +111,9 @@ export const FOODS: FoodDef[] = [
   { id: 'cocoa', name: t('Hot Cocoa', 'Chocolat chaud'), icon: 'food_cocoa', heal: 8 },
   { id: 'honeycake', name: t('Honey Cake', 'Gâteau au miel'), icon: 'food_honeycake', heal: 18 },
   { id: 'soup', name: t('Mushroom Soup', 'Soupe aux champignons'), icon: 'food_soup', heal: 24 },
+  { id: 'coconut', name: t('Coconut', 'Noix de coco'), icon: 'food_coconut', heal: 6 },
+  { id: 'mango', name: t('Mango', 'Mangue'), icon: 'food_mango', heal: 6 },
+  { id: 'smoothie', name: t('Tropical Smoothie', 'Smoothie tropical'), icon: 'food_smoothie', heal: 22 },
   { id: 'pie', name: t('Apple Pie', 'Tarte aux pommes'), icon: 'food_pie', heal: 99 },
 ];
 
@@ -126,6 +129,7 @@ export const RECIPES: RecipeDef[] = [
   { id: 'bread', makes: 'bread', needs: { banana: 2, date: 1 } },
   { id: 'salad', makes: 'salad', needs: { berries: 1, apple: 1, banana: 1 } },
   { id: 'honeycake', makes: 'honeycake', needs: { honey: 1, date: 1, berries: 1 } },
+  { id: 'smoothie', makes: 'smoothie', needs: { mango: 1, coconut: 1, berries: 1 } },
 ];
 
 /** Hazel Hedgehog's shop: foods, and charms that help for good. */
@@ -145,6 +149,7 @@ export const SHOP: ShopItem[] = [
   { id: 'date', kind: 'food', icon: 'food_date', name: t('Dates', 'Dattes'), info: t('+4 hearts', '+4 cœurs'), price: 12 },
   { id: 'heart', kind: 'charm', icon: 'item_charm_heart', name: t('Heart Charm', 'Breloque cœur'), info: t('+4 hearts for good', '+4 cœurs pour toujours'), price: 150 },
   { id: 'clover', kind: 'charm', icon: 'item_charm_clover', name: t('Clover Charm', 'Breloque trèfle'), info: t('Every move calms a bit more', 'Chaque geste calme un peu plus'), price: 200 },
+  { id: 'mango', kind: 'food', icon: 'food_mango', name: t('Mango', 'Mangue'), info: t('+6 hearts', '+6 cœurs'), price: 14 },
   { id: 'cocoa', kind: 'food', icon: 'food_cocoa', name: t('Hot Cocoa', 'Chocolat chaud'), info: t('+8 hearts, and warms you up', '+8 cœurs, et ça réchauffe'), price: 15 },
   { id: 'scarf', kind: 'charm', icon: 'item_charm_scarf', name: t('Warm Scarf', 'Foulard chaud'), info: t('Stay warm in the Snowy Mountains', 'Reste au chaud dans les montagnes'), price: 100 },
   { id: 'boot', kind: 'charm', icon: 'item_charm_boot', name: t('Speedy Charm', 'Breloque rapide'), info: t('Walk faster everywhere', 'Marche plus vite partout'), price: 120 },
@@ -237,16 +242,33 @@ export const SNOW_LEOPARD: WildDef = {
   fact: t('A snow leopard wraps its long, fluffy tail around itself like a scarf to stay warm.', 'Le léopard des neiges s’enroule dans sa longue queue touffue comme dans un foulard pour avoir chaud.'),
 };
 
+/** Wild animals of the Sunny Seashore (levels 13 to 15). */
+export const SEASHORE: WildDef[] = [
+  { id: 'crab', name: t('Crab', 'Crabe'), sprite: 'wild_crab', grump: 13, swipe: 1, drop: ['coconut', 0.4], xp: 46, fact: t('Most crabs walk sideways, because their legs bend best that way.', 'La plupart des crabes marchent de côté, car leurs pattes plient mieux ainsi.') },
+  { id: 'seagull', name: t('Seagull', 'Goéland'), sprite: 'wild_seagull', grump: 13, swipe: 1, xp: 46, fact: t('Gulls can drink salty sea water: special glands take the salt out.', 'Les goélands peuvent boire de l’eau de mer : des glandes spéciales enlèvent le sel.') },
+  { id: 'starfish', name: t('Sea Star', 'Étoile de mer'), sprite: 'wild_starfish', grump: 13, swipe: 1, drop: ['mango', 0.35], xp: 47, fact: t('A sea star can grow back an arm it has lost.', 'Une étoile de mer peut faire repousser un bras perdu.') },
+  { id: 'puffin', name: t('Puffin', 'Macareux'), sprite: 'wild_puffin', grump: 14, swipe: 1, xp: 49, fact: t('A puffin can carry lots of little fish in its beak at the same time.', 'Le macareux peut transporter plein de petits poissons dans son bec en même temps.') },
+  { id: 'lobster', name: t('Lobster', 'Homard'), sprite: 'wild_lobster', grump: 14, swipe: 1, drop: ['coconut', 0.4], xp: 49, fact: t('A lobster can grow back a lost claw.', 'Un homard peut faire repousser une pince perdue.') },
+  { id: 'seal', name: t('Harbor Seal', 'Phoque commun'), sprite: 'wild_seal', grump: 14, swipe: 1, drop: ['mango', 0.4], xp: 50, fact: t('Harbor seals can stay underwater for up to half an hour.', 'Le phoque commun peut rester sous l’eau jusqu’à une demi-heure.') },
+  { id: 'otter', name: t('Sea Otter', 'Loutre de mer'), sprite: 'wild_otter', grump: 15, swipe: 1, drop: ['mango', 0.5], xp: 52, fact: t('Sea otters hold hands while they sleep so they do not float apart.', 'Les loutres de mer se tiennent la patte en dormant pour ne pas dériver.') },
+  { id: 'walrus', name: t('Walrus', 'Morse'), sprite: 'wild_walrus', grump: 15, swipe: 1, drop: ['coconut', 0.5], xp: 53, fact: t('A walrus uses its long tusks to pull itself up onto the ice.', 'Le morse se sert de ses longues défenses pour se hisser sur la glace.') },
+];
+
+export const OCTOPUS: WildDef = {
+  id: 'octopus', name: t('Grumpy Octopus', 'Pieuvre grognonne'), sprite: 'boss_octopus', grump: 18, swipe: 1, xp: 420,
+  fact: t('An octopus has three hearts and blue blood!', 'La pieuvre a trois cœurs et du sang bleu!'),
+};
+
 /** Every boss, and the quest that asks you to calm it. */
-export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE, moose: MOOSE, snowleopard: SNOW_LEOPARD };
+export const BOSSES: Record<string, WildDef> = { gorilla: GORILLA, tortoise: TORTOISE, moose: MOOSE, snowleopard: SNOW_LEOPARD, octopus: OCTOPUS };
 
 export function wild(id: string): WildDef {
-  return BOSSES[id] ?? [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS].find((w) => w.id === id) ?? JUNGLE[0];
+  return BOSSES[id] ?? [...JUNGLE, ...DESERT, ...FOREST, ...MOUNTAINS, ...SEASHORE].find((w) => w.id === id) ?? JUNGLE[0];
 }
 
 /** The village helpers and their quests. */
 export interface QuestDef {
-  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise' | 'mushrooms' | 'moose' | 'crystals' | 'leopard';
+  id: 'pie' | 'puppies' | 'gorilla' | 'fossils' | 'cook' | 'tortoise' | 'mushrooms' | 'moose' | 'crystals' | 'leopard' | 'turtles' | 'octopus';
   giver: string;
   giverName: Text;
   sprite: string;
@@ -269,7 +291,7 @@ export interface QuestDef {
   where?: LandId;
 }
 
-export type LandId = 'jungle' | 'desert' | 'forest' | 'mountains';
+export type LandId = 'jungle' | 'desert' | 'forest' | 'mountains' | 'seashore';
 
 export const QUESTS: QuestDef[] = [
   {
@@ -346,6 +368,21 @@ export const QUESTS: QuestDef[] = [
     need: 1, acorns: 300, xp: 320, land: 'mountains', where: 'mountains',
     boss: { level: 13, after: ['crystals'] },
   },
+  {
+    id: 'turtles', giver: 'dogmom', giverName: t('Mama Dog', 'Maman Toutou'), sprite: 'npc_dogmom',
+    title: t('Baby sea turtles', 'Les bébés tortues de mer'),
+    ask: t('My puppies saw turtle nests on the Sunny Seashore! The baby turtles are ready to hatch. Can you help 5 of them out of their nests so they can reach the sea?', 'Mes chiots ont vu des nids de tortues sur la plage ensoleillée! Les bébés sont prêts à éclore. Peux-tu en aider 5 à sortir de leur nid pour rejoindre la mer?'),
+    thanks: t('Five little turtles safe in the sea! My puppies cheered so loudly. Thank you!', 'Cinq petites tortues en sécurité dans la mer! Mes chiots ont crié de joie. Merci!'),
+    need: 5, acorns: 150, xp: 280, land: 'seashore',
+  },
+  {
+    id: 'octopus', giver: 'pelican', giverName: t('Captain Pelican', 'Capitaine Pélican'), sprite: 'npc_pelican',
+    title: t('The grumpy octopus', 'La pieuvre grognonne'),
+    ask: t('Ahoy! A grumpy octopus is splashing all the boats at the end of the beach. Nobody can sail! Will you calm her down?', 'Ohé! Une pieuvre grognonne éclabousse tous les bateaux au bout de la plage. Personne ne peut naviguer! Vas-tu la calmer?'),
+    thanks: t('The sea is calm again! Let us have a big beach party to celebrate. You are a true captain!', 'La mer est calme de nouveau! Faisons une grande fête sur la plage pour célébrer. Tu es un vrai capitaine!'),
+    need: 1, acorns: 400, xp: 420, land: 'seashore', where: 'seashore',
+    boss: { level: 16, after: ['turtles'] },
+  },
 ];
 
 export function quest(id: QuestDef['id']): QuestDef {
@@ -356,7 +393,8 @@ export function quest(id: QuestDef['id']): QuestDef {
 export interface LandDef {
   id: LandId;
   name: Text;
-  dir: 'right' | 'down' | 'left' | 'up';
+  /** Which edge of the village leads there (the Seashore is reached by boat). */
+  dir: 'right' | 'down' | 'left' | 'up' | 'boat';
   open: boolean;
   /** The boss that must be calm before this land opens. */
   after?: string;
@@ -367,4 +405,5 @@ export const LANDS: LandDef[] = [
   { id: 'desert', name: t('Desert', 'Désert'), dir: 'down', open: true, after: 'gorilla' },
   { id: 'forest', name: t('Enchanted Forest', 'Forêt enchantée'), dir: 'left', open: true, after: 'tortoise' },
   { id: 'mountains', name: t('Snowy Mountains', 'Montagnes enneigées'), dir: 'up', open: true, after: 'moose' },
+  { id: 'seashore', name: t('Sunny Seashore', 'Plage ensoleillée'), dir: 'boat', open: true, after: 'snowleopard' },
 ];
