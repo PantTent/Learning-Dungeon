@@ -237,10 +237,15 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   const top = [...counts.entries()].filter(([, n]) => n === best).map(([fx]) => fx);
   if (cls.power.fx && top.includes(cls.power.fx)) return cls.power;
   if (top.length > 1) return cls.power;
-  const fx = top[0];
+  return powerFor(cls, top[0]);
+}
+
+/** The ultimate of one spell school, with the class's own name and look for it. */
+export function powerFor(cls: ClassDef, fx: Fx): PowerDef {
   // Necromancers raise an army for shadow magic.
   if (fx === 'shadow' && cls.id === 'necromancer') return cls.power;
-  const pw = SCHOOL_POWERS[fx]!;
+  const pw = SCHOOL_POWERS[fx];
+  if (!pw) return cls.power;
   const name = CLASS_POWER_NAMES[cls.id]?.[fx];
   // Rangers call spirit animals instead of plain vines.
   if (cls.id === 'ranger' && fx === 'nature') return { ...pw, name: name!, style: 'wild' };
@@ -251,4 +256,21 @@ export function activePower(cls: ClassDef, level: number, chosen: string[] | und
   // Necromancers lock the enemy in a tomb of ice.
   if (cls.id === 'necromancer' && fx === 'frost') return { ...pw, name: name!, style: 'tomb' };
   return name ? { ...pw, name } : pw;
+}
+
+/** Every ultimate a class can get: its own, plus one for each spell school it uses. */
+export function classPowers(cls: ClassDef): PowerDef[] {
+  const out: PowerDef[] = [cls.power];
+  for (const sk of cls.skills) {
+    if (sk.fx === 'heal' || !SCHOOL_POWERS[sk.fx]) continue;
+    const pw = powerFor(cls, sk.fx);
+    if (!out.some((x) => x.name === pw.name)) out.push(pw);
+  }
+  return out;
+}
+
+/** A surprise: any of the class's ultimates, at random. */
+export function randomPower(cls: ClassDef, rand: () => number = Math.random): PowerDef {
+  const all = classPowers(cls);
+  return all[Math.floor(rand() * all.length)];
 }

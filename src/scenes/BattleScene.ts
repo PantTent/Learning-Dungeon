@@ -4,7 +4,7 @@ import { makeEnemy, RARE_TIERS, xpFor, type EnemyInstance, type RareTier } from 
 import { AREAS, areaOf, type AreaDef } from '../data/areas';
 import { POTIONS, tierForLevel, type PotionDef } from '../data/potions';
 import { openPotionMenu } from '../ui/potionMenu';
-import { MAX_CHOSEN, activePower, chosenFamilies, chosenSpells, familyOf, petHealthShare } from '../data/spells';
+import { MAX_CHOSEN, randomPower, chosenFamilies, chosenSpells, familyOf, petHealthShare } from '../data/spells';
 import { spellLabel } from '../ui/spellText';
 import { ICON, itemColor, itemCss, makeItem, RARITY, STAT_LABEL, type Item, type Rarity } from '../data/items';
 import { makeSetItem } from '../data/sets';
@@ -326,7 +326,7 @@ export class BattleScene extends Phaser.Scene {
       if (this.isBoss && !p.dev) {
         c.add(txt(this, 320, H - 150, tr('Your power is saved for after the boss!'), 15, '#ffe9a0').setOrigin(0.5));
       } else {
-        const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${tr(this.ultimate().name)}! \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
+        const pb = button(this, 320, H - 152, 360, 46, `\u2605 ${tr('Surprise Ultimate!')} \u2605`, () => this.chooseSkill(this.powerSkill()), { size: 22, color: 0xb07a10 });
         fitLabel(pb, 360, 46, 22);
         c.add(pb);
         this.tweens.add({ targets: pb, scale: 1.06, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
@@ -413,16 +413,17 @@ export class BattleScene extends Phaser.Scene {
 
   // ------------------------------------------------------------ power attack
 
-  /** This hero's ultimate: it matches the school most of their chosen spells use. */
+  /** The next ultimate: a surprise, any of the class's ultimates (picked again after each one). */
+  private nextPower?: PowerDef;
+
   private ultimate(): PowerDef {
-    const p = current();
-    return activePower(classOf(p), p.level, p.spells);
+    return (this.nextPower ??= randomPower(classOf(current())));
   }
 
   private powerSkill(): SkillDef {
     const cls = classOf(current());
     const pw = this.ultimate();
-    return { id: 'power', name: `\u2605 ${tr(pw.name)}`, desc: 'Super attack!', unlock: 1, mp: 0, kind: 'damage', power: 3, fx: pw.fx ?? cls.skills[0].fx };
+    return { id: 'power', name: `\u2605 ${tr('Surprise Ultimate!')}`, desc: 'Super attack!', unlock: 1, mp: 0, kind: 'damage', power: 3, fx: pw.fx ?? cls.skills[0].fx };
   }
 
   /** 3 right in a row charges the power; using it (right or wrong) spends it. */
@@ -1067,10 +1068,13 @@ export class BattleScene extends Phaser.Scene {
     const p = current();
     const after = () => this.time.delayedCall(350, () => this.afterPlayerAction());
     if (sk.id === 'power') {
-      this.powerAnim(this.ultimate(), target, () => {
+      const pw = this.ultimate();
+      // The next one is a new surprise.
+      this.nextPower = undefined;
+      this.powerAnim(pw, target, () => {
         const r = this.calcDamage(sk, target, correct);
         this.hit(target, r, correct, sk.fx);
-        this.floatText(target.sprite.x, target.sprite.y - 140, correct ? tr('x3 POWER!') : tr('x1.5 (half power)'), correct ? this.ultimate().css : '#ffb36b', 26);
+        this.floatText(target.sprite.x, target.sprite.y - 140, correct ? tr('x3 POWER!') : tr('x1.5 (half power)'), correct ? pw.css : '#ffb36b', 26);
         this.time.delayedCall(500, after);
       });
       return;

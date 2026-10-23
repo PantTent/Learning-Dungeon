@@ -198,4 +198,7 @@ export const FR_MENUS: Record<string, string> = {
   "You said {given}, but the answer is {answer}.": "Tu as dit {given}, mais la réponse est {answer}.",
   "Listen...": "Écoute...",
   "Hear it again": "Réécouter",
+  "Surprise Ultimate!": "Attaque ultime surprise!",
+  "Ultimate: a surprise every time!": "Attaque ultime : une surprise à chaque fois!",
+  "It can be: {list}": "Ça peut être : {list}",
 };

@@ -1,5 +1,5 @@
 import { CLASSES } from './classes';
-import { MAX_CHOSEN, activePower, bestRank, chosenSpells, families, familyName, manaCost, nextRank } from './spells';
+import { MAX_CHOSEN, activePower, classPowers, randomPower, bestRank, chosenSpells, families, familyName, manaCost, nextRank } from './spells';
 
 describe('spellbooks', () => {
   for (const c of CLASSES) {
@@ -59,6 +59,23 @@ describe('ultimate follows the chosen spells', () => {
   it('druids get Starfall from moon magic', () => {
     const druid = CLASSES.find((c) => c.id === 'druid')!;
     expect(activePower(druid, 20, ['moonfire1', 'starsurge', 'rejuv1']).name).toBe('Starfall');
+  });
+});
+
+describe('surprise ultimates', () => {
+  it('the mage can get fire, ice, lightning or arcane, at random', () => {
+    const mage = CLASSES.find((c) => c.id === 'mage')!;
+    expect(new Set(classPowers(mage).map((p) => p.fx))).toEqual(new Set(['fire', 'frost', 'lightning', 'arcane']));
+    const seen = new Set(Array.from({ length: 400 }, () => randomPower(mage).name));
+    expect(seen.size).toBe(classPowers(mage).length);
+  });
+  it('every class has at least 2 different ultimates, all with a look', () => {
+    for (const c of CLASSES) {
+      const all = classPowers(c);
+      expect(all.length, c.id).toBeGreaterThanOrEqual(2);
+      expect(new Set(all.map((p) => p.name)).size).toBe(all.length);
+      for (const p of all) expect(p.style, p.name).toBeTruthy();
+    }
   });
 });
 

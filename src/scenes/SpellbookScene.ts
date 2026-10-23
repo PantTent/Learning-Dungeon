@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/audio';
-import { MAX_CHOSEN, activePower, bestRank, chosenFamilies, chosenSpells, families, familyName, familyOf, nextRank, petHealthShare } from '../data/spells';
+import { MAX_CHOSEN, classPowers, bestRank, chosenFamilies, chosenSpells, families, familyName, familyOf, nextRank, petHealthShare } from '../data/spells';
 import type { Fx, SkillDef } from '../data/classes';
 import { classOf, current, derive, saveProfile } from '../state/profile';
 import { C, H, W, button, panel, toast, txt } from '../ui/widgets';
@@ -72,14 +72,10 @@ export class SpellbookScene extends Phaser.Scene {
       }
     }
 
-    // The ultimate follows the school most chosen spells use.
-    const pw = activePower(cls, p.level, p.spells);
-    const same = chosen.filter((x) => x.fx === pw.fx).length;
-    const why = same >= 2
-      ? tr('(most of your spells are {school}. Pick spells of one kind to change it!)', { school: tr(FX_NAME[pw.fx ?? 'slash']) })
-      : tr('(the {cls} ultimate. Pick spells of one kind to change it!)', { cls: tr(cls.name) });
-    c.add(txt(this, W / 2, 452, `\u2605 ${tr('Ultimate: {name}', { name: tr(pw.name) })} \u2605`, 22, pw.css).setOrigin(0.5));
-    c.add(txt(this, W / 2, 482, why, 14, C.dim).setOrigin(0.5));
+    // The ultimate is a surprise: any of the class's ultimates, at random.
+    const all = classPowers(cls);
+    c.add(txt(this, W / 2, 452, `\u2605 ${tr('Ultimate: a surprise every time!')} \u2605`, 22, '#ffd24a').setOrigin(0.5));
+    c.add(txt(this, W / 2, 482, tr('It can be: {list}', { list: all.map((x) => tr(x.name)).join(', ') }), 14, C.dim, { align: 'center', wordWrap: { width: W - 80 } }).setOrigin(0.5));
 
     // Every spell once, at its best rank. All cards are the same size.
     const CW = 284;
